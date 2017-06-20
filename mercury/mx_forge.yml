@@ -1,0 +1,43 @@
+---
+
+globals:
+        project_dir: $METL_HOME
+        service_module: mx_services
+        log_directory: /home/dtaylor/workshop/element/metal/logs
+
+service_objects:
+        redis:
+            class:
+                RedisServiceObject
+            init_params:
+                - name: host
+                  value: localhost
+
+                - name: port
+                  value: 6379
+
+                - name: transformed_record_queue_name
+                  value: transformed_record_ids
+
+                - name: raw_record_queue_name
+                  value: raw_record_ids
+
+                - name: generator_user_map_name
+                  value: generator_user_map
+
+
+        couchbase:      
+            class:
+                CouchbaseServiceObject
+            init_params:
+                - name: host
+                  value: localhost
+
+                - name: data_bucket_name
+                  value: metl_data
+
+                - name: journal_bucket_name
+                  value: metl_journal
+
+                - name: cache_bucket_name
+                  value: metl_cache

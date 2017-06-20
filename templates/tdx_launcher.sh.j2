@@ -1,0 +1,9 @@
+#!/bin/bash
+
+cd {{ tdx_home  }}
+./clear_pipeline.sh
+./preload_cache.py metl.yml
+./extract_order_lineitems.py metl.yml --frames 13 --size 500000 --bucket {{ s3_bucket }}
+./transform_order_lineitems.py metl.yml --frames 40 --size 100000
+./load_order_lineitems.py metl.yml --frames 40 --size 100000 --bucket {{ s3_bucket }}
+ 

@@ -1,0 +1,135 @@
+---
+
+globals:
+        project_dir: $TDX_HOME
+        service_module: tdx_services
+        num_segments: 5
+        pipeline_id: order.starschema
+        log_directory: /tmp
+
+
+
+service_objects:
+
+        redshift:
+            class:
+                RedshiftServiceObject
+            init_params:
+                - name: host
+                  value: $REDSHIFT_HOST
+
+                - name: port
+                  value: 5439
+
+                - name: username
+                  value: readonly
+
+                - name: db_name
+                  value: analytics
+
+                - name: schema
+                  value: pgcore_orders
+
+
+        redshift_sandbox:
+            class:
+                RedshiftServiceObject
+            init_params:
+                - name: host
+                  value: $REDSHIFT_HOST
+
+                - name: port
+                  value: 5439
+
+                - name: username
+                  value: admin
+
+                - name: db_name
+                  value: sandbox
+
+                - name: schema
+                  value: public
+
+
+        redshift_extract:
+            class:
+                RedshiftServiceObject
+            init_params:
+                - name: host
+                  value: $REDSHIFT_HOST
+
+                - name: port
+                  value: 5439
+
+                - name: username
+                  value: readonly
+
+                - name: db_name
+                  value: analytics
+
+                - name: schema
+                  value: extract
+
+        redis:
+            class:
+                RedisServiceObject
+            init_params:
+                - name: host
+                  value: localhost
+
+                - name: port
+                  value: 6379
+
+                - name: transformed_record_queue_name
+                  value: transformed_record_ids
+
+                - name: raw_record_queue_name
+                  value: raw_record_ids
+
+                - name: generator_user_map_name
+                  value: generator_user_map
+
+
+        couchbase:      
+            class:
+                CouchbaseServiceObject
+            init_params:
+                - name: host
+                  value: localhost
+
+                - name: data_bucket_name
+                  value: tdx_data
+
+                - name: journal_bucket_name
+                  value: tdx_journal
+
+                - name: cache_bucket_name
+                  value: tdx_cache
+
+
+
+phase:
+        extract:
+                globals:
+                        logfile:
+                        lockfile:       
+                        redshift_host:
+                        redshift_port:
+                        redshift_db:
+                        redshift_schema:
+
+
+
+
+
+
+phase:
+        extract:
+                params:
+                        - name: page_size
+                          value: 10
+
+                          name: page_range
+                          value: 0-5
+
+

@@ -1,0 +1,144 @@
+#!/usr/bin/env python
+
+'''Usage: load_touches.py <initfile> [--segment=<segment_number>] (--frames <num_frames>) (--size <framesize>) (--bucket <s3_bucket>) (--out <output_filename>) [-p]
+
+   Options: 
+       --segment=<segment_number>    only load records labeled with this segment number
+       -p   --preview      generate (but do not upload) output records 
+       -s   --size         number of records per reading frame
+       -f   --frames       number of consecutive reading frames to open
+       -b   --bucket       target S3 bucket
+       -o   --out          name of output file
+'''
+
+
+import docopt
+import os, sys
+from snap import snap
+from snap import couchbasedbx as cbx
+from snap import common
+import tdxutils as tdx
+import keygen
+import constants as const
+import logging
+import datetime, time, arrow
+import yaml
+import tablib
+import couchbase
+
+LOG_TAG = 'METL_load'
+
+
+def log_tag(pipeline_id):
+    return '%s.%s' % (pipeline_id, LOG_TAG.lower())
+
+
+def get_cooked_records(record_type_name, segment_num, reading_frame, couchbase_pmgr, record_id_queue):
+    range_start = reading_frame.index_number * reading_frame.size
+    range_end = range_start + reading_frame.size - 1
+
+    ids = record_id_queue.range(range_start, range_end)
+    results = []
+    for id in ids:
+        raw_record = couchbase_pmgr.lookup_record_raw(id)
+        results.append(cbx.CouchbaseRecordBuilder(record_type_name).add_fields(raw_record).build())
+
+    return results
+
+
+def compile_fact_records(src_doc, rs_connection, couchbase_pmgr, pipeline_info_mgr, log):
+    log.info('calling stubbed-out compile_fact_records function in pipeline %s' % (pipeline_info_mgr.id))
+    
+    outbound_records = []    
+    outbound_records.append(dict(foo = 'test data', bar = 'more test data', bazz = 'yet more test data'))
+    return outbound_records
+
+
+def main(args):
+    print tdx.jsonpretty(args)
+
+    num_reading_frames = int(args.get('<num_frames>', -1))
+    reading_frame_size = int(args.get('<framesize>', -1))
+    output_filename = args['<output_filename>']
+    segment = args.get('--segment', -1)  
+    initial_reading_frame = None
+    paging_context = None
+    if num_reading_frames > 0 and reading_frame_size > 0:
+        paging_context = tdx.PagingContext(num_reading_frames, reading_frame_size)
+        
+    init_filename = args['<initfile>']
+    yaml_config = common.read_config_file(init_filename)
+    num_segments = int(yaml_config['globals'].get('num_segments', -1))
+    pipeline_id = yaml_config['globals']['pipeline_id']
+    job_id = tdx.generate_job_id('load', pipeline_id)
+    log_filename = tdx.generate_logfile_name(job_id)
+    log = tdx.init_logging(log_tag(pipeline_id), log_filename, logging.INFO)
+
+    service_objects = snap.initialize_services(yaml_config, log)
+    so_registry = common.ServiceObjectRegistry(service_objects)
+    redshift_svc = so_registry.lookup('redshift_sandbox')
+    password = os.getenv('REDSHIFT_PASSWORD')
+    redshift_svc.login(password)
+    s3_bucket_name = args['<s3_bucket>']
+    
+    couchbase_svc = so_registry.lookup('couchbase')
+    couchbase_svc.data_manager.register_keygen_function(const.RECTYPE_TOUCH, keygen.generate_touch_key)
+    couchbase_svc.data_manager.register_keygen_function(const.RECTYPE_TOUCH_TRANSFORMED, keygen.generate_transformed_touch_key)
+    
+    redis_svc = so_registry.lookup('redis')    
+    transformed_record_id_queue = redis_svc.get_transformed_record_queue(pipeline_id)
+
+    pipeline_info_mgr = tdx.PipelineInfoManager(pipeline_id,                                                
+                                                couchbase_svc.journal_manager)
+
+    job_dbkey = pipeline_info_mgr.record_job_start(job_id, args)
+
+    print '%s script started at %s, logging to %s...' % (job_id, datetime.datetime.now().isoformat(), log_filename)
+    log.info('jobid %s in pipeline %s started at %s' % (job_id, pipeline_id, datetime.datetime.now().isoformat()))
+    start_time = time.time()
+
+    paging_context = tdx.PagingContext(num_reading_frames, reading_frame_size)
+    reading_frame = paging_context.initial_reading_frame()
+    pages_remaining = paging_context.num_frames_to_read
+
+    record_headers = ['foo', 'bar', 'bazz']
+    output_data = tablib.Dataset()
+    num_records_processed = 0
+    num_facts_compiled = 0
+
+    with redshift_svc.get_connection() as conn:
+        while pages_remaining:
+            log.info('receiving touch keys for page %d...' % reading_frame.index_number)
+            
+            cooked_records = get_cooked_records(const.RECTYPE_TOUCH_TRANSFORMED, segment, reading_frame, couchbase_svc.data_manager, transformed_record_id_queue)
+            for rec in cooked_records:
+                
+                fact_records = compile_fact_records(rec, conn, couchbase_svc.cache_manager, pipeline_info_mgr, log)
+                for fact in fact_records:
+                    num_facts_compiled += 1
+                    output_fields = [fact[key] for key in record_headers]
+                    output_data.append(output_fields)
+
+                    if not num_facts_compiled % 50000:
+                        log.info('%d fact records compiled.' % num_facts_compiled)
+                        
+            num_records_processed += len(cooked_records)
+            if num_records_processed % 100000 == 0:
+                log.info('+++ %d records loaded.' % (num_records_processed))
+
+            reading_frame = reading_frame.shift_right()            
+            pages_remaining -= 1
+
+    with open(output_filename, 'wb') as output_file:
+        output_file.write(output_data.csv)
+
+    end_time = time.time()
+    log.info('%d records processed.' % (num_records_processed))
+    log.info('%d fact records compiled.' % (num_facts_compiled))
+    log.info('Total running time %s' % (tdx.hms_string(end_time - start_time)))
+    pipeline_info_mgr.record_job_end(job_dbkey)
+
+
+if __name__=='__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

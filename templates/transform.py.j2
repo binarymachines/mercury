@@ -1,0 +1,75 @@
+#!/usr/bin/env python
+
+'''Usage: transform_touches.py <initfile> (--frames <num_frames>) (--size <framesize>)
+
+   Options:
+         -f --frames    number of reading frames to open
+         -s --size      size of each reading frame
+'''
+
+
+import docopt
+import os, sys
+from snap import snap
+from snap import couchbasedbx as cbx
+from snap import common
+import tdxutils as tdx
+import logging
+import datetime, time, arrow
+import yaml
+import couchbase
+
+LOG_TAG = 'METL_transform'
+
+
+def log_tag(pipeline_id):
+    return '%s.%s' % (pipeline_id, LOG_TAG.lower())
+
+
+def main(args):
+    print tdx.jsonpretty(args)
+
+    num_reading_frames = int(args.get('<num_frames>', -1))
+    reading_frame_size = int(args.get('<framesize>', -1))
+    segment = -1  
+    initial_reading_frame = None
+    paging_context = None
+    if num_reading_frames > 0 and reading_frame_size > 0:
+        paging_context = tdx.PagingContext(num_reading_frames, reading_frame_size)
+        
+    init_filename = args['<initfile>']    
+    yaml_config = common.read_config_file(init_filename)
+    num_segments = int(yaml_config['globals'].get('num_segments', -1))
+    pipeline_id = yaml_config['globals']['pipeline_id']
+    job_id = tdx.generate_job_id('transform', pipeline_id)
+    log_filename = tdx.generate_logfile_name(job_id)
+    log = tdx.init_logging(log_tag(pipeline_id), log_filename, logging.INFO)
+
+    service_objects = snap.initialize_services(yaml_config, log)
+    so_registry = common.ServiceObjectRegistry(service_objects)
+    couchbase_svc = so_registry.lookup('couchbase')
+    redis_svc = so_registry.lookup('redis')
+    raw_record_id_queue = redis_svc.get_raw_record_queue(pipeline_id)
+
+    pipeline_info_mgr = tdx.PipelineInfoManager(pipeline_id,                                                
+                                                couchbase_svc.journal_manager)
+
+    job_dbkey = pipeline_info_mgr.record_job_start(job_id, args)
+
+    print '%s script started at %s, logging to %s...' % (job_id, datetime.datetime.now().isoformat(), log_filename)
+    log.info('jobid %s in pipeline %s started at %s' % (job_id, pipeline_id, datetime.datetime.now().isoformat()))
+    start_time = time.time()
+
+    
+
+
+    
+    end_time = time.time()
+    log.info('Total running time %s' % (tdx.hms_string(end_time - start_time)))
+    pipeline_info_mgr.record_job_end(job_dbkey)
+    
+
+    
+if __name__=='__main__':
+    args = docopt.docopt(__doc__)
+    main(args)
