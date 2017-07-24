@@ -4,7 +4,8 @@
 '''
 
 import docopt
-from snap import common, snap, redisx
+from snap import common
+import redisx
 import tdx_services
 import tdxutils as tdx
 import logging

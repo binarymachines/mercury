@@ -11,7 +11,8 @@ import yaml
 import logging
 import metl_utils as metl
 import cli_tools as cli
-from snap import snap, common
+import snap
+from snap import common
 
 
 

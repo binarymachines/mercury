@@ -27,7 +27,7 @@ import tablib
 import boto3
 from couchbase.n1ql import N1QLQuery
 from couchbase.exceptions import *
-from snap import common, snap
+from snap import common
 import constants as const
 import cb_queries
 import tdxutils as tdx

@@ -5,7 +5,7 @@
 
 from __future__ import division
 import snap
-from snap import sqldbx
+import sqldbx
 import getpass
 import datetime, time
 import os
@@ -17,7 +17,7 @@ import yaml
 import arrow
 import tablib
 import boto3
-from snap import common, snap
+from snap import common
 import couchbase
 import constants as const
 import tdxutils as tdx
