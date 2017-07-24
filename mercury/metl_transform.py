@@ -5,9 +5,9 @@
 
 from __future__ import division
 import snap
-from snap import couchbasedbx as cbx
-from snap import sqldbx
-from snap import common, snap
+from snap import common
+import couchbasedbx as cbx
+import sqldbx
 import getpass
 import datetime, time
 import os

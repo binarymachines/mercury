@@ -2,8 +2,8 @@
 
 import os
 import logging
-from snap import couchbasedbx as cbx
-from snap import journaling
+import couchbasedbx as cbx
+import journaling
 import datetime
 import boto3
 import json

@@ -12,9 +12,10 @@ import constants as const
 import datetime
 import tdxutils as tdx
 import couchbase
-from snap import snap
-from snap import couchbasedbx as cbx
+import snap
 from snap import common
+import couchbasedbx as cbx
+
 
 
 

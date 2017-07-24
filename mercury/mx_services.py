@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 
-from snap import sqldbx
-from snap import couchbasedbx as cbx
-from snap import redisx
+import sqldbx
+import couchbasedbx as cbx
+import redisx
 
 
 

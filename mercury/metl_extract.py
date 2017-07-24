@@ -7,13 +7,11 @@
 
 import os, fnmatch
 import tempfile
-from snap import couchbasedbx as cbx
-from snap import sqldbx
-from snap import common, snap
-from snap import csvutils as csvu
-from snap import journaling as journaling
-from snap.journaling import *
-from snap import redisx
+import couchbasedbx as cbx
+import sqldbx
+import csvutils as csvu
+from journaling import *
+import redisx
 
 import getpass
 import time
