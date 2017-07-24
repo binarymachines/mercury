@@ -1,3 +1,5 @@
+# Makefile for Mercury data management framework
+
 HOST=127.0.0.1
 TEST_PATH=./tests
 RECIPEPREFIX= # prefix char is a space, on purpose; do not delete
