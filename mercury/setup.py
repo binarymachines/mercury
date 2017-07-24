@@ -10,7 +10,7 @@ from jinja2 import Template
 import logging
 import time
 import tdxutils as tdx
-from snap import ansiblex as anx
+import ansiblex as anx
 from snap import common
 
 
