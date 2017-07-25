@@ -485,7 +485,33 @@ class BulkTransferAgent(object):
 
         transfer_func(self._svc_registry, log, **kwargs)
 
- 
+
+def dimension_id_lookup_func(value, dim_table_name, key_field_name, value_field_name, **kwargs):
+    if not value:
+        return None
+
+    else:
+        db_schema = 'olap'
+        raw_template = """
+            SELECT {field}
+            from {schema}.{table}
+            where {dim_table_value_field_name} = :source_value""".format(schema=db_schema,
+                                                                         field=key_field_name,
+                                                                         table=dim_table_name,
+                                                                         dim_table_value_field_name=value_field_name)
+        template = text(raw_template)
+        stmt = template.bindparams(bindparam('source_value', String))
+
+        data_mgr = kwargs['persistence_manager']
+        dbconnection = data_mgr.database.engine.connect()
+        # db_session = data_mgr.getSession()
+
+        result = dbconnection.execute(stmt, {"source_value": value})
+        record = result.fetchone()
+        if not record:
+            raise Exception('returned empty result set from query: %s where value is %s' % (str(stmt), value))
+
+        return record[0]
 
 class OLAPSchemaDimension(object):
     def __init__(self, **kwargs):
