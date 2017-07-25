@@ -18,6 +18,7 @@ import types
 import os
 import exceptions
 import sys
+from contextlib import contextmanager
 
 
 class NoSuchTableError(Exception):
@@ -25,7 +26,7 @@ class NoSuchTableError(Exception):
         Exception.__init__(self, "No table named '%s' exists in database schema '%s'." % (tableName, schemaName))
 
 
-Session = scoped_session(sessionmaker(autoflush=False, autocommit=False, expire_on_commit=False))
+
 
 
 class SQLDataTypeBuilder(object):
@@ -113,8 +114,8 @@ class Database:
         self.port = port
         self.schema = schema
         self.engine = None
-        self.metadata = None
-        
+        self.metadata = None        
+        self._session_factory = None
     
 
     def __createURL__(self, dbType, username, password):
@@ -122,7 +123,7 @@ class Database:
         pass
 
 
-    def jdbcURL(self):
+    def jdbc_url(self):
         """Return the connection URL without user credentials."""
         return 'jdbc:%s://%s:%s/%s' % (self.dbType, self.host, self.port, self.schema)
 
@@ -137,24 +138,22 @@ class Database:
         else:
             self.metadata = sqla.MetaData(self.engine)
         self.metadata.reflect(bind=self.engine)
-        
-        #self.sessionFactory.configure(bind=self.engine)
-        Session.configure(bind=self.engine)
+        self._session_factory = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
         
 
-    def getMetaData(self):
+    def get_metadata(self):
         return self.metadata
 
-    def getEngine(self):
+    def get_engine(self):
         return self.engine
 
-    def getSession(self):
-        return Session()
+    def get_session(self):        
+        return self._session_factory()
 
-    def listTables(self):
+    def list_tables(self):
         return self.metadata.tables.keys()
 
-    def getTable(self, name):
+    def get_table(self, name):
         """Passthrough call to SQLAlchemy reflection logic. 
 
         Arguments:
@@ -170,6 +169,19 @@ class Database:
         return self.metadata.tables[name]
 
 
+@contextmanager
+def txn_scope(database):
+    session = database.getSession()
+    try:
+        yield session
+        session.commit()
+    except:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
 
 class SQLServerDatabase(Database):
     '''Database type for connecting to Microsoft SQL Server instances
@@ -179,7 +191,7 @@ class SQLServerDatabase(Database):
         Database.__init__(self, 'mssql', host, schema, port)
 
 
-    def __createURL__(self, dbtype, username, password):
+    def __create_url__(self, dbtype, username, password):
         return '%s+pymssql://%s:%s@%s:%s/%s' % (self.dbType, username, password, self.host, self.port, self.schema)
 
 
@@ -191,7 +203,7 @@ class MySQLDatabase(Database):
         Database.__init__(self, "mysql", host, schema, port)
 
 
-    def __createURL__(self, dbType, username, password):
+    def __create_url__(self, dbType, username, password):
         return "%s://%s:%s@%s:%d/%s" % (self.dbType, username, password, self.host, self.port, self.schema)
 
 
@@ -203,7 +215,7 @@ class PostgreSQLDatabase(Database):
         Database.__init__(self, "postgresql+psycopg2", host, schema, port)
 
 
-    def __createURL__(self, dbType, username, password):
+    def __create_url__(self, dbType, username, password):
         return "%s://%s:%s@%s:%d/%s" % (self.dbType, username, password, self.host, self.port, self.schema)
 
 
@@ -227,7 +239,7 @@ class PersistenceManager:
         self._typeMap = {}
         self.modelAliasMap = {}
         self.database = database
-        self.metaData = self.database.getMetaData()
+        self.metaData = self.database.get_metadata()
         self.pluginTable = {}
         self.mappers = {}
 
@@ -235,14 +247,14 @@ class PersistenceManager:
     def __del__(self):
         clear_mappers()
 
-    def getSession(self):
-        return self.database.getSession()
+    def get_session(self):
+        return self.database.get_session()
 
-    def refreshMetaData(self):
-        self.metaData = self.database.getMetaData()
+    def refresh_metadata(self):
+        self.metaData = self.database.get_metadata()
 
 
-    def loadTable(self, tableName):
+    def load_table(self, tableName):
         """Retrieve table data using SQLAlchemy reflection"""
 
         return sqlalchemy.schema.Table(tableName, self.metaData, autoload = True)
@@ -289,7 +301,7 @@ class PersistenceManager:
         return session.query(objectType)
 
 
-    def mapTypeToTable(self, modelClassName, tableName, **kwargs):
+    def map_type_to_table(self, modelClassName, tableName, **kwargs):
         """Call-through to SQLAlchemy O/R mapping routine. Creates an SQLAlchemy mapper instance.
 
         Arguments:
@@ -312,7 +324,7 @@ class PersistenceManager:
         self._typeMap[modelClassName] = dbTable
         
     
-    def mapParentToChild(self, parentTypeName, parentTableName, parentTypeRefName, childTypeName, childTableName, childTypeRefName, **kwargs):
+    def map_parent_to_child(self, parentTypeName, parentTableName, parentTypeRefName, childTypeName, childTableName, childTypeRefName, **kwargs):
         """Create a parent-child (one to many relationship between two DB-mapped entities in SQLAlchemy's O/R mapping layer.
 
         Arguments:
@@ -340,7 +352,7 @@ class PersistenceManager:
 
 
 
-    def mapPeerToPeer(self, parentTypeName, parentTableName, parentTypeRefName, peerTypeName, peerTableName, peerTypeRefName, **kwargs):
+    def map_peer_to_peer(self, parentTypeName, parentTableName, parentTypeRefName, peerTypeName, peerTableName, peerTypeRefName, **kwargs):
         """Create a peer-peer (one to one) relationship between two DB-mapped entities in SQLAlchemy's O/R mapping layer.
 
         Arguments:
@@ -368,13 +380,13 @@ class PersistenceManager:
        
 
 
-    def getTableForType(self, modelName):
+    def get_table_for_type(self, modelName):
         if modelName not in self.modelAliasMap:
             raise NoTypeMappingError(modelName)
         
         return self._typeMap[self.modelAliasMap[modelName]]
 
-    def retrieveAll(self, objectTypeName, session):
+    def retrieve_all(self, objectTypeName, session):
         objClass = self.str_to_class(objectTypeName)
         resultSet = session.query(objClass).all()
         return resultSet
@@ -388,14 +400,15 @@ class PersistenceManager:
     def delete(self, object, session):
         session.delete(object)
 
-    def loadByKey(self, objectTypeName, objectID, session):
+    def load_by_key(self, objectTypeName, objectID, session):
         query = session.query(self.str_to_class(objectTypeName)).filter_by(id = objectID)
         return query.first()
 
-    def registerPlugin(self, plugin, name):
+    def register_plugin(self, plugin, name):
         self.pluginTable[name] = plugin
 
-    def callPlugin(self, pluginName, targetObject):
+
+    def call_plugin(self, pluginName, targetObject):
         plugin = self.pluginTable[pluginName]
         if plugin == None:
             raise NoSuchPluginError(pluginName)
@@ -410,7 +423,7 @@ class PersistenceManagerPlugin:
     def __init__(self):
         pass
         
-    def performOperation(self, persistenceMgr, object):
+    def perform_operation(self, persistenceMgr, object):
         method = getattr(self, 'execute')
         
         return method(persistenceMgr, object)
