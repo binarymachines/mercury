@@ -7,7 +7,8 @@ import time
 import datetime
 import json
 import docopt
-import common
+from snap import snap
+from snap import common
 import sqldbx as sqlx
 import couchbasedbx as cbx
 import logging
@@ -285,7 +286,8 @@ class KafkaIngestRecordReader(object):
                                        consumer_timeout_ms=5000)
 
         #self._consumer.subscribe(topic)
-
+        #self._num_commits = 0
+        
 
     def read(self, data_relay, logger, **kwargs): # insist on passing a checkpoint_frequency as kwarg?
 
@@ -335,7 +337,8 @@ class KafkaIngestRecordReader(object):
                 logger.error('Final checkpoint command threw an exception: %s' % str(err))
             finally:    
                 checkpoint_timer.stop()
-        
+
+        return num_commits
 
 
     @property
