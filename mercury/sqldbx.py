@@ -118,7 +118,7 @@ class Database:
         self._session_factory = None
     
 
-    def __createURL__(self, dbType, username, password):
+    def __create_url__(self, dbType, username, password):
         """Implement in subclasses to provide database-type-specific connection URLs."""
         pass
 
