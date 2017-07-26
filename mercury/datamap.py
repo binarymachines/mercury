@@ -2,7 +2,7 @@
 
 
 import csv
-import common
+from snap import common
 import yaml
 import sqldbx as sqlx
 
