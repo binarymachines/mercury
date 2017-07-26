@@ -264,6 +264,7 @@ def main(args):
 
     elif filter_mode:
         # Filter source records for schema compliance
+        schema_config_file = args.get('--schema')
         record_type = args.get('--rtype')        
         required_fields = get_required_fields(record_type, schema_config_file)
         header_fields = get_all_fields(record_type, schema_config_file)
