@@ -638,7 +638,7 @@ class OLAPSchemaMappingContext(object):
 
     def get_fact_values(self, source_record, **kwargs):
         data = {}
-        print '### source record info: %s'%  source_record
+        #print '### source record info: %s'%  source_record
 
         for src_record_field_name in self._direct_mappings.keys():
             non_dimension_field = self._direct_mappings[src_record_field_name]

@@ -101,6 +101,9 @@ class RecordTransformer:
 
 
     def lookup(self, target_field_name, source_record):
+        record_value = source_record.get(target_field_name)
+        if record_value != None and record_value != '':
+            return record_value
         datasource = self.datasources.get(target_field_name)
         if not datasource:
             raise NoDatasourceForFieldException(target_field_name)

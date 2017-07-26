@@ -13,9 +13,9 @@
 import yaml
 import docopt
 import logging
-import telegraf as tg
-import datamap as dmap
-import sqldbx
+from mercury.mercury import telegraf as tg
+from mercury.mercury import datamap as dmap
+from mercury.mercury import sqldbx
 from kafka import TopicPartition, KafkaConsumer
 from sqlalchemy import Integer, String, DateTime, Float, Boolean, text, and_, bindparam
 from sqlalchemy.dialects.mssql import UNIQUEIDENTIFIER
@@ -173,7 +173,7 @@ def scb_to_direct_olap(pipeline_config, pgsql_host, pgsql_username, pgsql_passwo
     mapping_context = tg.OLAPSchemaMappingContext(fact)
     mapping_context.map_src_record_field_to_dimension('agreement_id', dim_agreement_category)
     mapping_context.map_src_record_field_to_dimension('class_of_trade', dim_class_of_trade)
-    mapping_context.map_src_record_field_to_dimension('loc_shipped_to', dim_location)
+    mapping_context.map_src_record_field_to_dimension('loc_billed_to', dim_location)
     mapping_context.map_src_record_field_to_non_dimension('price_is_at_ceiling', 'price_is_at_ceiling', Boolean())
     mapping_context.map_src_record_field_to_non_dimension('customer_is_340b', 'customer_is_340b', Boolean())
 
@@ -181,7 +181,7 @@ def scb_to_direct_olap(pipeline_config, pgsql_host, pgsql_username, pgsql_passwo
 
 
 def ingest_with_mapping_context(mapping_context, pipeline_config, pgsql_host, pgsql_username, pgsql_password, log_name, source_topic):
-
+    print mapping_context
     db = sqldbx.PostgreSQLDatabase(pgsql_host, 'praxis')
     db.login(pgsql_username, pgsql_password)
     pmgr = sqldbx.PersistenceManager(db)
@@ -223,7 +223,8 @@ def main(args):
         yaml_config = yaml.load(f)
         pipeline_config = tg.KafkaPipelineConfig(yaml_config)
 
-    log_name = log_file + "." + rectype + "." + src_topic
+    log_name = log_file + "_" + rectype + "_" + src_topic
+    print 'logging to: %s' % log_name
     logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
     if rectype == 'direct_sales':

@@ -171,7 +171,7 @@ class Database:
 
 @contextmanager
 def txn_scope(database):
-    session = database.getSession()
+    session = database.get_session()
     try:
         yield session
         session.commit()

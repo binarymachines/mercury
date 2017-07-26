@@ -17,7 +17,7 @@
 import docopt
 import os, sys
 from snap import common
-from mercury import datamap as dmap
+from mercury.mercury import datamap as dmap
 import yaml
 
 
