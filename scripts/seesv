@@ -83,7 +83,7 @@ def transform_data(source_datafile, src_header_fields, target_header_fields, tra
 
 class FilteringDisplayProcessor(dmap.DataProcessor):
     def __init__(self, required_record_fields, header_fields, delimiter, should_pass_good_records, data_processor=None):
-        dmap.DataProcessor.__init__(self, processor)
+        dmap.DataProcessor.__init__(self, data_processor)
 
         self._required_fields = required_record_fields        
         self._pass_good = should_pass_good_records
