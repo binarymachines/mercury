@@ -16,8 +16,8 @@
 
 import docopt
 import os, sys
-import common
-import datamap as dmap
+from snap import common
+from mercury import datamap as dmap
 import yaml
 
 
@@ -37,7 +37,7 @@ class TransformProcessor(dmap.DataProcessor):
 
 
 class Dictionary2CSVProcessor(dmap.DataProcessor):
-    def __init__(self, header_fields, delimiter, data_processor, **kwargs):
+    def __init__(self, header_fields, delimiter, data_processor=None, **kwargs):
         dmap.DataProcessor.__init__(self, data_processor)
         self._delimiter = delimiter
         self._header_fields = header_fields
@@ -81,6 +81,34 @@ def transform_data(source_datafile, src_header_fields, target_header_fields, tra
     extractor.extract(source_datafile)
 
 
+class FilteringDisplayProcessor(dmap.DataProcessor):
+    def __init__(self, required_record_fields, header_fields, delimiter, should_pass_good_records, data_processor=None):
+        dmap.DataProcessor.__init__(self, data_processor)
+
+        self._required_fields = required_record_fields        
+        self._pass_good = should_pass_good_records
+        self._dict2csvproc = Dictionary2CSVProcessor(header_fields, delimiter, processor=data_processor)
+
+
+    def _process(self, record_dict):
+        record_is_good = True
+        for field in self._required_fields:
+            if record_dict.get(field) is None or str(record_dict.get(field)) == '':
+                record_is_good = False
+                break
+        
+        if self._pass_good == record_is_good:
+            self._dict2csvproc.process(record_dict)
+        
+        #TODO: THIS IS BAD AND HACKY
+        # The behavior of this class violates the law of least surprises; it correctly filters noncompliant records,
+        # but returns both compliant and noncompliant records from this method. If you are trying to generate a stream of
+        # compliant (or noncompliant) records for further processing, you must find a different solution until this 
+        # logic is fixed. (Sorry, I was in a hurry.) --binarymachineshop@gmail.com
+        return record_dict
+
+
+
 class ComplianceStatsProcessor(dmap.DataProcessor):
     def __init__(self, required_record_fields, processor=None):
         dmap.DataProcessor.__init__(self, processor)
@@ -119,7 +147,7 @@ class ComplianceStatsProcessor(dmap.DataProcessor):
         error = False
         self._record_index += 1
         for name, datatype in self._required_fields.iteritems():
-            if record_dict.get(name) is None:
+            if record_dict.get(name) is None or record_dict.get(name) == '':
                 error = True
                 self._error_table[self._record_index] = (name, 'null')
                 break
@@ -172,8 +200,26 @@ def get_required_fields(record_type, schema_config_file):
             raise Exception('No record type "%s" found in schema config file %s.' % (record_type, schema_config_file))
         
         for field_name in schema_config:
-            required_fields.append(field_name)
+            if record_config['record_types'][record_type][field_name]['required'] == True:
+                required_fields.append(field_name)
+
     return required_fields
+
+
+def get_all_fields(record_type, schema_config_file):
+    fields = []
+    with open(schema_config_file) as f:
+        record_config = yaml.load(f)            
+        schema_config = record_config['record_types'].get(record_type)
+        if not schema_config:
+            raise Exception('No record type "%s" found in schema config file %s.' % (record_type, schema_config_file))
+        
+        for field_name in schema_config:
+            fields.append(field_name)
+
+    return fields
+
+
 
 def get_transform_target_header(transform_config_file, map_name):
     header_fields = []
@@ -218,8 +264,18 @@ def main(args):
 
     elif filter_mode:
         # Filter source records for schema compliance
-        print 'filtering data from source file %s...' % src_datafile
+        schema_config_file = args.get('--schema')
+        record_type = args.get('--rtype')        
+        required_fields = get_required_fields(record_type, schema_config_file)
+        header_fields = get_all_fields(record_type, schema_config_file)
 
+        filter_proc = FilteringDisplayProcessor(required_fields, header_fields, '|', True)
+        extractor = dmap.CSVFileDataExtractor(filter_proc,
+                                              delimiter='|',
+                                              quotechar='"',
+                                              header_fields=header_fields)
+        extractor.extract(src_datafile)
+        
 
 
 

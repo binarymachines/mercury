@@ -118,7 +118,7 @@ class Database:
         self._session_factory = None
     
 
-    def __createURL__(self, dbType, username, password):
+    def __create_url__(self, dbType, username, password):
         """Implement in subclasses to provide database-type-specific connection URLs."""
         pass
 
@@ -131,7 +131,7 @@ class Database:
     def login(self, username, password, schema=None):    
         """Connect as the specified user."""
 
-        url = self.__createURL__(self.dbType, username, password)
+        url = self.__create_url__(self.dbType, username, password)
         self.engine = sqla.create_engine(url, echo=False)
         if schema:
             self.metadata = sqla.MetaData(self.engine, schema=schema)
