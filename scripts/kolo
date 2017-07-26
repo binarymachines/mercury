@@ -143,6 +143,44 @@ def sst_to_direct_olap(pipeline_config, pgsql_host, pgsql_username, pgsql_passwo
     mapping_context.map_src_record_field_to_non_dimension('customer_is_340b', 'customer_is_340b', Boolean())
     # mapping_context.map_src_record_field_to_non_dimension('', 'txn_price', Float())
 
+    ingest_with_mapping_context(mapping_context, pipeline_config, pgsql_host, pgsql_username, pgsql_password, log_name, source_topic)
+
+
+def scb_to_direct_olap(pipeline_config, pgsql_host, pgsql_username, pgsql_password, log_name, source_topic):
+    fact = tg.OLAPSchemaFact('olap.f_chargebacks', 'id', UNIQUEIDENTIFIER())
+
+    dim_agreement_category = tg.OLAPSchemaDimension(fact_table_field_name='agreement_category_id',
+                                                          dim_table_name='d_agreement_category',
+                                                          key_field_name='id',
+                                                          value_field_name='value',
+                                                          primary_key_type=Integer(),
+                                                          id_lookup_function=get_optional_dimension_id_func)
+
+    dim_class_of_trade = tg.OLAPSchemaDimension(fact_table_field_name='cot_id',
+                                                      dim_table_name='d_class_of_trade',
+                                                      key_field_name='id',
+                                                      value_field_name='value',
+                                                      primary_key_type=Integer(),
+                                                      id_lookup_function=get_required_dimension_id_func)
+
+    dim_location = tg.OLAPSchemaDimension(fact_table_field_name='location_id',
+                                                dim_table_name='d_location',
+                                                key_field_name='id',
+                                                value_field_name='value',
+                                                primary_key_type=Integer(),
+                                                id_lookup_function=get_required_dimension_id_func)
+
+    mapping_context = tg.OLAPSchemaMappingContext(fact)
+    mapping_context.map_src_record_field_to_dimension('agreement_id', dim_agreement_category)
+    mapping_context.map_src_record_field_to_dimension('class_of_trade', dim_class_of_trade)
+    mapping_context.map_src_record_field_to_dimension('loc_shipped_to', dim_location)
+    mapping_context.map_src_record_field_to_non_dimension('price_is_at_ceiling', 'price_is_at_ceiling', Boolean())
+    mapping_context.map_src_record_field_to_non_dimension('customer_is_340b', 'customer_is_340b', Boolean())
+
+    ingest_with_mapping_context(mapping_context, pipeline_config, pgsql_host, pgsql_username, pgsql_password, log_name, source_topic)
+
+
+def ingest_with_mapping_context(mapping_context, pipeline_config, pgsql_host, pgsql_username, pgsql_password, log_name, source_topic):
 
     db = sqldbx.PostgreSQLDatabase(pgsql_host, 'praxis')
     db.login(pgsql_username, pgsql_password)
@@ -186,17 +224,13 @@ def main(args):
         pipeline_config = tg.KafkaPipelineConfig(yaml_config)
 
     log_name = log_file + "." + rectype + "." + src_topic
-    # log = logging.getLogger(log_name)
-    # ch = logging.StreamHandler()
-    # formatter = logging.Formatter('%(levelname)s:%(message)s')
-    # ch.setFormatter(formatter)
-    # log.setLevel(logging.DEBUG)
-    # log.addHandler(ch)
-
     logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
     if rectype == 'direct_sales':
         sst_to_direct_olap(pipeline_config, host, user, passw, log_name, src_topic)
+
+    if rectype == 'indirect_sales':
+        scb_to_direct_olap(pipeline_config, host, user, passw, log_name, src_topic)
 
 
 if __name__ == '__main__':
