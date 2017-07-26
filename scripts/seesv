@@ -147,7 +147,7 @@ class ComplianceStatsProcessor(dmap.DataProcessor):
         error = False
         self._record_index += 1
         for name, datatype in self._required_fields.iteritems():
-            if record_dict.get(name) is None:
+            if record_dict.get(name) is None or record_dict.get(name) == '':
                 error = True
                 self._error_table[self._record_index] = (name, 'null')
                 break
