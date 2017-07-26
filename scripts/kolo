@@ -174,7 +174,7 @@ def scb_to_direct_olap(pipeline_config, pgsql_host, pgsql_username, pgsql_passwo
     mapping_context.map_src_record_field_to_dimension('agreement_id', dim_agreement_category)
     mapping_context.map_src_record_field_to_dimension('class_of_trade', dim_class_of_trade)
     mapping_context.map_src_record_field_to_dimension('loc_billed_to', dim_location)
-    mapping_context.map_src_record_field_to_non_dimension('price_is_at_ceiling', 'price_is_at_ceiling', Boolean())
+    mapping_context.map_src_record_field_to_non_dimension('price_is_at_ceiling', 'is_340b_ceiling_price', Boolean())
     mapping_context.map_src_record_field_to_non_dimension('customer_is_340b', 'customer_is_340b', Boolean())
 
     ingest_with_mapping_context(mapping_context, pipeline_config, pgsql_host, pgsql_username, pgsql_password, log_name, source_topic)
