@@ -215,7 +215,7 @@ def get_all_fields(record_type, schema_config_file):
             raise Exception('No record type "%s" found in schema config file %s.' % (record_type, schema_config_file))
         
         for field_name in schema_config:
-            required_fields.append(field_name)
+            fields.append(field_name)
 
     return fields
 
