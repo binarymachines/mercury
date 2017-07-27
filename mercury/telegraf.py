@@ -6,7 +6,7 @@ import threading
 import time
 import datetime
 import json
-import docopt
+import docopt, traceback
 from snap import snap
 from snap import common
 import sqldbx as sqlx
@@ -317,8 +317,9 @@ class KafkaIngestRecordReader(object):
                     data_relay.checkpoint(logger, **kwargs)
                     checkpoint_timer.reset()
             except Exception, err:
-                logger.error('Kafka message reader threw an exception from its DataRelay while processing message %d: %s' % (message_counter, str(err)))
-                logger.error('Offending message: %s' % str(message))
+                print 'Kafka message reader threw an exception from its DataRelay while processing message %d: %s' % (message_counter, str(err))
+                print 'Offending message: %s' % str(message)
+                traceback.print_exc()
                 error_count += 1
             finally:
                 message_counter += 1
