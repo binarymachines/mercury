@@ -650,6 +650,49 @@ class OLAPSchemaMappingContext(object):
 
 
 
+class OLAPSchemaMappingContextBuilder(object):
+    def __init__(self, yaml_config_filename, **kwargs):
+        kwreader = common.KeywordArgReader('context_name')
+        kwreader.read(kwargs)
+        self._context_name = kwreader.get_value('context_name')
+        self._yaml_config = None
+        with open(yaml_config_filename, 'r') as f:
+            self._yaml_config = yaml.load(f)
+
+
+    def build(self):
+
+        fact = tg.OLAPSchemaFact(fact_table_name,
+                                 fact_pk_field_name,
+                                 fact_pk_field_class())
+
+        mapping_context = OLAPSchemaMappingContext(fact)
+
+        for dim_name in self._yaml_config['mappings'][self._context_name]['dimensions']:
+            dim_config = self._yaml_config['mappings'][self._context_name]['dimensions'][dim_name]
+
+            pk_type_class = self.load_sqltype_class(dim_config['primary_key_type'])
+
+            dim = tg.OLAPSchemaDimension(fact_table_field_name=dim_config['fact_table_field'],
+                                         dim_table_name=dim_config['table_name'],
+                                         key_field_name=dim_config['primary_key_field'],
+                                         value_field_name=dim_config['value_field'],
+                                         primary_key_type=pk_type_class(),
+                                         id_lookup_function=get_dimension_id_func)
+
+            source_record_fieldname = dim_config['source_record_field']
+            mapping_context.map_src_record_field_to_dimension(source_record_fieldname, dim)
+
+
+        for non_dim_name in self._yaml_config[self._context_name]['non_dimensions']:
+            non_dim_config = self._yaml_config[self._context_name]['non_dimensions'][non_dim_name]
+            source_record_field = non_dim_config
+            mapping_context.map_src_record_field_to_non_dimension('transaction_id', 'internal_txn_id', String())
+
+        return mapping_context
+            
+            
+
 class OLAPStarSchemaRelay(DataRelay):
     def __init__(self, persistence_mgr, olap_schema_map_ctx, **kwargs):
         DataRelay.__init__(self, **kwargs)
