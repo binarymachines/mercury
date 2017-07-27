@@ -1,5 +1,5 @@
 #!\usr\bin\env python
-#
+
 #  
 '''Usage:
         kolo.py --rtype=<record_type> --pconfig=<pipeline_config_file> --topic=<topic> --pgsql_host=<host> --pgsql_user=<user> --pgsql_password=<password> [<logfile>]
@@ -10,12 +10,13 @@
 # comsumes data records from a designated Kafka topic into an OLAP star schema
 # 
 
+import context
 import yaml
 import docopt
 import logging
-from mercury.mercury import telegraf as tg
-from mercury.mercury import datamap as dmap
-from mercury.mercury import sqldbx
+from mercury import telegraf as tg
+from mercury import datamap as dmap
+from mercury import sqldbx
 from kafka import TopicPartition, KafkaConsumer
 from sqlalchemy import Integer, String, DateTime, Float, Boolean, text, and_, bindparam
 from sqlalchemy.dialects.mssql import UNIQUEIDENTIFIER
@@ -216,7 +217,9 @@ def main(args):
     host = args['--pgsql_host']
     user = args['--pgsql_user']
     passw = args['--pgsql_password']
-    log_file = args.get('<logfile>', 'kola-log.txt')
+    log_file = args.get('<logfile>')
+    if log_file is None:
+       log_file = 'kolo-log.txt'
     pipeline_config = None
 
     with open(pipeline_config_file) as f:

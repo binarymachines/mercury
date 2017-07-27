@@ -14,10 +14,11 @@
 # seesv: command line utility for examining CSV files and evaluating them against a schema of required fields
 #
 
+import context
 import docopt
 import os, sys
 from snap import common
-from mercury.mercury import datamap as dmap
+from mercury import datamap as dmap
 import yaml
 
 
@@ -269,7 +270,7 @@ def main(args):
         required_fields = get_required_fields(record_type, schema_config_file)
         header_fields = get_all_fields(record_type, schema_config_file)
 
-        filter_proc = FilteringDisplayProcessor(required_fields, header_fields, '|', True)
+        filter_proc = FilteringDisplayProcessor(required_fields, header_fields, '|', False)
         extractor = dmap.CSVFileDataExtractor(filter_proc,
                                               delimiter='|',
                                               quotechar='"',
