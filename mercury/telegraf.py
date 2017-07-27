@@ -319,7 +319,7 @@ class KafkaIngestRecordReader(object):
             except Exception, err:
                 print 'Kafka message reader threw an exception from its DataRelay while processing message %d: %s' % (message_counter, str(err))
                 print 'Offending message: %s' % str(message)
-                traceback.print_exc()
+                #traceback.print_exc()
                 error_count += 1
             finally:
                 message_counter += 1
