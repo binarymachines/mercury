@@ -315,8 +315,8 @@ class KafkaIngestRecordReader(object):
                     data_relay.checkpoint(logger, **kwargs)
                     checkpoint_timer.reset()
             except Exception, err:
-                logger.error('Kafka message reader threw an exception from its DataRelay while processing message %d: %s' % (message_counter, str(err)))
-                logger.error('Offending message: %s' % str(message))
+                logger.debug('Kafka message reader threw an exception from its DataRelay while processing message %d: %s' % (message_counter, str(err)))
+                logger.debug('Offending message: %s' % str(message))
                 error_count += 1
             finally:
                 message_counter += 1
@@ -403,6 +403,7 @@ class DataRelay(object):
         self.pre_send(kmsg_header, logger, **kwargs)
         if self._transformer:
             data_to_send = self._transformer.transform(kafka_message.value['body'])
+            print '## Data to send: %s \n\n' % str(data_to_send)
         else:
             data_to_send = kafka_message.value
         self._send(kmsg_header, data_to_send, logger, **kwargs)
