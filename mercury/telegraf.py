@@ -407,6 +407,7 @@ class DataRelay(object):
         self.pre_send(kmsg_header, logger, **kwargs)
         if self._transformer:
             data_to_send = self._transformer.transform(kafka_message.value['body'])
+            print '## Data to send: %s \n\n' % str(data_to_send)
         else:
             data_to_send = kafka_message.value
         self._send(kmsg_header, data_to_send, logger, **kwargs)

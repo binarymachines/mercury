@@ -109,6 +109,7 @@ class RecordTransformer:
             raise NoDatasourceForFieldException(target_field_name)
 
         transform_func_name = 'lookup_%s' % (target_field_name)
+        print '## transform function name = %s \n\n' % transform_func_name
         if not hasattr(datasource, transform_func_name):
             raise NoSuchLookupMethodException(datasource.__class__.__name__, transform_func_name)
 
