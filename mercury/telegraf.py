@@ -6,8 +6,8 @@ import threading
 import time
 import datetime
 import json
-import docopt, traceback
-from snap import snap
+import docopt
+import yaml
 from snap import common
 import sqldbx as sqlx
 import couchbasedbx as cbx
@@ -654,6 +654,79 @@ class OLAPSchemaMappingContext(object):
         return data
 
 
+
+class OLAPSchemaMappingContextBuilder(object):
+    def __init__(self, yaml_config_filename, **kwargs):
+        kwreader = common.KeywordArgReader('context_name')
+        kwreader.read(**kwargs)
+        self._context_name = kwreader.get_value('context_name')
+        self._yaml_config = None
+        with open(yaml_config_filename, 'r') as f:
+            self._yaml_config = yaml.load(f)
+
+
+    def load_sqltype_class(self, classname, **kwargs):
+        pk_type_module = self._yaml_config['globals']['sql_datatype_module']
+        klass = common.load_class(classname, pk_type_module)
+        return klass
+
+
+    def load_fact_pk_sqltype_class(self, classname, **kwargs):
+        pk_type_module = self._yaml_config['globals']['primary_key_datatype_module']
+        klass = common.load_class(classname, pk_type_module)
+        return klass
+
+
+
+    def load_fact_pk_type_options(self):
+        #TODO: pull this from the YAML file
+        return {'binary': False}
+
+
+    def build(self):
+        fact_config = self._yaml_config['mappings'][self._context_name]['fact']
+        fact_table_name = fact_config['table_name']
+        fact_pk_field_name = fact_config['primary_key_name']
+        fact_pk_field_classname = fact_config['primary_key_type']
+
+
+        fact_pk_field_class = self.load_fact_pk_sqltype_class(fact_pk_field_classname)
+        pk_type_options = self.load_fact_pk_type_options()
+
+        fact = OLAPSchemaFact(fact_table_name,
+                              fact_pk_field_name,
+                              fact_pk_field_class(**pk_type_options))
+
+        mapping_context = OLAPSchemaMappingContext(fact)
+
+        for dim_name in self._yaml_config['mappings'][self._context_name]['dimensions']:
+            dim_config = self._yaml_config['mappings'][self._context_name]['dimensions'][dim_name]
+
+            pk_type_class = self.load_sqltype_class(dim_config['primary_key_type'])
+
+            dim = OLAPSchemaDimension(fact_table_field_name=dim_config['fact_table_field_name'],
+                                      dim_table_name=dim_config['table_name'],
+                                      key_field_name=dim_config['primary_key_field_name'],
+                                      value_field_name=dim_config['value_field_name'],
+                                      primary_key_type=pk_type_class(),
+                                      id_lookup_function=dimension_id_lookup_func)
+
+            source_record_fieldname = dim_name
+            mapping_context.map_src_record_field_to_dimension(source_record_fieldname, dim)
+
+
+        for non_dim_name in self._yaml_config['mappings'][self._context_name]['non_dimensions']:
+            non_dim_config = self._yaml_config['mappings'][self._context_name]['non_dimensions'][non_dim_name]
+            source_record_field = non_dim_name
+            fact_field_name = non_dim_config['fact_field_name']
+            fact_field_type = non_dim_config['fact_field_type']
+            mapping_context.map_src_record_field_to_non_dimension(source_record_field,
+                                                                  fact_field_name,
+                                                                  self.load_sqltype_class(fact_field_type))
+
+        return mapping_context
+            
+            
 
 class OLAPStarSchemaRelay(DataRelay):
     def __init__(self, persistence_mgr, olap_schema_map_ctx, **kwargs):
