@@ -243,7 +243,7 @@ def resolve_env_var(var_string):
 
 def resolve_initfile_args(arg_dict):
     '''Resolve filsystem refs such as tilde and dollar-sign'''
-
+    print '### resolving cmd args: %s' % arg_dict
     output_args = {}
     for key, value in arg_dict.iteritems():
         if not value:
