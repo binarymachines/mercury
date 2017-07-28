@@ -101,12 +101,15 @@ class RecordTransformer:
 
 
     def lookup(self, target_field_name, source_record):
+        record_value = source_record.get(target_field_name)
+        if record_value != None and record_value != '':
+            return record_value
         datasource = self.datasources.get(target_field_name)
         if not datasource:
             raise NoDatasourceForFieldException(target_field_name)
 
         transform_func_name = 'lookup_%s' % (target_field_name)
-        print '## transform function name = %s \n\n' % transform_func_name
+        #print '## transform function name = %s \n\n' % transform_func_name
         if not hasattr(datasource, transform_func_name):
             raise NoSuchLookupMethodException(datasource.__class__.__name__, transform_func_name)
 

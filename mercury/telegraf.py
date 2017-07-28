@@ -19,6 +19,7 @@ from kafka.common import OffsetRequestPayload
 
 from sqlalchemy import Integer, String, DateTime, text, and_
 from sqlalchemy import Integer, String, DateTime, Float, text
+from sqlalchemy.sql import bindparam
 
 from raven import Client
 from raven.handlers.logging import SentryHandler
@@ -286,7 +287,8 @@ class KafkaIngestRecordReader(object):
                                        consumer_timeout_ms=5000)
 
         #self._consumer.subscribe(topic)
-
+        #self._num_commits = 0
+        
 
     def read(self, data_relay, logger, **kwargs): # insist on passing a checkpoint_frequency as kwarg?
 
@@ -318,6 +320,7 @@ class KafkaIngestRecordReader(object):
             except Exception, err:
                 logger.debug('Kafka message reader threw an exception from its DataRelay while processing message %d: %s' % (message_counter, str(err)))
                 logger.debug('Offending message: %s' % str(message))
+                #traceback.print_exc()
                 error_count += 1
             finally:
                 message_counter += 1
@@ -336,7 +339,8 @@ class KafkaIngestRecordReader(object):
                 logger.error('Final checkpoint command threw an exception: %s' % str(err))
             finally:    
                 checkpoint_timer.stop()
-        
+
+        return num_commits
 
 
     @property
@@ -637,7 +641,7 @@ class OLAPSchemaMappingContext(object):
 
     def get_fact_values(self, source_record, **kwargs):
         data = {}
-        print '### source record info: %s'%  source_record
+        #print '### source record info: %s'%  source_record
 
         for src_record_field_name in self._direct_mappings.keys():
             non_dimension_field = self._direct_mappings[src_record_field_name]

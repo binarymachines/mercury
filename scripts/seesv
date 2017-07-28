@@ -1,20 +1,25 @@
 #!/usr/bin/env python
 
 '''Usage:
-            seesv.py --xform=<transform_file> --xmap=<transform_map> --schema=<schema_file> --rtype=<record_type> <datafile>
-            seesv.py (-t | -f) --schema=<schema_file> --rtype=<record_type> <datafile>
+            seesv --xform=<transform_file> --xmap=<transform_map> --schema=<schema_file> --rtype=<record_type> <datafile>
+            seesv (-t | -f) --schema=<schema_file> --rtype=<record_type> <datafile>
+            seesv -i
+            seesv --initfile=<init_file>
 
    Options:
             -t --test          Test the records in the target file for schema compliance
             -f --filter        Send the compliant records in the target file to stdout
-
+            -i --interactive   Start up in interactive mode
 '''
 
 #
 # seesv: command line utility for examining CSV files and evaluating them against a schema of required fields
 #
 
+import context
 import docopt
+from docopt import docopt as docopt_func
+from docopt import DocoptExit
 import os, sys
 from snap import common
 from mercury import datamap as dmap
@@ -233,15 +238,39 @@ def get_transform_target_header(transform_config_file, map_name):
     return header_fields
 
 
-def main(args):
+def resolve_env_var(var_string):
+    pass
 
+def resolve_initfile_args(arg_dict):
+    '''Resolve filsystem refs such as tilde and dollar-sign'''
+    print '### resolving cmd args: %s' % arg_dict
+    output_args = {}
+    for key, value in arg_dict.iteritems():
+        if not value:
+            continue
+        raw_value_tokens = value.split(os.path.sep)
+        cooked_value_tokens = []
+        for tok in raw_value_tokens:
+            if tok is not None:
+                print 'adding cooked value token: %s...' % common.load_config_var(tok)
+                cooked_value_tokens.append(common.load_config_var(tok))
+        output_args[key] = os.path.sep.join(cooked_value_tokens)
+    return output_args
+
+
+
+def main(args):
+    print args
     test_mode = args.get('--test')
     filter_mode = args.get('--filter')
+    initfile_mode = args.get('--initfile') is not None
     transform_mode = False
-    src_datafile = args.get('<datafile>')
-
     if args.get('--xform'):
         transform_mode = True
+    interactive_mode = args.get('--interactive')
+    src_datafile = args.get('<datafile>')
+
+    if transform_mode:
         transform_config_file = args.get('--xform')
         transform_map = args.get('--xmap')
         schema_config_file = args.get('--schema')
@@ -252,6 +281,19 @@ def main(args):
         xformer = build_transformer(transform_config_file, transform_map)
         transform_data(src_datafile, src_header, target_header, xformer)
 
+    elif interactive_mode:
+        print 'PLACEHOLDER: seesv interactive mode'
+        return
+
+    elif initfile_mode:        
+        initfile_name = args['--initfile']
+        cmd_line = None
+        with open(initfile_name) as f:
+            cmd_line = f.readline()
+        raw_args = docopt_func(__doc__, cmd_line.split(' '))
+        cooked_args = resolve_initfile_args(raw_args)
+        main(cooked_args)
+
     elif test_mode:
         #print 'testing data in source file %s for schema compliance...' % src_datafile
         schema_config_file = args.get('--schema')
@@ -261,7 +303,6 @@ def main(args):
             schema_config = record_config['record_types'][record_type]
             print get_schema_compliance_stats(src_datafile, schema_config)
 
-
     elif filter_mode:
         # Filter source records for schema compliance
         schema_config_file = args.get('--schema')
@@ -269,15 +310,13 @@ def main(args):
         required_fields = get_required_fields(record_type, schema_config_file)
         header_fields = get_all_fields(record_type, schema_config_file)
 
-        filter_proc = FilteringDisplayProcessor(required_fields, header_fields, '|', True)
+        filter_proc = FilteringDisplayProcessor(required_fields, header_fields, '|', False)
         extractor = dmap.CSVFileDataExtractor(filter_proc,
                                               delimiter='|',
                                               quotechar='"',
                                               header_fields=header_fields)
         extractor.extract(src_datafile)
         
-
-
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)
