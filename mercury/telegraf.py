@@ -24,6 +24,8 @@ from raven import Client
 from raven.handlers.logging import SentryHandler
 
 from logging import Formatter
+#import traceback
+from sqlalchemy.sql import bindparam
 
 DEFAULT_SENTRY_DSN = 'https://64488b5074a94219ba25882145864700:9129da74c26a43cd84760d098b902f97@sentry.io/163031'
 
@@ -502,7 +504,7 @@ def dimension_id_lookup_func(value, dim_table_name, key_field_name, value_field_
                                                                          table=dim_table_name,
                                                                          dim_table_value_field_name=value_field_name)
         template = text(raw_template)
-        stmt = template.bindparams('source_value', String)
+        stmt = template.bindparams(bindparam('source_value', String))
 
         data_mgr = kwargs['persistence_manager']
         dbconnection = data_mgr.database.engine.connect()
