@@ -238,17 +238,35 @@ def get_transform_target_header(transform_config_file, map_name):
     return header_fields
 
 
+def resolve_env_var(var_string):
+    pass
+
+def resolve_initfile_args(arg_dict):
+    '''Resolve filsystem refs such as tilde and dollar-sign'''
+
+    output_args = {}
+    for key, value in arg_dict.iteritems():
+        raw_value_tokens = value.split(os.path.sep)
+        cooked_value_tokens = []
+        for tok in raw_value_tokens:
+            cooked_value_tokens.append(common.load_config_var(tok))
+        output_args[key] = os.path.sep.join(cooked_value_tokens)
+    return output_args
+
+
+
 def main(args):
     print args
     test_mode = args.get('--test')
     filter_mode = args.get('--filter')
     initfile_mode = args.get('--initfile') is not None
     transform_mode = False
+    if args.get('--xform'):
+        transform_mode = True
     interactive_mode = args.get('--interactive')
     src_datafile = args.get('<datafile>')
 
-    if args.get('--xform'):
-        transform_mode = True
+    if transform_mode:
         transform_config_file = args.get('--xform')
         transform_map = args.get('--xmap')
         schema_config_file = args.get('--schema')
@@ -268,11 +286,9 @@ def main(args):
         cmd_line = None
         with open(initfile_name) as f:
             cmd_line = f.readline()
-        args = docopt_func(__doc__, cmd_line.split(' '))
-        # just in case: explicitly set interactive to False so that we don't 
-        # recurse infinitely
-        args['--initfile'] = None
-        main(args)
+        raw_args = docopt_func(__doc__, cmd_line.split(' '))
+        cooked_args = resolve_initfile_args(args)
+        main(cooked_args)
 
     elif test_mode:
         #print 'testing data in source file %s for schema compliance...' % src_datafile
