@@ -18,6 +18,7 @@ from kafka.common import OffsetRequestPayload
 
 from sqlalchemy import Integer, String, DateTime, text, and_
 from sqlalchemy import Integer, String, DateTime, Float, text
+from sqlalchemy.sql import bindparam
 
 from raven import Client
 from raven.handlers.logging import SentryHandler
