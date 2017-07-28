@@ -7,7 +7,8 @@ import time
 import datetime
 import json
 import docopt
-import common
+import yaml
+from snap import common
 import sqldbx as sqlx
 import couchbasedbx as cbx
 import logging
@@ -286,7 +287,8 @@ class KafkaIngestRecordReader(object):
                                        consumer_timeout_ms=5000)
 
         #self._consumer.subscribe(topic)
-
+        #self._num_commits = 0
+        
 
     def read(self, data_relay, logger, **kwargs): # insist on passing a checkpoint_frequency as kwarg?
 
@@ -316,8 +318,9 @@ class KafkaIngestRecordReader(object):
                     data_relay.checkpoint(logger, **kwargs)
                     checkpoint_timer.reset()
             except Exception, err:
-                logger.error('Kafka message reader threw an exception from its DataRelay while processing message %d: %s' % (message_counter, str(err)))
-                logger.error('Offending message: %s' % str(message))
+                logger.debug('Kafka message reader threw an exception from its DataRelay while processing message %d: %s' % (message_counter, str(err)))
+                logger.debug('Offending message: %s' % str(message))
+                #traceback.print_exc()
                 error_count += 1
             finally:
                 message_counter += 1
@@ -336,7 +339,8 @@ class KafkaIngestRecordReader(object):
                 logger.error('Final checkpoint command threw an exception: %s' % str(err))
             finally:    
                 checkpoint_timer.stop()
-        
+
+        return num_commits
 
 
     @property
@@ -404,6 +408,7 @@ class DataRelay(object):
         self.pre_send(kmsg_header, logger, **kwargs)
         if self._transformer:
             data_to_send = self._transformer.transform(kafka_message.value['body'])
+            print '## Data to send: %s \n\n' % str(data_to_send)
         else:
             data_to_send = kafka_message.value
         self._send(kmsg_header, data_to_send, logger, **kwargs)
@@ -636,7 +641,7 @@ class OLAPSchemaMappingContext(object):
 
     def get_fact_values(self, source_record, **kwargs):
         data = {}
-        print '### source record info: %s'%  source_record
+        #print '### source record info: %s'%  source_record
 
         for src_record_field_name in self._direct_mappings.keys():
             non_dimension_field = self._direct_mappings[src_record_field_name]
@@ -650,6 +655,79 @@ class OLAPSchemaMappingContext(object):
         return data
 
 
+
+class OLAPSchemaMappingContextBuilder(object):
+    def __init__(self, yaml_config_filename, **kwargs):
+        kwreader = common.KeywordArgReader('context_name')
+        kwreader.read(**kwargs)
+        self._context_name = kwreader.get_value('context_name')
+        self._yaml_config = None
+        with open(yaml_config_filename, 'r') as f:
+            self._yaml_config = yaml.load(f)
+
+
+    def load_sqltype_class(self, classname, **kwargs):
+        pk_type_module = self._yaml_config['globals']['sql_datatype_module']
+        klass = common.load_class(classname, pk_type_module)
+        return klass
+
+
+    def load_fact_pk_sqltype_class(self, classname, **kwargs):
+        pk_type_module = self._yaml_config['globals']['primary_key_datatype_module']
+        klass = common.load_class(classname, pk_type_module)
+        return klass
+
+
+
+    def load_fact_pk_type_options(self):
+        #TODO: pull this from the YAML file
+        return {'binary': False}
+
+
+    def build(self):
+        fact_config = self._yaml_config['mappings'][self._context_name]['fact']
+        fact_table_name = fact_config['table_name']
+        fact_pk_field_name = fact_config['primary_key_name']
+        fact_pk_field_classname = fact_config['primary_key_type']
+
+
+        fact_pk_field_class = self.load_fact_pk_sqltype_class(fact_pk_field_classname)
+        pk_type_options = self.load_fact_pk_type_options()
+
+        fact = OLAPSchemaFact(fact_table_name,
+                              fact_pk_field_name,
+                              fact_pk_field_class(**pk_type_options))
+
+        mapping_context = OLAPSchemaMappingContext(fact)
+
+        for dim_name in self._yaml_config['mappings'][self._context_name]['dimensions']:
+            dim_config = self._yaml_config['mappings'][self._context_name]['dimensions'][dim_name]
+
+            pk_type_class = self.load_sqltype_class(dim_config['primary_key_type'])
+
+            dim = OLAPSchemaDimension(fact_table_field_name=dim_config['fact_table_field_name'],
+                                      dim_table_name=dim_config['table_name'],
+                                      key_field_name=dim_config['primary_key_field_name'],
+                                      value_field_name=dim_config['value_field_name'],
+                                      primary_key_type=pk_type_class(),
+                                      id_lookup_function=dimension_id_lookup_func)
+
+            source_record_fieldname = dim_name
+            mapping_context.map_src_record_field_to_dimension(source_record_fieldname, dim)
+
+
+        for non_dim_name in self._yaml_config['mappings'][self._context_name]['non_dimensions']:
+            non_dim_config = self._yaml_config['mappings'][self._context_name]['non_dimensions'][non_dim_name]
+            source_record_field = non_dim_name
+            fact_field_name = non_dim_config['fact_field_name']
+            fact_field_type = non_dim_config['fact_field_type']
+            mapping_context.map_src_record_field_to_non_dimension(source_record_field,
+                                                                  fact_field_name,
+                                                                  self.load_sqltype_class(fact_field_type))
+
+        return mapping_context
+            
+            
 
 class OLAPStarSchemaRelay(DataRelay):
     def __init__(self, persistence_mgr, olap_schema_map_ctx, **kwargs):

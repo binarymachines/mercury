@@ -1,5 +1,5 @@
 #!\usr\bin\env python
-#
+
 #  
 '''Usage:
         kolo.py --rtype=<record_type> --pconfig=<pipeline_config_file> --topic=<topic> --pgsql_host=<host> --pgsql_user=<user> --pgsql_password=<password> [<logfile>]
@@ -10,12 +10,13 @@
 # comsumes data records from a designated Kafka topic into an OLAP star schema
 # 
 
+import context
 import yaml
 import docopt
 import logging
-import telegraf as tg
-import datamap as dmap
-import sqldbx
+from mercury import telegraf as tg
+from mercury import datamap as dmap
+from mercury import sqldbx
 from kafka import TopicPartition, KafkaConsumer
 from sqlalchemy import Integer, String, DateTime, Float, Boolean, text, and_, bindparam
 from sqlalchemy.dialects.mssql import UNIQUEIDENTIFIER
@@ -173,15 +174,15 @@ def scb_to_direct_olap(pipeline_config, pgsql_host, pgsql_username, pgsql_passwo
     mapping_context = tg.OLAPSchemaMappingContext(fact)
     mapping_context.map_src_record_field_to_dimension('agreement_id', dim_agreement_category)
     mapping_context.map_src_record_field_to_dimension('class_of_trade', dim_class_of_trade)
-    mapping_context.map_src_record_field_to_dimension('loc_shipped_to', dim_location)
-    mapping_context.map_src_record_field_to_non_dimension('price_is_at_ceiling', 'price_is_at_ceiling', Boolean())
+    mapping_context.map_src_record_field_to_dimension('loc_billed_to', dim_location)
+    mapping_context.map_src_record_field_to_non_dimension('price_is_at_ceiling', 'is_340b_ceiling_price', Boolean())
     mapping_context.map_src_record_field_to_non_dimension('customer_is_340b', 'customer_is_340b', Boolean())
 
     ingest_with_mapping_context(mapping_context, pipeline_config, pgsql_host, pgsql_username, pgsql_password, log_name, source_topic)
 
 
 def ingest_with_mapping_context(mapping_context, pipeline_config, pgsql_host, pgsql_username, pgsql_password, log_name, source_topic):
-
+    print mapping_context
     db = sqldbx.PostgreSQLDatabase(pgsql_host, 'praxis')
     db.login(pgsql_username, pgsql_password)
     pmgr = sqldbx.PersistenceManager(db)
@@ -216,14 +217,17 @@ def main(args):
     host = args['--pgsql_host']
     user = args['--pgsql_user']
     passw = args['--pgsql_password']
-    log_file = args.get('<logfile>', 'kola-log.txt')
+    log_file = args.get('<logfile>')
+    if log_file is None:
+       log_file = 'kolo-log.txt'
     pipeline_config = None
 
     with open(pipeline_config_file) as f:
         yaml_config = yaml.load(f)
         pipeline_config = tg.KafkaPipelineConfig(yaml_config)
 
-    log_name = log_file + "." + rectype + "." + src_topic
+    log_name = log_file + "_" + rectype + "_" + src_topic
+    print 'logging to: %s' % log_name
     logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
     if rectype == 'direct_sales':
