@@ -246,6 +246,8 @@ def resolve_initfile_args(arg_dict):
 
     output_args = {}
     for key, value in arg_dict.iteritems():
+        if not value:
+            continue
         raw_value_tokens = value.split(os.path.sep)
         cooked_value_tokens = []
         for tok in raw_value_tokens:
