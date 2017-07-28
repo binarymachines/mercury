@@ -502,7 +502,7 @@ def dimension_id_lookup_func(value, dim_table_name, key_field_name, value_field_
                                                                          table=dim_table_name,
                                                                          dim_table_value_field_name=value_field_name)
         template = text(raw_template)
-        stmt = template.bindparams(bindparam('source_value', String))
+        stmt = template.bindparams('source_value', String)
 
         data_mgr = kwargs['persistence_manager']
         dbconnection = data_mgr.database.engine.connect()
@@ -675,7 +675,6 @@ class OLAPSchemaMappingContextBuilder(object):
         pk_type_module = self._yaml_config['globals']['primary_key_datatype_module']
         klass = common.load_class(classname, pk_type_module)
         return klass
-
 
 
     def load_fact_pk_type_options(self):
