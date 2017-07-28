@@ -290,7 +290,7 @@ def main(args):
         with open(initfile_name) as f:
             cmd_line = f.readline()
         raw_args = docopt_func(__doc__, cmd_line.split(' '))
-        cooked_args = resolve_initfile_args(args)
+        cooked_args = resolve_initfile_args(raw_args)
         main(cooked_args)
 
     elif test_mode:
