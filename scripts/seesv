@@ -3,6 +3,7 @@
 '''Usage:
             seesv --xform=<transform_file> --xmap=<transform_map> --schema=<schema_file> --rtype=<record_type> <datafile>
             seesv (-t | -f) --schema=<schema_file> --rtype=<record_type> <datafile>
+            seesv -l --schema=<schema_file> --rtype=<record_type> <datafile
             seesv -i
             seesv --initfile=<init_file>
 
@@ -10,6 +11,7 @@
             -t --test          Test the records in the target file for schema compliance
             -f --filter        Send the compliant records in the target file to stdout
             -i --interactive   Start up in interactive mode
+            -l --lookup        Run seesv in lookup mode; attempt to look up missing data
 '''
 
 #
@@ -22,7 +24,7 @@ import docopt
 from docopt import docopt as docopt_func
 from docopt import DocoptExit
 import os, sys
-from snap import common
+from snap import snap, common
 from mercury import datamap as dmap
 import yaml
 
@@ -180,6 +182,29 @@ class ComplianceStatsProcessor(dmap.DataProcessor):
         return validity_stats
 
 
+class RecordRepairProcessor(dmap.DataProcessor):
+    def __init__(self, required_record_fields, data_supplier, processor=None):
+        dmap.DataProcessor.__init__(self, processor)
+        self._required_fields = required_record_fields
+        self._data_supplier = data_supplier
+
+
+    def _process(self, record):
+        output_record = {}
+        for field_name, field_value in record.iteritems():
+            if field_name in self._required_record_fields:
+                if field_value is None or str(field_value) == '':
+                    value = self._data_supplier.supply(field_name, record)
+                if value is None:
+                    output_record[field_name] = field_value # do not change empties to None
+                else:
+                    output_record[field_name] = value
+            else:
+                output_record[field_name] = field_value                    
+        return output_record
+                
+            
+
 def get_schema_compliance_stats(source_datafile, schema_config):
 
     required_fields = {}
@@ -197,11 +222,30 @@ def get_schema_compliance_stats(source_datafile, schema_config):
     return cstats_proc.get_stats()
 
 
+
+def load_data_supplier(record_type, schema_config_file):
+    supplier_class = None
+    svc_object_registry = None
+    supplier_init_params = None
+    with open(schema_config_file) as f:
+        config = yaml.load(f)
+        supplier_module = config['globals']['supplier_module']
+        supplier_classname = config['globals']['data_supplier']
+        supplier_class = common.load_class(supplier_classname, supplier_module)
+        service_objects = snap.initialize_services(config)
+        svc_object_registry = common.ServiceObjectRegistry(service_objects)
+        supplier_params = config['globals'].get('supplier_init_params') or []
+        for param in supplier_params:
+            supplier_init_params[param['name']] = common.load_config_var(param['value'])
+
+    return supplier_class(svc_object_registry, **supplier_init_params)
+
+
 def get_required_fields(record_type, schema_config_file):
     required_fields = []
     with open(schema_config_file) as f:
-        record_config = yaml.load(f)            
-        schema_config = record_config['record_types'].get(record_type)
+        config = yaml.load(f)            
+        schema_config = config['record_types'].get(record_type)
         if not schema_config:
             raise Exception('No record type "%s" found in schema config file %s.' % (record_type, schema_config_file))
         
@@ -226,7 +270,6 @@ def get_all_fields(record_type, schema_config_file):
     return fields
 
 
-
 def get_transform_target_header(transform_config_file, map_name):
     header_fields = []
     with open(transform_config_file) as f:
@@ -237,6 +280,7 @@ def get_transform_target_header(transform_config_file, map_name):
         
         header_fields = [field_name for field_name in transform_map['fields']]
     return header_fields
+
 
 
 def find_env_vars(arg_dict):
@@ -276,6 +320,7 @@ def main(args):
     print args
     test_mode = args.get('--test')
     filter_mode = args.get('--filter')
+    lookup_mode = args.get('--lookup')
     initfile_mode = args.get('--initfile') is not None
     transform_mode = False
     if args.get('--xform'):
@@ -294,17 +339,24 @@ def main(args):
         xformer = build_transformer(transform_config_file, transform_map)
         transform_data(src_datafile, src_header, target_header, xformer)
 
+    elif lookup_mode:
+        record_type = args.get('--rtype')
+        schema_config_file = args.get('--schema')
+        data_supplier = load_data_supplier(record_type, schema_config_file)
+        repair_processor = RecordRepairProcessor(data_supplier)
+
     elif interactive_mode:
         print 'PLACEHOLDER: seesv interactive mode'
         return
 
-    elif initfile_mode:        
+    elif initfile_mode:
         initfile_name = args['--initfile']
         cmd_line = None
         with open(initfile_name) as f:
             cmd_line = f.readline()
         raw_args = docopt_func(__doc__, cmd_line.split(' '))
         cooked_args = resolve_initfile_args(raw_args)
+        cooked_args['--initfile'] = None # just to make sure we don't recurse infinitely
         main(cooked_args)
 
     elif test_mode:

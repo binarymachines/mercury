@@ -30,6 +30,21 @@ class NonexistentDatasourceException(Exception):
         Exception.__init__(self, 'No datasource named "%s" in target Python module "%s".' % (src_name, module_name))
 
 
+class MissingSupplierMethodException(Exception):
+    def __init__(self, classname, methodname):
+        Exception.__init__(self, 'DataSupplier subclass %s contains no supply method "%s".' % (classname, methodname))
+
+
+class InvalidSupplierRequestException(Exception):
+    def __init__(self, field_name):
+        Exception.__init__(self, 'Cannot supply a value for a record identifier field (%s).' % field_name)
+
+
+class InvalidSupplierRecordException(Exception):
+    def __init__(self, record_id_field_name):
+        Exception.__init__(self, 'Incoming record is missing a value for its identifier field "%s"; cannot supply data.' % record_id_field_name)
+
+
 
 class FieldValueResolver(object):
     def __init__(self, field_name_string):
@@ -187,6 +202,9 @@ class RecordTransformerBuilder(object):
 
 
     def load_datasource(self, src_name, transform_config):
+        # TODO: update this method to initialize a service object registry 
+        # and pass it to the datasource contstructor
+
         src_module_name = self._transform_config['globals']['lookup_source_module']
         
         datasource_class_name = self._transform_config['sources'][src_name]['class']
@@ -287,6 +305,41 @@ class NullByteFilter:
                 if '\0' not in record:
                     readable_lines.append(record)
         return readable_lines
+
+
+
+class DataSupplier(object):
+    def __init__(self, service_object_registry, **kwargs):
+        kwreader = common.KeywordArgReader('record_id_field')
+        kwreader.read(**kwargs)
+        self._record_id_field = kwreader.get_value('record_id_field')
+        self.service_object_registry = service_object_registry
+        
+
+    def get_service_object(self, so_name):
+        return self.service_object_registry.lookup(so_name)
+
+
+    def supply(self, field_name, record):        
+        if field_name == self._record_id_field:
+            raise InvalidSupplierRequestException(field_name)
+
+        record_id = record.get(self._record_id_field)
+        if record_id is None or record_id == '':
+            raise InvalidSupplierRecordException(self._record_id_field)
+
+        supply_function_name = 'supply_%s' % field_name
+        if hasattr(self, supply_function_name):
+            supply_function = getattr(self, supply_function_name)
+
+            # we do not need to pass the name of the field whose value
+            # is being supplied, because it is implicit in the name of the
+            # target method -- if you wrote it, you know what value it should
+            # supply
+            return supply_function(record_id)
+        else:
+            raise MissingSupplierMethodException(self.__class__.__name__, supply_function_name)
+
 
 
 class CSVFileDataExtractor(object):
