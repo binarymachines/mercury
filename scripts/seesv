@@ -13,7 +13,8 @@
 '''
 
 #
-# seesv: command line utility for examining CSV files and evaluating them against a schema of required fields
+# seesv: command line utility for examining CSV files and evaluating them
+# against a schema of required fields
 #
 
 import context
@@ -238,12 +239,24 @@ def get_transform_target_header(transform_config_file, map_name):
     return header_fields
 
 
-def resolve_env_var(var_string):
-    pass
+def find_env_vars(arg_dict):
+    vars = []
+    for value in arg_dict.values():
+        if not value:
+            continue
+        raw_value_tokens = value.split(os.path.sep)
+        for tok in raw_value_tokens:
+            if tok.startswith('$'):
+                vars.append(tok[1:])
+    return vars
+            
 
 def resolve_initfile_args(arg_dict):
     '''Resolve filsystem refs such as tilde and dollar-sign'''
-    print '### resolving cmd args: %s' % arg_dict
+    env_vars = find_env_vars(arg_dict)
+    localenv = common.LocalEnvironment(*env_vars)
+    localenv.init()
+
     output_args = {}
     for key, value in arg_dict.iteritems():
         if not value:
@@ -252,7 +265,7 @@ def resolve_initfile_args(arg_dict):
         cooked_value_tokens = []
         for tok in raw_value_tokens:
             if tok is not None:
-                print 'adding cooked value token: %s...' % common.load_config_var(tok)
+                #print 'adding cooked value token: %s...' % common.load_config_var(tok)
                 cooked_value_tokens.append(common.load_config_var(tok))
         output_args[key] = os.path.sep.join(cooked_value_tokens)
     return output_args
