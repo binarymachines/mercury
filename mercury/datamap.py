@@ -5,6 +5,7 @@ import csv
 from snap import snap, common
 import yaml
 import sqldbx as sqlx
+import logging
 
 
 class NoSuchTargetFieldException(Exception):
@@ -216,7 +217,7 @@ class RecordTransformerBuilder(object):
 
 
     def build(self):
-        service_object_dict = snap.initialize_services(self._transform_config, self._log)
+        service_object_dict = snap.initialize_services(self._transform_config, logging.getLogger())
         so_registry = common.ServiceObjectRegistry(service_object_dict)
 
         datasource_name = self._transform_config['maps'][self._map_name]['lookup_source']
@@ -346,7 +347,7 @@ class DataSupplier(object):
             raise MissingSupplierMethodException(self.__class__.__name__, supply_function_name)
 
 
-class LookupDataSource(object):
+class LookupDatasource(object):
     def __init__(self, service_object_registry, **kwargs):
         self._service_object_registry = service_object_registry
 
