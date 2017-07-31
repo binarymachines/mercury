@@ -2,7 +2,7 @@
 
 
 import csv
-from snap import common
+from snap import snap, common
 import yaml
 import sqldbx as sqlx
 
@@ -28,6 +28,21 @@ class NoSuchLookupMethodException(Exception):
 class NonexistentDatasourceException(Exception):
     def __init__(self, src_name, module_name):
         Exception.__init__(self, 'No datasource named "%s" in target Python module "%s".' % (src_name, module_name))
+
+
+class MissingSupplierMethodException(Exception):
+    def __init__(self, classname, methodname):
+        Exception.__init__(self, 'DataSupplier subclass %s contains no supply method "%s".' % (classname, methodname))
+
+
+class InvalidSupplierRequestException(Exception):
+    def __init__(self, field_name):
+        Exception.__init__(self, 'Cannot supply a value for a record identifier field (%s).' % field_name)
+
+
+class InvalidSupplierRecordException(Exception):
+    def __init__(self, record_id_field_name):
+        Exception.__init__(self, 'Incoming record is missing a value for its identifier field "%s"; cannot supply data.' % record_id_field_name)
 
 
 
@@ -108,6 +123,9 @@ class RecordTransformer:
         if not datasource:
             raise NoDatasourceForFieldException(target_field_name)
 
+        return datasource.lookup(target_field_name, source_record, self.value_map)
+
+        '''
         transform_func_name = 'lookup_%s' % (target_field_name)
         #print '## transform function name = %s \n\n' % transform_func_name
         if not hasattr(datasource, transform_func_name):
@@ -115,6 +133,7 @@ class RecordTransformer:
 
         transform_func = getattr(datasource, transform_func_name)
         return transform_func(target_field_name, source_record, self.value_map)
+        '''
 
 
     def transform(self, source_record, **kwargs):
@@ -128,8 +147,7 @@ class RecordTransformer:
             elif self.field_map.get(target_field_name):
                 source_field_resolver = self.field_map[target_field_name]
                 target_record[target_field_name] = source_field_resolver.resolve(source_record)
-
-        #print 'transformer returning record: %s' % target_record
+        
         return target_record
 
 
@@ -145,14 +163,16 @@ class RecordTransformerBuilder(object):
         with open(yaml_config_filename) as f:
             self._transform_config = yaml.load(f)
 
+        '''
         self._databases=self.load_databases(self._transform_config)
 
         lookup_src = self._transform_config['maps'][self._map_name]['lookup_source']
         target_datasource_db_name = self._transform_config['sources'][lookup_src]['database'] 
         db = self._databases[target_datasource_db_name]
         self._pmgr = sqlx.PersistenceManager(db)
+        '''
 
-
+    '''
     def load_databases(self, transform_config):
 
         dbs = {}
@@ -184,20 +204,23 @@ class RecordTransformerBuilder(object):
             dbs[db_section] = database            
         
         return dbs
+    '''
 
+    def load_datasource(self, src_name, transform_config, service_object_registry):
 
-    def load_datasource(self, src_name, transform_config):
         src_module_name = self._transform_config['globals']['lookup_source_module']
-        
         datasource_class_name = self._transform_config['sources'][src_name]['class']
         klass = common.load_class(datasource_class_name, src_module_name)        
-        init_params = self._transform_config['sources'][src_name].get('init_params', {})
-        return klass(self._pmgr, **init_params)
+        #init_params = self._transform_config['sources'][src_name].get('init_params', {})
+        return klass(service_object_registry)
 
 
     def build(self):
+        service_object_dict = snap.initialize_services(self._transform_config, self._log)
+        so_registry = common.ServiceObjectRegistry(service_object_dict)
+
         datasource_name = self._transform_config['maps'][self._map_name]['lookup_source']
-        datasource = self.load_datasource(datasource_name, self._transform_config)
+        datasource = self.load_datasource(datasource_name, self._transform_config, so_registry)
         transformer = RecordTransformer()
 
         for fieldname in self._transform_config['maps'][self._map_name]['fields']:
@@ -287,6 +310,57 @@ class NullByteFilter:
                 if '\0' not in record:
                     readable_lines.append(record)
         return readable_lines
+
+
+
+class DataSupplier(object):
+    def __init__(self, service_object_registry, **kwargs):
+        kwreader = common.KeywordArgReader('record_id_field')
+        kwreader.read(**kwargs)
+        self._record_id_field = kwreader.get_value('record_id_field')
+        self.service_object_registry = service_object_registry
+        
+
+    def get_service_object(self, so_name):
+        return self.service_object_registry.lookup(so_name)
+
+
+    def supply(self, field_name, record):        
+        if field_name == self._record_id_field:
+            raise InvalidSupplierRequestException(field_name)
+
+        record_id = record.get(self._record_id_field)
+        if record_id is None or record_id == '':
+            raise InvalidSupplierRecordException(self._record_id_field)
+
+        supply_function_name = 'supply_%s' % field_name
+        if hasattr(self, supply_function_name):
+            supply_function = getattr(self, supply_function_name)
+
+            # we do not need to pass the name of the field whose value
+            # is being supplied, because it is implicit in the name of the
+            # target method -- if you wrote it, you know what value it should
+            # supply
+            return supply_function(record_id)
+        else:
+            raise MissingSupplierMethodException(self.__class__.__name__, supply_function_name)
+
+
+class LookupDataSource(object):
+    def __init__(self, service_object_registry, **kwargs):
+        self._service_object_registry = service_object_registry
+
+
+    def get_service_object(self, service_object_name):
+        return self._service_object_registry.lookup(service_object_name)
+
+
+    def lookup(self, target_field_name, source_record, field_value_map):
+        lookup_method_name = 'lookup_%s' % target_field_name
+        if not hasattr(self, lookup_method_name):
+            raise NoSuchLookupMethodException(self.__class__.__name, lookup_method_name)
+        lookup_method = getattr(self, lookup_method_name)
+        return lookup_method(target_field_name, source_record, field_value_map)            
 
 
 class CSVFileDataExtractor(object):
