@@ -223,10 +223,10 @@ def get_schema_compliance_stats(source_datafile, schema_config):
 
 
 
-def load_data_supplier(record_type, schema_config_file):
+def load_data_supplier(record_type, schema_config_file, record_id_field):
     supplier_class = None
     svc_object_registry = None
-    supplier_init_params = {}
+    supplier_init_params = {'record_id_field': record_id_field}
     with open(schema_config_file) as f:
         config = yaml.load(f)
         supplier_module = config['globals']['supplier_module']
@@ -342,7 +342,7 @@ def main(args):
     elif lookup_mode:
         record_type = args.get('--rtype')
         schema_config_file = args.get('--schema')
-        data_supplier = load_data_supplier(record_type, schema_config_file)
+        data_supplier = load_data_supplier(record_type, schema_config_file, 'INDIR_SALES_KEY')
         repair_processor = RecordRepairProcessor(data_supplier)
 
     elif interactive_mode:
