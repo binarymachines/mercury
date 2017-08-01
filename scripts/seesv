@@ -226,7 +226,7 @@ def get_schema_compliance_stats(source_datafile, schema_config):
 def load_data_supplier(record_type, schema_config_file):
     supplier_class = None
     svc_object_registry = None
-    supplier_init_params = None
+    supplier_init_params = {}
     with open(schema_config_file) as f:
         config = yaml.load(f)
         supplier_module = config['globals']['supplier_module']
