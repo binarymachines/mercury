@@ -3,7 +3,7 @@
 '''Usage:
             seesv --xform=<transform_file> --xmap=<transform_map> --schema=<schema_file> --rtype=<record_type> <datafile>
             seesv (-t | -f) --schema=<schema_file> --rtype=<record_type> <datafile>
-            seesv -l --schema=<schema_file> --rtype=<record_type> <datafile
+            seesv -l --schema=<schema_file> --rtype=<record_type> <datafile>
             seesv -i
             seesv --initfile=<init_file>
 
@@ -27,7 +27,7 @@ import os, sys
 from snap import snap, common
 from mercury import datamap as dmap
 import yaml
-
+import logging
 
 
 class TransformProcessor(dmap.DataProcessor):
@@ -232,7 +232,7 @@ def load_data_supplier(record_type, schema_config_file):
         supplier_module = config['globals']['supplier_module']
         supplier_classname = config['globals']['data_supplier']
         supplier_class = common.load_class(supplier_classname, supplier_module)
-        service_objects = snap.initialize_services(config)
+        service_objects = snap.initialize_services(config, logging.getLogger())
         svc_object_registry = common.ServiceObjectRegistry(service_objects)
         supplier_params = config['globals'].get('supplier_init_params') or []
         for param in supplier_params:
