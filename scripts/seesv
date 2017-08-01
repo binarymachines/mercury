@@ -250,7 +250,7 @@ def get_required_fields(record_type, schema_config_file):
             raise Exception('No record type "%s" found in schema config file %s.' % (record_type, schema_config_file))
         
         for field_name in schema_config:
-            if record_config['record_types'][record_type][field_name]['required'] == True:
+            if schema_config['record_types'][record_type][field_name]['required'] == True:
                 required_fields.append(field_name)
 
     return required_fields
