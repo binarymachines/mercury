@@ -342,8 +342,10 @@ def main(args):
     elif lookup_mode:
         record_type = args.get('--rtype')
         schema_config_file = args.get('--schema')
+        required_fields = get_required_fields(record_type, schema_config_file)
         data_supplier = load_data_supplier(record_type, schema_config_file, 'INDIR_SALES_KEY')
-        repair_processor = RecordRepairProcessor(data_supplier)
+        #     def __init__(self, required_record_fields, data_supplier, processor=None):
+        repair_processor = RecordRepairProcessor(required_fields, data_supplier)
 
     elif interactive_mode:
         print 'PLACEHOLDER: seesv interactive mode'
