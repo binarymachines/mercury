@@ -345,10 +345,12 @@ def main(args):
         data_supplier = load_data_supplier(record_type, schema_config_file, 'INDIR_SALES_KEY')
         #     def __init__(self, required_record_fields, data_supplier, processor=None):
         repair_processor = RecordRepairProcessor(required_fields, data_supplier, processor=dmap.WhitespaceCleanupProcessor())
+        src_header = get_all_fields(record_type, schema_config_file)
+        d2csv_proc = Dictionary2CSVProcessor(src_header, '|', data_processor=repair_processor)
         with open(schema_config_file) as f:
             record_config = yaml.load(f)
             schema_config = record_config['record_types'][record_type]
-            print get_schema_compliance_stats(src_datafile, schema_config, record_type, repair_processor)
+            print get_schema_compliance_stats(src_datafile, schema_config, record_type, d2csv_proc)
 
     elif interactive_mode:
         print 'PLACEHOLDER: seesv interactive mode'
