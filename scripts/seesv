@@ -199,6 +199,8 @@ class RecordRepairProcessor(dmap.DataProcessor):
                         output_record[field_name] = field_value # do not change empties to None
                     else:
                         output_record[field_name] = value
+                else:
+                    output_record[field_name] = field_value
             else:
                 output_record[field_name] = field_value                    
         return output_record
