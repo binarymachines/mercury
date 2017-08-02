@@ -195,10 +195,10 @@ class RecordRepairProcessor(dmap.DataProcessor):
             if field_name in self._required_record_fields:
                 if field_value is None or str(field_value) == '':
                     value = self._data_supplier.supply(field_name, record)
-                if value is None:
-                    output_record[field_name] = field_value # do not change empties to None
-                else:
-                    output_record[field_name] = value
+                    if value is None:
+                        output_record[field_name] = field_value # do not change empties to None
+                    else:
+                        output_record[field_name] = value
             else:
                 output_record[field_name] = field_value                    
         return output_record
