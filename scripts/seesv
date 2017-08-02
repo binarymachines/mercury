@@ -368,6 +368,7 @@ def main(args):
         schema_config_file = args.get('--schema')
         required_fields = get_required_fields(record_type, schema_config_file)
         data_supplier = load_data_supplier(record_type, schema_config_file, 'INDIR_SALES_KEY')
+        print data_supplier.get_service_object('mssql').db.list_tables
         #     def __init__(self, required_record_fields, data_supplier, processor=None):
         repair_processor = RecordRepairProcessor(required_fields, data_supplier, processor=dmap.WhitespaceCleanupProcessor())
         get_schema_compliance_with_lookup(src_datafile, schema_config_file, record_type, repair_processor)
