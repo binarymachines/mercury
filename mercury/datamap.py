@@ -330,9 +330,9 @@ class DataSupplier(object):
         if field_name == self._record_id_field:
             raise InvalidSupplierRequestException(field_name)
 
-        record_id = record.get(self._record_id_field)
-        if record_id is None or record_id == '':
-            raise InvalidSupplierRecordException(self._record_id_field)
+        # record_id = record.get(self._record_id_field)
+        # if record_id is None or record_id == '':
+        #     raise InvalidSupplierRecordException(self._record_id_field)
 
         supply_function_name = 'supply_%s' % field_name
         if hasattr(self, supply_function_name):
@@ -342,7 +342,8 @@ class DataSupplier(object):
             # is being supplied, because it is implicit in the name of the
             # target method -- if you wrote it, you know what value it should
             # supply
-            return supply_function(record_id)
+            # return supply_function(record_id)
+            return supply_function(record)
         else:
             raise MissingSupplierMethodException(self.__class__.__name__, supply_function_name)
 
