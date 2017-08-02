@@ -185,7 +185,7 @@ class ComplianceStatsProcessor(dmap.DataProcessor):
 class RecordRepairProcessor(dmap.DataProcessor):
     def __init__(self, required_record_fields, data_supplier, processor=None):
         dmap.DataProcessor.__init__(self, processor)
-        self._required_fields = required_record_fields
+        self._required_record_fields = required_record_fields
         self._data_supplier = data_supplier
 
 
