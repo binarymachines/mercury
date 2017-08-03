@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 
+import sys
 import csv
 from snap import snap, common
 import yaml
@@ -319,6 +320,7 @@ class DataSupplier(object):
         kwreader = common.KeywordArgReader('record_id_field')
         kwreader.read(**kwargs)
         self._record_id_field = kwreader.get_value('record_id_field')
+        self._abort_on_null = kwreader.get_value('abort_on_null') or False
         self.service_object_registry = service_object_registry
         
 
@@ -342,7 +344,11 @@ class DataSupplier(object):
             # is being supplied, because it is implicit in the name of the
             # target method -- if you wrote it, you know what value it should
             # supply
-            return supply_function(record_id)
+            result = supply_function(record_id)
+            if result is None and self._abort_on_null == True:       
+                function_name = sys._getframe().f_code.co_name    
+                raise Exception('data supplier method "%s" could not provide a value.' % function_name)
+            return result
         else:
             raise MissingSupplierMethodException(self.__class__.__name__, supply_function_name)
 
