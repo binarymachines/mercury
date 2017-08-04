@@ -7,6 +7,21 @@ import sqlalchemy as sqla
 import sqlalchemy_utils
 
 
+object_table_create_template = '''
+CREATE TABLE "{{schema}}.{{table.name}}" (
+
+"{{table.pk_field}}" {{table.pk_type}} NOT NULL,
+
+PRIMARY KEY ("{{id}}") 
+
+)
+'''
+
+object_table_field_template = '''
+"{{}}" {{}} NOT NULL
+'''
+
+
 class FieldSpec(object):
     def __init__(self, field_name, sql_type_name, **kwargs):
         self._name = field_name
@@ -19,6 +34,10 @@ class FieldSpec(object):
     @property
     def sqltype(self):
         return self._sqltype
+
+    @property
+    def ddl(self):
+        return '"{fname}" {ftype} NOT NULL'.format(ftype=self.sqltype, fname=self.name)
 
 
 
@@ -37,6 +56,12 @@ class TableSpec(object):
 
     def add_meta_field(self, field_spec):
         self._meta_fields.append(field_spec)
+
+    
+    @property
+    def ddl(self):
+
+
 
 
 
@@ -74,6 +99,10 @@ class Accumulator(object):
 
     def clear(self):
         '''remove all staged data -- override in subclass'''
+
+
+    def generate_load_query(self, source_table_spec, reading_frame):
+        
 
 
     def load_source_data(self, source_table_spec, reading_frame, max_generation=-1):
