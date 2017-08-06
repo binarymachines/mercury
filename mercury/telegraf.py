@@ -456,6 +456,7 @@ class K2Relay(DataRelay):
         self._target_log_writer.write(self._target_topic, kafka_message.value)
 
 
+
 class BulkTransferAgent(object):
     def __init__(self, **kwargs):
         kwreader = common.KeywordArgReader('local_temp_dir',
@@ -515,6 +516,8 @@ def dimension_id_lookup_func(value, dim_table_name, key_field_name, value_field_
             raise Exception('returned empty result set from query: %s where value is %s' % (str(stmt), value))
 
         return record[0]
+
+
 
 class OLAPSchemaDimension(object):
     def __init__(self, **kwargs):
@@ -744,8 +747,6 @@ class OLAPStarSchemaRelay(DataRelay):
             fact_record_type_builder.add_field(name,
                                                self._schema_mapping_context.get_dimension(name).fact_table_field_name,
                                                self._schema_mapping_context.get_dimension(name).primary_key_field_type)
-
-        #TODO: add non-dimension fields to builder
 
         for name in self._schema_mapping_context.non_dimension_names:
             nd_field = self._schema_mapping_context.get_non_dimension_field(name)

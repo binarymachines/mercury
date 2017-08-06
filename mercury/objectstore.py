@@ -6,63 +6,119 @@ import os
 import sqlalchemy as sqla
 import sqlalchemy_utils
 
+from snap import common
+import sqldbx as sqlx
+
 
 object_table_create_template = '''
-CREATE TABLE "{{schema}}.{{table.name}}" (
-
-"{{table.pk_field}}" {{table.pk_type}} NOT NULL,
-
-PRIMARY KEY ("{{id}}") 
-
+CREATE TABLE "{schema}"."{tablename}" (
+"{pk_field}" {pk_type} NOT NULL {pk_default},
+{fields},
+PRIMARY KEY ("{pk_field}")
 )
 '''
 
-object_table_field_template = '''
-"{{}}" {{}} NOT NULL
+load_query_template = '''
+SELECT
+{fields}
+FROM {objectstore_table}
+WHERE generation = {generation}
 '''
 
 
 class FieldSpec(object):
-    def __init__(self, field_name, sql_type_name, **kwargs):
+    def __init__(self, field_name, sql_type_name, *field_args):
         self._name = field_name
         self._sqltype = sql_type_name
+        self._field_args = field_args
+
+
+    def get_field_arg_clause(self):
+        if len(self._field_args):
+            return ' '.join(self._field_args)
+        return ''
+
 
     @property
     def name(self):
         return self._name
 
+
     @property
     def sqltype(self):
         return self._sqltype
 
+
     @property
-    def ddl(self):
-        return '"{fname}" {ftype} NOT NULL'.format(ftype=self.sqltype, fname=self.name)
+    def sql(self):
+        return '"{fname}" {ftype} {args}'.format(ftype=self.sqltype, 
+                                                 fname=self.name,
+                                                 args=self.get_field_arg_clause())
 
 
 
 class TableSpec(object):
     def __init__(self, name, **kwargs):
+        kwreader = common.KeywordArgReader('pk_field',
+                                            'pk_type',
+                                            'schema',
+                                            'fact_id_field')
+        kwreader.read(**kwargs)
         self._table_name = name
-        self._primary_key_field = primary_key_field
-        self._primary_key_type = primary_key_type
+        self._fact_id_field = kwreader.get_value('fact_id_field')
+        self._primary_key_field = kwreader.get_value('pk_field')
+        self._primary_key_type = kwreader.get_value('pk_type')
+        self._schema = kwreader.get_value('schema')
+        pk_default = kwreader.get_value('pk_default')
+        if pk_default:
+            self._pk_default_clause = 'DEFAULT %s' % pk_default
+        else:
+            self._pk_default_clause = ''
         self._data_fields = []
-        self._meta_fields = []
+        self._meta_fields = []        
 
 
-    def add_data_field(self, field_spec):
+    def add_data_field(self, field_spec, 'NOT NULL'):
         self._data_fields.append(field_spec)
 
 
     def add_meta_field(self, field_spec):
         self._meta_fields.append(field_spec)
 
+
+    def get_field_creation_sql(self):
+        all_fields = self._data_fields + self._meta_fields
+        create_lines = [f.sql for f in all_fields]
+        return ',\n'.join(create_lines)
+
+    @property
+    def fact_id_field(self):
+        return self._fact_id_field
+
+    @property
+    def data_fieldnames(self):
+        return [fieldspec.name for fieldspec in self._data_fields]
+
+    @property
+    def tablename(self):
+        return self._table_name
+
+    @property
+    def pk_field_name(self):
+        return self._primary_key_field
+
+    @property
+    def pk_field_type(self):
+        return self._primary_key_type
     
     @property
-    def ddl(self):
-
-
-
+    def sql(self):
+        return object_table_create_template.format(schema=self._schema,
+                                                   tablename=self.tablename,
+                                                   pk_field=self.pk_field_name,
+                                                   pk_type=self.pk_field_type,
+                                                   fields=self.get_field_creation_sql(),
+                                                   pk_default=self._pk_default_clause)
 
 
 class TableSpecBuilder(object):
@@ -72,15 +128,17 @@ class TableSpecBuilder(object):
         for key, value in kwargs.iteritems():
             self._extra_params[key] = value
 
-        self._tablespec = TableSpec(self._name)
+        self._tablespec = TableSpec(self._name, **kwargs)
 
 
-    def add_data_field(self, f_name, f_type, **kwargs):
-        self._tablespec.add_data_field(FieldSpec(f_name, f_type, **kwargs))
+    def add_data_field(self, f_name, f_type, *field_args):
+        self._tablespec.add_data_field(FieldSpec(f_name, f_type, *field_args))
+        return self
 
 
-    def add_meta_field(self, f_name, f_type, **kwargs):
-        self._tablespec.add_meta_field(FieldSpec(f_name, f_type, **kwargs))
+    def add_meta_field(self, f_name, f_type, *field_args):
+        self._tablespec.add_meta_field(FieldSpec(f_name, f_type, *field_args))
+        return self
 
 
     def build(self):
@@ -88,8 +146,18 @@ class TableSpecBuilder(object):
     
 
 class Accumulator(object):
-    def __init__(self):
-        pass
+    def __init__(self, source_tablespec, source_sqldb):
+        self._src_tablespec = source_tablespec
+        self._src_pmgr = sqlx.PersistenceManager(source_sqldb)
+
+
+    @property
+    def tablespec(self):
+        return self._src_tablespec
+
+    @property
+    def persistence_mgr(self):
+        return self._src_pmgr
 
 
     def _load(self, loading_query, **kwargs):
@@ -101,22 +169,28 @@ class Accumulator(object):
         '''remove all staged data -- override in subclass'''
 
 
-    def generate_load_query(self, source_table_spec, reading_frame):
+    def generate_load_query(self, generation_number, **kwargs):
+        return load_query_template.format(fields=',\n'.join(self._src_tablespec.data_fieldnames),
+                                          objectstore_table=self._src_tablespec.tablename,
+                                          generation=generation_number)
         
 
+    def load_source_data(self, **kwargs):
+        kwreader = common.KeywordArgReader()
+        kwreader.read(**kwargs)
 
-    def load_source_data(self, source_table_spec, reading_frame, max_generation=-1):
+        max_generation = int(kwreader.get_value('max_generation') or 0)
         current_gen = 0
         load_error = None
         while True:
-            loading_query = self.generate_load_query(source_table_spec, reading_frame, current_gen)
+            loading_query = self.generate_load_query(current_gen)
             try:
                 self._load(loading_query, **kwargs)
                 if max_generation >= 0 and current_gen == max_generation:
                     break
                 current_gen += 1 
             except Exception, err:
-                self._clear()
+                self.clear()
                 load_error = err
                 break
         if load_error:
@@ -132,6 +206,28 @@ class Accumulator(object):
         '''override in subclass'''
         pass
 
+ 
+class InMemoryAccumulator(Accumulator):
+    def __init__(self, tablespec, source_sqldb):
+        Accumulator.__init__(self, tablespec, source_sqldb)
+        self._data = {}
+
+
+    def _load(self, loading_query, **kwargs):
+        with sqlx.txn_scope(self.persistence_mgr.database) as session:
+            results = session.execute(loading_query)
+            for row in results:
+                record_id = row[self.tablespec.fact_id_field]
+                #row2dict = lambda row: {c.name: str(getattr(row, c.name)) for c in row.__table__.columns}
+                self._data[record_id] = dict(row)
+        
+
+    def get_data(self):
+        return common.jsonpretty(self._data)
+
+
+    def clear(self):
+        self._data.clear()
 
 
 class TimelimeExtractor(object):
