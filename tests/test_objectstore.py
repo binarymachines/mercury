@@ -18,6 +18,8 @@ TESTING_SCHEMA = 'test'
 OBJECT_TABLE_NAME = 'objects'
 
 
+# direct_sales_topic_0
+
 class TimelineGenerationTest(unittest.TestCase):
 
     def setUp(self):
@@ -39,7 +41,7 @@ class TimelineGenerationTest(unittest.TestCase):
                                             schema=TESTING_SCHEMA,
                                             pk_field='id',
                                             pk_type='uuid',
-                                            fact_id_field='event_uuid',
+                                            object_id_field='event_uuid',
                                             pk_default='public.gen_random_uuid()')
 
         self.tablespec_builder.add_data_field('event_type', 'varchar(32)')
@@ -166,7 +168,25 @@ class TimelineGenerationTest(unittest.TestCase):
         self.assertEquals(condensed_record_count,
                           records_in_source - 1)
 
+
+    def test_tablespec_config_loads_valid_tablespec(self):
+        configfile = 'data/sample_objectstore_cfg.yaml'
         
+        obj_store_cfg = obs.ObjectstoreConfig(configfile)
+        self.log.debug(obj_store_cfg.tablespec.sql)
+
+        tblspec = obj_store_cfg.tablespec
+        self.create_object_table(tblspec, obj_store_cfg.database)
+        
+        engine = obj_store_cfg.database.get_engine()
+        self.assertTrue(engine.dialect.has_table(engine, 
+                                                 tblspec.tablename,
+                                                 schema=tblspec.schema))
+                                                 
+        with sqlx.txn_scope(obj_store_cfg.database) as session:
+            drop_statement = 'DROP TABLE "%s"."%s"' % (tblspec.schema, tblspec.tablename)
+            session.execute(drop_statement)
+
 
 if __name__ == '__main__':
     logging.basicConfig( stream=sys.stderr )

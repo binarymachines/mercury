@@ -3,11 +3,14 @@
 
 import yaml
 import os
+import logging
 import sqlalchemy as sqla
 import sqlalchemy_utils
 
+from snap import snap
 from snap import common
 import sqldbx as sqlx
+import telegraf as tg
 
 
 object_table_create_template = '''
@@ -62,10 +65,10 @@ class TableSpec(object):
         kwreader = common.KeywordArgReader('pk_field',
                                             'pk_type',
                                             'schema',
-                                            'fact_id_field')
+                                            'object_id_field')
         kwreader.read(**kwargs)
         self._table_name = name
-        self._fact_id_field = kwreader.get_value('fact_id_field')
+        self._fact_id_field = kwreader.get_value('object_id_field')
         self._primary_key_field = kwreader.get_value('pk_field')
         self._primary_key_type = kwreader.get_value('pk_type')
         self._schema = kwreader.get_value('schema')
@@ -248,6 +251,67 @@ class InMemoryAccumulator(Accumulator):
 
     def clear(self):
         self._data.clear()
+
+
+class ObjectstoreConfig(object):
+    def __init__(self, configfile_name, **kwargs):
+        yaml_config = None
+        with open(configfile_name) as f:
+            yaml_config = yaml.load(f)
+
+        self._cluster = tg.KafkaCluster()
+        for entry in yaml_config['globals']['cluster_nodes']:
+            tokens = entry.split(':')
+            ip = tokens[0]
+            port = tokens[1]
+            self._cluster = self._cluster.add_node(tg.KafkaNode(ip, port))
+
+        self._source_topic = yaml_config['globals']['source_topic']
+
+        service_object_tbl = snap.initialize_services(yaml_config, logging.getLogger(__name__))
+        self._service_object_registry = common.ServiceObjectRegistry(service_object_tbl)
+
+        object_db_config = yaml_config['object_db']
+        so_name = object_db_config['service_object']
+
+        db_service_object = self._service_object_registry.lookup(so_name)
+        db_property = object_db_config['property']
+
+        self._db = getattr(db_service_object, db_property)
+
+        tbl_name = yaml_config['tablespec']['table_name']
+        target_schema = yaml_config['tablespec']['schema']
+        obj_id_field = yaml_config['tablespec']['object_id_field']
+        pkfield_cfg = yaml_config['tablespec']['pk_field']
+        tspec_builder = TableSpecBuilder(tbl_name,
+                                         schema=target_schema,
+                                         pk_field=pkfield_cfg['name'],
+                                         pk_type=pkfield_cfg['type'],
+                                         object_id_field=obj_id_field,
+                                         pk_default=pkfield_cfg['default'])
+
+        for fieldname in yaml_config['tablespec']['data_fields']:
+            fieldtype = yaml_config['tablespec']['data_fields'][fieldname]
+            tspec_builder.add_data_field(fieldname, fieldtype)
+
+        for fieldname in yaml_config['tablespec']['meta_fields']:
+            fieldtype = yaml_config['tablespec']['meta_fields'][fieldname]
+            tspec_builder.add_meta_field(fieldname, fieldtype)
+
+        self._tablespec = tspec_builder.build()
+
+
+    @property
+    def source_topic(self):
+        return self._source_topic
+
+    @property
+    def database(self):
+        return self._db
+
+    @property
+    def tablespec(self):
+        return self._tablespec
 
 
 class TimelimeExtractor(object):

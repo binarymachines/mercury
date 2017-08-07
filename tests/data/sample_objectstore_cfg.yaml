@@ -5,6 +5,11 @@ globals:
   project_home: $PRX_HOME  
   service_module: prx_services
   store_module: prx_objectstore
+  source_topic: test_objstore_0
+  cluster_nodes:
+    - 172.31.17.24:9092
+    - 172.31.18.160:9092
+    - 172.31.17.250:9092
 
 
 service_objects:
@@ -26,12 +31,15 @@ service_objects:
         - name: password 
           value: $PGSQL_PASSWORD
 
-source_topic: test_objstore_0
+object_db:
+  service_object: pgsql
+  property: database
+
 
 tablespec:
   table_name: sst_objects
   schema: test
-  fact_id_field: transaction_id
+  object_id_field: transaction_id
   pk_field:
     name: id
     type: uuid
@@ -39,79 +47,43 @@ tablespec:
 
   data_fields:
     invoice_number: varchar(32)
-
     transaction_id: varchar(64)
-
     contract_id: varchar(32)
-
     customer_number: varchar(32)
-
     shipto_customer_number: varchar(32)
-
     order_type: varchar(32)
-
     transaction_type_code: varchar(32)
-
     credit_or_rebill_code: varchar(32)
-
     chargeback_key: varchar(32)
-    
     edoc_number: varchar(32)
-    
     edoc_line_number: varchar(32)
-    
     tc_match_number: varchar(32)
-    
     invoice_date: date
-    
     sale_posted_date: date
-    
     order_date: date
-    
     product_id: varchar(32)
-    
     product_name: varchar(32)
-    
     ndc: varchar(16)
-    
     class_of_trade: varchar(16)
-    
     customer_is_340b: bool
-            
     agreement_id: varchar(16)
-    
     reason_code: varchar(16)
-    
     sale_type:  varchar(16)
-
     pkg_quantity: int4
-      
     medicaid_unit_qty: int4
-      
     price_per_each: float
-            
     contract_price: float     
-      
     wac_price: float
-      
     price_is_at_ceiling: bool
-      
     fair_market_value: float
-      
     loc_billed_to: varchar(16)
-      
     loc_shipped_to: varchar(16)
-      
     payment_terms_code: varchar(16)
-
     prompt_pay_discount_amt: float
-      
     pp_discount_is_customary: bool
       
   meta_fields:
-
     generation: int4
-
     correction_id: int4
 
 
