@@ -51,6 +51,9 @@ class TimelineGenerationTest(unittest.TestCase):
         self.tablespec_builder.add_meta_field('generation', 'int4')
         self.tablespec_builder.add_meta_field('correction_id', 'int4')
 
+        configfile = 'data/small_objectstore_cfg.yaml'
+        self.obj_store_cfg = obs.ObjectstoreConfig(configfile)
+
         self.create_object_table(self.tablespec_builder.build(), self.objectstore_db)
         self.clear_object_table(self.objectstore_db)
         

@@ -449,6 +449,7 @@ class CouchbaseRelay(DataRelay):
 
 class ObjectstoreDBRelay(DataRelay):
     def __init__(self, **kwargs):
+        DataRelay.__init__(self, **kwargs)
         kwreader = common.KeywordArgReader('db', 'tablespec')
         kwreader.read(**kwargs)
         self.database = kwreader.get_value('db')        

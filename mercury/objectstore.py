@@ -350,8 +350,6 @@ class ObjectstoreConfig(object):
         return self._cluster
 
 
-
-
 class TimelimeExtractor(object):
     def __init__(self):
         pass
