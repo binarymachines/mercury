@@ -212,6 +212,7 @@ class DataProcessor(object):
         return self._process(data)
 
 
+
 class ConsoleProcessor(DataProcessor):
     def __init__(self, processor=None):
         DataProcessor.__init__(self, processor)
@@ -219,6 +220,18 @@ class ConsoleProcessor(DataProcessor):
     def _process(self, record):
         print common.jsonpretty(record)
         return record
+
+
+
+class SQLTableInsertProcessor(DataProcessor):
+    def __init__(self, sql_db, insert_function, processor=None, **kwargs):
+        DataProcessor.__init__(self, processor)
+        self._insert_function = insert_function
+        self._db = sql_db
+
+
+    def _process(self, record):
+        self._insert_function(record, self._db)
 
 
 
@@ -301,6 +314,7 @@ class DataSupplier(object):
             raise MissingSupplierMethodException(self.__class__.__name__, supply_function_name)
 
 
+
 class LookupDatasource(object):
     def __init__(self, service_object_registry, **kwargs):
         self._service_object_registry = service_object_registry
@@ -318,8 +332,9 @@ class LookupDatasource(object):
         return lookup_method(target_field_name, source_record, field_value_map)            
 
 
+
 class CSVFileDataExtractor(object):
-    def __init__(self, processor, **kwargs):
+    def __init__(self, processor=None, **kwargs):
         kwreader = common.KeywordArgReader('quotechar')
         kwreader.read(**kwargs)                                           
         self._delimiter = kwreader.get_value('delimiter') or ','

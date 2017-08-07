@@ -11,7 +11,7 @@ import sqldbx as sqlx
 
 
 object_table_create_template = '''
-CREATE TABLE "{schema}"."{tablename}" (
+CREATE TABLE IF NOT EXISTS "{schema}"."{tablename}" (
 "{pk_field}" {pk_type} NOT NULL {pk_default},
 {fields},
 PRIMARY KEY ("{pk_field}")
@@ -21,7 +21,7 @@ PRIMARY KEY ("{pk_field}")
 load_query_template = '''
 SELECT
 {fields}
-FROM {objectstore_table}
+FROM "{schema}"."{objectstore_table}"
 WHERE generation = {generation}
 '''
 
@@ -78,7 +78,7 @@ class TableSpec(object):
         self._meta_fields = []        
 
 
-    def add_data_field(self, field_spec, 'NOT NULL'):
+    def add_data_field(self, field_spec):
         self._data_fields.append(field_spec)
 
 
@@ -98,6 +98,22 @@ class TableSpec(object):
     @property
     def data_fieldnames(self):
         return [fieldspec.name for fieldspec in self._data_fields]
+
+    @property
+    def meta_fieldnames(self):
+        return [fieldspec.name for fieldspec in self._meta_fields]
+
+    @property
+    def fieldnames(self):
+        result = []
+        result.append(self.pk_field_name)
+        result.extend(self.data_fieldnames)
+        result.extend(self.meta_fieldnames)
+        return result    
+
+    @property
+    def schema(self):
+        return self._schema
 
     @property
     def tablename(self):
@@ -132,7 +148,9 @@ class TableSpecBuilder(object):
 
 
     def add_data_field(self, f_name, f_type, *field_args):
-        self._tablespec.add_data_field(FieldSpec(f_name, f_type, *field_args))
+        args = ['NOT NULL']
+        args.extend(field_args)
+        self._tablespec.add_data_field(FieldSpec(f_name, f_type, *args))
         return self
 
 
@@ -144,6 +162,7 @@ class TableSpecBuilder(object):
     def build(self):
         return self._tablespec
     
+
 
 class Accumulator(object):
     def __init__(self, source_tablespec, source_sqldb):
@@ -171,6 +190,7 @@ class Accumulator(object):
 
     def generate_load_query(self, generation_number, **kwargs):
         return load_query_template.format(fields=',\n'.join(self._src_tablespec.data_fieldnames),
+                                          schema=self._src_tablespec.schema,
                                           objectstore_table=self._src_tablespec.tablename,
                                           generation=generation_number)
         
@@ -202,7 +222,7 @@ class Accumulator(object):
         pass
 
 
-    def push(self, kafka_loader):
+    def push_source_data(self, kafka_loader):
         '''override in subclass'''
         pass
 
@@ -223,7 +243,7 @@ class InMemoryAccumulator(Accumulator):
         
 
     def get_data(self):
-        return common.jsonpretty(self._data)
+        return self._data
 
 
     def clear(self):
