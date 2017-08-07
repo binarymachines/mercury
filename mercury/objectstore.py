@@ -306,6 +306,10 @@ class ObjectstoreConfig(object):
         return self._source_topic
 
     @property
+    def cluster(self):
+        return self._cluster
+
+    @property
     def database(self):
         return self._db
 
