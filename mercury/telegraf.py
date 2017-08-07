@@ -25,6 +25,8 @@ from raven import Client
 from raven.handlers.logging import SentryHandler
 
 from logging import Formatter
+#import traceback
+from sqlalchemy.sql import bindparam
 
 DEFAULT_SENTRY_DSN = 'https://64488b5074a94219ba25882145864700:9129da74c26a43cd84760d098b902f97@sentry.io/163031'
 
@@ -698,7 +700,6 @@ class OLAPSchemaMappingContextBuilder(object):
         pk_type_module = self._yaml_config['globals']['primary_key_datatype_module']
         klass = common.load_class(classname, pk_type_module)
         return klass
-
 
 
     def load_fact_pk_type_options(self):
