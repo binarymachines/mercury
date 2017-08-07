@@ -412,7 +412,7 @@ class DataRelay(object):
             data_to_send = self._transformer.transform(kafka_message.value['body'])
             print '## Data to send: %s \n\n' % str(data_to_send)
         else:
-            data_to_send = kafka_message.value
+            data_to_send = kafka_message.value['body']
         self._send(kmsg_header, data_to_send, logger, **kwargs)
         self.post_send(kmsg_header, logger, **kwargs)
 
