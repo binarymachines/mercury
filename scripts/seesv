@@ -3,7 +3,7 @@
 '''Usage:
             seesv --xform=<transform_file> --xmap=<transform_map> --schema=<schema_file> --rtype=<record_type> <datafile>
             seesv (-t | -f) --schema=<schema_file> --rtype=<record_type> <datafile>
-            seesv -l --schema=<schema_file> --rtype=<record_type> <datafile
+            seesv -l --schema=<schema_file> --rtype=<record_type> <datafile>
             seesv -i
             seesv --initfile=<init_file>
 
@@ -27,7 +27,7 @@ import os, sys
 from snap import snap, common
 from mercury import datamap as dmap
 import yaml
-
+import logging
 
 
 class TransformProcessor(dmap.DataProcessor):
@@ -185,7 +185,7 @@ class ComplianceStatsProcessor(dmap.DataProcessor):
 class RecordRepairProcessor(dmap.DataProcessor):
     def __init__(self, required_record_fields, data_supplier, processor=None):
         dmap.DataProcessor.__init__(self, processor)
-        self._required_fields = required_record_fields
+        self._required_record_fields = required_record_fields
         self._data_supplier = data_supplier
 
 
@@ -195,44 +195,68 @@ class RecordRepairProcessor(dmap.DataProcessor):
             if field_name in self._required_record_fields:
                 if field_value is None or str(field_value) == '':
                     value = self._data_supplier.supply(field_name, record)
-                if value is None:
-                    output_record[field_name] = field_value # do not change empties to None
+                    if value is None:
+                        output_record[field_name] = field_value # do not change empties to None
+                    else:
+                        output_record[field_name] = value
                 else:
-                    output_record[field_name] = value
+                    output_record[field_name] = field_value
             else:
                 output_record[field_name] = field_value                    
         return output_record
                 
             
 
-def get_schema_compliance_stats(source_datafile, schema_config):
+def get_schema_compliance_stats(source_datafile, schema_config, record_type, pre_processor):
 
-    required_fields = {}
+    required_fields_dict = {}
     for field_name in schema_config:
         if schema_config[field_name]['required'] == True:
-            required_fields[field_name] = schema_config[field_name]['type']
+            required_fields_dict[field_name] = schema_config[field_name]['type']
 
-    cstats_proc = ComplianceStatsProcessor(required_fields, dmap.WhitespaceCleanupProcessor())
+    cstats_proc = ComplianceStatsProcessor(required_fields_dict, processor=pre_processor)
  
     extractor = dmap.CSVFileDataExtractor(cstats_proc,
                                           delimiter='|',
                                           quotechar='"',
-                                          header_fields=required_fields.keys())
+                                          header_fields=required_fields_dict.keys())
     extractor.extract(source_datafile)
     return cstats_proc.get_stats()
 
 
+def get_schema_compliance_with_lookup(source_datafile, schema_config_file, record_type, pre_processor):
+    required_fields_dict = {}
+    with open(schema_config_file) as f:
+        record_config = yaml.load(f)
+        schema_config = record_config['record_types'][record_type]
 
-def load_data_supplier(record_type, schema_config_file):
+        for field_name in schema_config:
+            if schema_config[field_name]['required'] == True:
+                required_fields_dict[field_name] = schema_config[field_name]['type']
+
+    cstats_proc = ComplianceStatsProcessor(required_fields_dict, processor=pre_processor)
+
+    src_header = get_all_fields(record_type, schema_config_file)
+    d2csv_proc = Dictionary2CSVProcessor(src_header, '|', data_processor=cstats_proc)
+
+    extractor = dmap.CSVFileDataExtractor(d2csv_proc,
+                                          delimiter='|',
+                                          quotechar='"',
+                                          header_fields=required_fields_dict.keys())
+    extractor.extract(source_datafile)
+    return cstats_proc.get_stats()
+
+
+def load_data_supplier(record_type, schema_config_file, record_id_field):
     supplier_class = None
     svc_object_registry = None
-    supplier_init_params = None
+    supplier_init_params = {'record_id_field': record_id_field}
     with open(schema_config_file) as f:
         config = yaml.load(f)
         supplier_module = config['globals']['supplier_module']
         supplier_classname = config['globals']['data_supplier']
         supplier_class = common.load_class(supplier_classname, supplier_module)
-        service_objects = snap.initialize_services(config)
+        service_objects = snap.initialize_services(config, logging.getLogger())
         svc_object_registry = common.ServiceObjectRegistry(service_objects)
         supplier_params = config['globals'].get('supplier_init_params') or []
         for param in supplier_params:
@@ -250,7 +274,7 @@ def get_required_fields(record_type, schema_config_file):
             raise Exception('No record type "%s" found in schema config file %s.' % (record_type, schema_config_file))
         
         for field_name in schema_config:
-            if record_config['record_types'][record_type][field_name]['required'] == True:
+            if schema_config[field_name]['required'] == True:
                 required_fields.append(field_name)
 
     return required_fields
@@ -318,6 +342,7 @@ def resolve_initfile_args(arg_dict):
 
 def main(args):
     print args
+    logging.basicConfig(filename='seesv.log', level=logging.DEBUG)
     test_mode = args.get('--test')
     filter_mode = args.get('--filter')
     lookup_mode = args.get('--lookup')
@@ -342,8 +367,12 @@ def main(args):
     elif lookup_mode:
         record_type = args.get('--rtype')
         schema_config_file = args.get('--schema')
-        data_supplier = load_data_supplier(record_type, schema_config_file)
-        repair_processor = RecordRepairProcessor(data_supplier)
+        required_fields = get_required_fields(record_type, schema_config_file)
+        data_supplier = load_data_supplier(record_type, schema_config_file, 'INDIR_SALES_KEY')
+        print data_supplier.get_service_object('mssql').db.list_tables()
+        #     def __init__(self, required_record_fields, data_supplier, processor=None):
+        repair_processor = RecordRepairProcessor(required_fields, data_supplier, processor=dmap.WhitespaceCleanupProcessor())
+        get_schema_compliance_with_lookup(src_datafile, schema_config_file, record_type, repair_processor)
 
     elif interactive_mode:
         print 'PLACEHOLDER: seesv interactive mode'
@@ -366,7 +395,7 @@ def main(args):
             record_config = yaml.load(f)
             record_type = args.get('--rtype')
             schema_config = record_config['record_types'][record_type]
-            print get_schema_compliance_stats(src_datafile, schema_config)
+            print get_schema_compliance_stats(src_datafile, schema_config, record_type, dmap.WhitespaceCleanupProcessor())
 
     elif filter_mode:
         # Filter source records for schema compliance
