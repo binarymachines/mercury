@@ -182,10 +182,28 @@ class TimelineGenerationTest(unittest.TestCase):
         self.assertTrue(engine.dialect.has_table(engine, 
                                                  tblspec.tablename,
                                                  schema=tblspec.schema))
-                                                 
+                                             
         with sqlx.txn_scope(obj_store_cfg.database) as session:
             drop_statement = 'DROP TABLE "%s"."%s"' % (tblspec.schema, tblspec.tablename)
             session.execute(drop_statement)
+
+
+    def test_tablespec_config_generates_correct_insert_statement(self):
+        configfile = 'data/sample_objectstore_cfg.yaml'
+        
+        obj_store_cfg = obs.ObjectstoreConfig(configfile)
+        self.log.debug(obj_store_cfg.tablespec.sql)
+
+        tblspec = obj_store_cfg.tablespec
+        self.create_object_table(tblspec, obj_store_cfg.database)
+        
+        self.log.debug(tblspec.insert_statement_template)
+                                             
+        with sqlx.txn_scope(obj_store_cfg.database) as session:
+            drop_statement = 'DROP TABLE "%s"."%s"' % (tblspec.schema, tblspec.tablename)
+            session.execute(drop_statement)
+        
+        self.assertTrue(False)
 
 
 if __name__ == '__main__':
