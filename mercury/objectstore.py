@@ -341,6 +341,12 @@ class ObjectstoreConfig(object):
     def tablespec(self):
         return self._tablespec
 
+    @property
+    def kafka_cluster(self):
+        return self._cluster
+
+
+
 
 class TimelimeExtractor(object):
     def __init__(self):
