@@ -445,6 +445,25 @@ class CouchbaseRelay(DataRelay):
 
 
 
+class ObjectstoreDBRelay(DataRelay):
+    def __init__(self, **kwargs):
+        kwreader = common.KeywordArgReader('db', 'tablespec')
+        kwreader.read(**kwargs)
+        self.database = kwreader.get_value('db')        
+        self.tablespec = kwreader.get_value('tablespec')
+
+        
+    def _send(self, src_message_header, data, logger, **kwargs):
+        #execute insert statement against objectstore DB
+        insert_sql = text(self.tablespec.insert_statement_template)
+        insert_statement = insert_sql.bindparams(**data)
+
+        with sqlx.txn_scope(self.database) as session:
+            session.execute(insert_statement)
+
+
+
+
 class K2Relay(DataRelay):
     def __init__(self, target_topic, kafka_ingest_log_writer, **kwargs):
         DataRelay.__init__(self, **kwargs)
@@ -454,6 +473,7 @@ class K2Relay(DataRelay):
 
     def _send(self, kafka_message, logger):
         self._target_log_writer.write(self._target_topic, kafka_message.value)
+
 
 
 class BulkTransferAgent(object):
@@ -515,6 +535,8 @@ def dimension_id_lookup_func(value, dim_table_name, key_field_name, value_field_
             raise Exception('returned empty result set from query: %s where value is %s' % (str(stmt), value))
 
         return record[0]
+
+
 
 class OLAPSchemaDimension(object):
     def __init__(self, **kwargs):
@@ -744,8 +766,6 @@ class OLAPStarSchemaRelay(DataRelay):
             fact_record_type_builder.add_field(name,
                                                self._schema_mapping_context.get_dimension(name).fact_table_field_name,
                                                self._schema_mapping_context.get_dimension(name).primary_key_field_type)
-
-        #TODO: add non-dimension fields to builder
 
         for name in self._schema_mapping_context.non_dimension_names:
             nd_field = self._schema_mapping_context.get_non_dimension_field(name)

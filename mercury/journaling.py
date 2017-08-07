@@ -15,7 +15,6 @@ def generate_op_record_key(oplog_record):
 
 
 
-
 class OpLogField(object):
     def __init__(self, name):
         self.name = name
@@ -77,7 +76,6 @@ class PIDField(OpLogField):
     def _value(self):
         return self.process_id
 
-
     
     
 class RecordPageField(OpLogField):
@@ -103,14 +101,14 @@ class OpLogWriter(object):
         raise Exception('OpLogWriter.update() method not implemented in this class.')
 
 
-
     
 class OpLogLoader(object):
     def load_oplog_entry(self, entry_key):
         '''implement in subclass'''
         pass
 
-    
+
+
 class CouchbaseOpLogWriter(OpLogWriter):
     def __init__(self, record_type_name, couchbase_persistence_mgr, **kwargs):
         self.record_type_name = record_type_name
@@ -146,8 +144,7 @@ class ContextDecorator(object):
         return wrapper
 
 
-    
-    
+
 class journal(ContextDecorator):
     def __init__(self, op_name, oplog_writer, start_entry, end_entry = None):
         self.oplog_writer = oplog_writer
@@ -164,9 +161,7 @@ class journal(ContextDecorator):
         return self
 
 
-    def __exit__(self, typ, val, exc_traceback):
-
-        
+    def __exit__(self, typ, val, exc_traceback):        
         print typ
         print val
         traceback.print_tb(exc_traceback)
@@ -181,8 +176,6 @@ class journal(ContextDecorator):
 
     
 
-
-    
 class delta_journal(ContextDecorator):
     def __init_(self, op_name, oplog_writer, oplog_loader, oplog_entry, update_function):
         self.op_name = op_name
@@ -192,7 +185,6 @@ class delta_journal(ContextDecorator):
         self.oplog_entry_key = None
 
 
-        
     def __enter__(self):
         record = self.oplog_entry.data()
         record.op_name = self.op_name
@@ -201,14 +193,7 @@ class delta_journal(ContextDecorator):
         return self
 
     
-
     def __exit__(self, typ, val, traceback):
         record = self.oplog_loader.load(self.oplog_entry_key)
         updated_record = self.oplog_entry_update_func(record)
         self.oplog_writer.update(self.oplog_entry_key, **updated_record)
-        
-        
-    
-
-    
-        

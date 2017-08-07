@@ -127,16 +127,6 @@ class RecordTransformer:
 
         return datasource.lookup(target_field_name, source_record, self.value_map)
 
-        '''
-        transform_func_name = 'lookup_%s' % (target_field_name)
-        #print '## transform function name = %s \n\n' % transform_func_name
-        if not hasattr(datasource, transform_func_name):
-            raise NoSuchLookupMethodException(datasource.__class__.__name__, transform_func_name)
-
-        transform_func = getattr(datasource, transform_func_name)
-        return transform_func(target_field_name, source_record, self.value_map)
-        '''
-
 
     def transform(self, source_record, **kwargs):
         target_record = {}
@@ -165,48 +155,6 @@ class RecordTransformerBuilder(object):
         with open(yaml_config_filename) as f:
             self._transform_config = yaml.load(f)
 
-        '''
-        self._databases=self.load_databases(self._transform_config)
-
-        lookup_src = self._transform_config['maps'][self._map_name]['lookup_source']
-        target_datasource_db_name = self._transform_config['sources'][lookup_src]['database'] 
-        db = self._databases[target_datasource_db_name]
-        self._pmgr = sqlx.PersistenceManager(db)
-        '''
-
-    '''
-    def load_databases(self, transform_config):
-
-        dbs = {}
-        db_config_section = transform_config.get('databases')
-        
-        if not db_config_section:
-            raise Exception('The data transform config file must have a "databases" section.')
-
-        db_module = transform_config['globals']['database_module']
-        p_reader = common.KeywordArgReader('class',
-                                               'host',
-                                               'db',
-                                               'schema',
-                                               'username',
-                                               'password')
-        for db_section in db_config_section:
-            p_reader.read(**db_config_section[db_section])
-
-            db_class = p_reader.get_value('class')
-            db_host = common.load_config_var(p_reader.get_value('host'))
-            db_name = p_reader.get_value('db')
-            db_schema = p_reader.get_value('schema')
-            db_user = common.load_config_var(p_reader.get_value('username'))
-            db_password = common.load_config_var(p_reader.get_value('password'))
-
-            database_class = common.load_class(db_class, db_module)
-            database = database_class(db_host, db_name)
-            database.login(db_user, db_password, db_schema)
-            dbs[db_section] = database            
-        
-        return dbs
-    '''
 
     def load_datasource(self, src_name, transform_config, service_object_registry):
 
@@ -264,6 +212,7 @@ class DataProcessor(object):
         return self._process(data)
 
 
+
 class ConsoleProcessor(DataProcessor):
     def __init__(self, processor=None):
         DataProcessor.__init__(self, processor)
@@ -271,6 +220,18 @@ class ConsoleProcessor(DataProcessor):
     def _process(self, record):
         print common.jsonpretty(record)
         return record
+
+
+
+class SQLTableInsertProcessor(DataProcessor):
+    def __init__(self, sql_db, insert_function, processor=None, **kwargs):
+        DataProcessor.__init__(self, processor)
+        self._insert_function = insert_function
+        self._db = sql_db
+
+
+    def _process(self, record):
+        self._insert_function(record, self._db)
 
 
 
@@ -355,6 +316,7 @@ class DataSupplier(object):
             raise MissingSupplierMethodException(self.__class__.__name__, supply_function_name)
 
 
+
 class LookupDatasource(object):
     def __init__(self, service_object_registry, **kwargs):
         self._service_object_registry = service_object_registry
@@ -372,8 +334,9 @@ class LookupDatasource(object):
         return lookup_method(target_field_name, source_record, field_value_map)            
 
 
+
 class CSVFileDataExtractor(object):
-    def __init__(self, processor, **kwargs):
+    def __init__(self, processor=None, **kwargs):
         kwreader = common.KeywordArgReader('quotechar')
         kwreader.read(**kwargs)                                           
         self._delimiter = kwreader.get_value('delimiter') or ','
