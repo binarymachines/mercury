@@ -100,7 +100,7 @@ class TableSpec(object):
     def insert_statement_template(self):
         target_fields = []
         target_fields.extend(self.data_fieldnames)
-        target_fields.extend(self.meta_fieldnames)
+        #target_fields.extend(self.meta_fieldnames)
 
         placeholders = self._generate_placeholders(target_fields)
         return insert_statement_template.format(schema=self.schema,

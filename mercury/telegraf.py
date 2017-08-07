@@ -454,14 +454,15 @@ class ObjectstoreDBRelay(DataRelay):
         kwreader.read(**kwargs)
         self.database = kwreader.get_value('db')        
         self.tablespec = kwreader.get_value('tablespec')
-
+        self._insert_sql = text(self.tablespec.insert_statement_template)
+        
         
     def _send(self, src_message_header, data, logger, **kwargs):
-        #execute insert statement against objectstore DB
-        insert_sql = text(self.tablespec.insert_statement_template)
+        '''execute insert statement against objectstore DB'''
+
         data['generation'] = 0
         data['correction_id'] = None
-        insert_statement = insert_sql.bindparams(**data)
+        insert_statement = self._insert_sql.bindparams(**data)
 
         with sqlx.txn_scope(self.database) as session:
             session.execute(insert_statement)
