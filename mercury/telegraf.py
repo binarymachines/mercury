@@ -445,6 +445,25 @@ class CouchbaseRelay(DataRelay):
 
 
 
+class ObjectstoreDBRelay(DataRelay):
+    def __init__(self, **kwargs):
+        kwreader = common.KeywordArgReader('db', 'tablespec')
+        kwreader.read(**kwargs)
+        self.database = kwreader.get_value('db')        
+        self.tablespec = kwreader.get_value('tablespec')
+
+        
+    def _send(self, src_message_header, data, logger, **kwargs):
+        #execute insert statement against objectstore DB
+        insert_sql = text(self.tablespec.insert_statement_template)
+        insert_statement = insert_sql.bindparams(**data)
+
+        with sqlx.txn_scope(self.database) as session:
+            session.execute(insert_statement)
+
+
+
+
 class K2Relay(DataRelay):
     def __init__(self, target_topic, kafka_ingest_log_writer, **kwargs):
         DataRelay.__init__(self, **kwargs)

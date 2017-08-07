@@ -24,8 +24,19 @@ PRIMARY KEY ("{pk_field}")
 load_query_template = '''
 SELECT
 {fields}
-FROM "{schema}"."{objectstore_table}"
+FROM "{schema}"."{table}"
 WHERE generation = {generation}
+'''
+
+insert_statement_template = '''
+INSERT INTO "{schema}"."{table}"
+(
+    {fields}
+)
+VALUES
+(
+    {placeholders}, :generation, :correction_id
+)
 '''
 
 
@@ -80,6 +91,23 @@ class TableSpec(object):
         self._data_fields = []
         self._meta_fields = []        
 
+
+    def _generate_placeholders(self, fieldnames):
+        return [':%s' % f for f in fieldnames]
+
+
+    @property
+    def insert_statement_template(self):
+        target_fields = []
+        target_fields.extend(self.data_fieldnames)
+        target_fields.extend(self.meta_fieldnames)
+
+        placeholders = self._generate_placeholders(target_fields)
+        return insert_statement_template.format(schema=self.schema,
+                                                table=self.tablename,
+                                                fields=',\n'.join(target_fields),
+                                                placeholders=',\n'.join(placeholders))
+                                                                            
 
     def add_data_field(self, field_spec):
         self._data_fields.append(field_spec)
@@ -194,7 +222,7 @@ class Accumulator(object):
     def generate_load_query(self, generation_number, **kwargs):
         return load_query_template.format(fields=',\n'.join(self._src_tablespec.data_fieldnames),
                                           schema=self._src_tablespec.schema,
-                                          objectstore_table=self._src_tablespec.tablename,
+                                          table=self._src_tablespec.tablename,
                                           generation=generation_number)
         
 
