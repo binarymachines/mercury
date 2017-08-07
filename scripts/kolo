@@ -209,8 +209,6 @@ def ingest_with_mapping_context(mapping_context, pipeline_config, pgsql_host, pg
 
 
 def main(args):
-    print args
-
     pipeline_config_file = args['--pconfig']
     src_topic = args['--topic']
     rectype = args['--rtype']

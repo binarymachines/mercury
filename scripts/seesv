@@ -341,7 +341,6 @@ def resolve_initfile_args(arg_dict):
 
 
 def main(args):
-    print args
     logging.basicConfig(filename='seesv.log', level=logging.DEBUG)
     test_mode = args.get('--test')
     filter_mode = args.get('--filter')
