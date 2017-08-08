@@ -177,7 +177,7 @@ class TableSpec(object):
                                                    pk_default=self._pk_default_clause)
 
 
-    def add_to_transform_map(self, f_name, f_type):
+    def add_to_transform_map(self, f_name, f_type, **kwargs):
         if f_name in self._transform_map:
             raise Exception(self, 'Name %s already exists in TableSpecBuilder transform map' % f_name)
         converter = None
@@ -188,6 +188,7 @@ class TableSpec(object):
         elif 'bool' in f_type:
             converter = csvutils.StringToBooleanConverter()
         elif 'date' in f_type:
+            str_format = kwargs.get('string_format', '%Y-%m-%d %H:%M:%S')
             converter = csvutils.StringToDatetimeConverter() # Add format string as converter param if needed
         elif 'varchar' not in f_type:
             raise Exception(self, 'Type %s is not recognized for the transform map' % f_type)
@@ -205,6 +206,7 @@ class TableSpec(object):
                 converted_data[key] = value
         return converted_data
 
+
 class TableSpecBuilder(object):
     def __init__(self, table_name, **kwargs):
         self._name = table_name
@@ -220,9 +222,8 @@ class TableSpecBuilder(object):
         args = ['NOT NULL']
         args.extend(field_args)
         self._tablespec.add_data_field(FieldSpec(f_name, f_type, *args))
-        self._tablespec.add_to_transform_map(f_name, f_type)
+        self._tablespec.add_to_transform_map(f_name, f_type, **self._extra_params)
         return self
-
 
 
     def add_meta_field(self, f_name, f_type, *field_args):
