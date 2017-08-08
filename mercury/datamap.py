@@ -7,6 +7,7 @@ from snap import snap, common
 import yaml
 import sqldbx as sqlx
 import logging
+import csvutils
 
 
 class NoSuchTargetFieldException(Exception):
@@ -83,6 +84,22 @@ class FieldValueMap(object):
             raise Exception('No FieldValueResolver registered with value map under the name "%s".' % field_name)
         return resolver.resolve(source_record)
 
+
+class DataTypeTransformer:
+    def __init__(self):
+        self._csv_record_map_builder = csvutils.CSVRecordMapBuilder()
+        self._csv_record_map = None
+
+
+    def build(self, type_dict, **kwargs):
+        for f_name, f_type in type_dict.iteritems():
+            self._csv_record_map_builder.add_field(f_name, f_type)
+
+        self._csv_record_map = self._csv_record_map_builder.build(**kwargs)
+
+
+    def transform(self, source_record, **kwargs):
+        return self._csv_record_map.convert_dict(source_record, **kwargs)
 
 
 class RecordTransformer:

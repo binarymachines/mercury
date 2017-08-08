@@ -28,6 +28,11 @@ class NoSuchCSVFieldException(Exception):
         Exception.__init__(self, 'No field in csv record map named "%s"' % field_name)
 
 
+class DuplicateCSVFieldNameException(Exception):
+    def __init__(self, field_name):
+        Exception.__init__(self, 'CSV field %s already exists in CSV Record Map Builder.' % field_name)
+
+
         
 class CSVField(object):
     def __init__(self, name, field_type):
@@ -51,7 +56,6 @@ class CSVDataConverter(object):
             raise IncorrectConverterTypeError(self.source_class, object.__class__)
         '''
         return self._convert(obj)
-    
 
     
 class TimestampISOConverter(CSVDataConverter):
@@ -73,19 +77,29 @@ class DatetimeStringToISOFormatConverter(CSVDataConverter):
 
     
         
-class SingleLetterToBooleanConverter(CSVDataConverter):
+class StringToBooleanConverter(CSVDataConverter):
 
     def __init__(self):
         CSVDataConverter.__init__(self, str)
 
     def _convert(self, obj):
-        if obj == 't':
+        if obj == 't' or obj == 'true' or obj == 'True':
             return True
-        elif obj == 'f':
+        elif obj == 'f' or obj == 'false' or obj == 'False':
             return False
         else:
             return None
 
+
+class StringToDatetimeConverter(CSVDataConverter):
+
+    def __init__(self, str_format):
+        CSVDataConverter.__init__(self, datetime)
+        self._format = str_format
+
+
+    def _convert(self, obj):
+        return datetime.strptime(obj, self._format)
         
 
 class StringToIntConverter(CSVDataConverter):
@@ -95,7 +109,6 @@ class StringToIntConverter(CSVDataConverter):
 
     def _convert(self, obj):
         return int(obj)
-
     
 
 class StringToFloatConverter(CSVDataConverter):
@@ -164,14 +177,14 @@ class CSVRecordMap(object):
     
     
     def dictionary_to_row(self, dict, **kwargs):
-        should_accept_nulls = kwargs.get('accept_nulls')
+        should_accept_nulls = kwargs.get('accept_nulls', True)
         output = []
         for f in self.fields:
             data = dict.get(f.name)
             if data is None and not should_accept_nulls:
                 raise NoDataForFieldInSourceRecordError(f.name, dict)
             elif data is None:
-                data = 'NULL'
+                data = ''
                 
             if self.conversion_tbl.get(f.name):
                 output.append(self.conversion_tbl[f.name].convert(dict.get(f.name)))
@@ -180,6 +193,26 @@ class CSVRecordMap(object):
 
         delimiter = kwargs.get('delimiter') or self.delimiter
         return delimiter.join(output)
+
+
+    def convert_dict(self, row_dict, **kwargs):
+        should_accept_nulls = kwargs.get('accept_nulls', True)
+        output = {}
+        for f in self.fields:
+            data = row_dict.get(f.name)
+            if data is None and not should_accept_nulls:
+                raise NoDataForFieldInSourceRecordError(f.name, row_dict)
+            elif data is None:
+                data = ''
+
+            if self.conversion_tbl.get(f.name):
+                output[f.name] = self.conversion_tbl[f.name].convert(row_dict.get(f.name))
+            else:
+                output[f.name] = self.format(data, f)
+
+        return output
+
+
     
 
     
@@ -210,14 +243,15 @@ class CSVRecordMapBuilder(object):
     def build(self, **kwargs):
         # try to automatically determine what converters we'll need
         for f in self.fields:
-            if f.type == int:
+            if f.type == int or 'int' in f.type:
                 self.register_converter(StringToIntConverter(), f.name)
-            if f.type == float:
+            if f.type == float or 'float' in f.type:
                 self.register_converter(StringToFloatConverter(), f.name)
+            if f.type == bool or 'bool' in f.type:
+                self.register_converter(StringToBooleanConverter(), f.name)
+            if f.type == datetime or 'date' in f.type:
+                str_format = kwargs.get('string_format', '%Y-%m-%d %H:%M:%S')
+                self.register_converter(StringToDatetimeConverter(str_format), f.name)
               
         return CSVRecordMap(self.fields, self.converter_map, **kwargs)
-    
-
-    
-
 
