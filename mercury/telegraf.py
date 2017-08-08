@@ -412,7 +412,7 @@ class DataRelay(object):
             data_to_send = self._transformer.transform(kafka_message.value['body'])
             print '## Data to send: %s \n\n' % str(data_to_send)
         else:
-            data_to_send = kafka_message.value
+            data_to_send = kafka_message.value['body']
         self._send(kmsg_header, data_to_send, logger, **kwargs)
         self.post_send(kmsg_header, logger, **kwargs)
 
@@ -454,12 +454,15 @@ class ObjectstoreDBRelay(DataRelay):
         kwreader.read(**kwargs)
         self.database = kwreader.get_value('db')        
         self.tablespec = kwreader.get_value('tablespec')
-
+        self._insert_sql = text(self.tablespec.insert_statement_template)
+        
         
     def _send(self, src_message_header, data, logger, **kwargs):
-        #execute insert statement against objectstore DB
-        insert_sql = text(self.tablespec.insert_statement_template)
-        insert_statement = insert_sql.bindparams(**data)
+        '''execute insert statement against objectstore DB'''
+
+        data['generation'] = 0
+        data['correction_id'] = None
+        insert_statement = self._insert_sql.bindparams(**data)
 
         with sqlx.txn_scope(self.database) as session:
             session.execute(insert_statement)

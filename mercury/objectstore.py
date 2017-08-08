@@ -35,7 +35,7 @@ INSERT INTO "{schema}"."{table}"
 )
 VALUES
 (
-    {placeholders}, :generation, :correction_id
+    {placeholders}
 )
 '''
 

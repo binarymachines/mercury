@@ -16,8 +16,7 @@ import yaml
 import datetime
 
 
-def main(args):
-    print args
+def main(args):    
 
     pipeline_config_file = args['--pconfig']
     datafile = args['<source_datafile>']

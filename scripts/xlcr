@@ -94,8 +94,6 @@ def get_cell(worksheet, cell_id):
 
 
 def main(args):
-    #rint common.jsonpretty(args)
-
     excel_file = args['<excel_file>']
     workbook = xl.load_workbook(excel_file)
 
