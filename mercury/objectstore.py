@@ -127,6 +127,13 @@ class TableSpec(object):
         return self._fact_id_field
 
     @property
+    def data_fields(self):
+        fields = {}
+        for fieldspec in self._data_fields:
+            fields[fieldspec.name] = fieldspec.sqltype
+        return fields
+
+    @property
     def data_fieldnames(self):
         return [fieldspec.name for fieldspec in self._data_fields]
 
