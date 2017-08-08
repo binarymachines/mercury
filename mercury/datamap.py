@@ -99,8 +99,12 @@ class DataTypeTransformer:
 
 
     def transform(self, source_record, **kwargs):
-        return self._csv_record_map.convert_dict(source_record, **kwargs)
-
+        txfrmd_record = self._csv_record_map.convert_dict(source_record, **kwargs)
+        log = logging.getLogger()
+        log.debug('Transforming record.')
+        log.debug(txfrmd_record)
+        return txfrmd_record
+    
 
 class RecordTransformer:
     def __init__(self):
