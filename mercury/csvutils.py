@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 
-import common
+from snap import common
 import arrow
 from datetime import datetime
 
@@ -213,9 +213,7 @@ class CSVRecordMap(object):
         return output
 
 
-    
 
-    
 class CSVRecordMapBuilder(object):
     def __init__(self):
         self.fields = []
