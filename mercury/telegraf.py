@@ -460,9 +460,10 @@ class ObjectstoreDBRelay(DataRelay):
     def _send(self, src_message_header, data, logger, **kwargs):
         '''execute insert statement against objectstore DB'''
 
-        data['generation'] = 0
-        data['correction_id'] = None
-        insert_statement = self._insert_sql.bindparams(**data)
+        rec_data = self.tablespec.convert_data(data)
+        rec_data['generation'] = 0
+        rec_data['correction_id'] = None
+        insert_statement = self._insert_sql.bindparams(**rec_data)
 
         with sqlx.txn_scope(self.database) as session:
             session.execute(insert_statement)

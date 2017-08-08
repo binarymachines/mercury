@@ -11,6 +11,7 @@ from snap import snap
 from snap import common
 import sqldbx as sqlx
 import telegraf as tg
+import csvutils
 
 
 object_table_create_template = '''
@@ -89,7 +90,8 @@ class TableSpec(object):
         else:
             self._pk_default_clause = ''
         self._data_fields = []
-        self._meta_fields = []        
+        self._meta_fields = []
+        self._transform_map = {}
 
 
     def _generate_placeholders(self, fieldnames):
@@ -175,6 +177,34 @@ class TableSpec(object):
                                                    pk_default=self._pk_default_clause)
 
 
+    def add_to_transform_map(self, f_name, f_type):
+        if f_name in self._transform_map:
+            raise Exception(self, 'Name %s already exists in TableSpecBuilder transform map' % f_name)
+        converter = None
+        if 'int' in f_type:
+            converter = csvutils.StringToIntConverter()
+        elif 'float' in f_type:
+            converter = csvutils.StringToFloatConverter()
+        elif 'bool' in f_type:
+            converter = csvutils.StringToBooleanConverter()
+        elif 'date' in f_type:
+            converter = csvutils.StringToDatetimeConverter() # Add format string as converter param if needed
+        elif 'varchar' not in f_type:
+            raise Exception(self, 'Type %s is not recognized for the transform map' % f_type)
+
+        if converter:
+            self._transform_map[f_name] = converter
+
+    def convert_data(self, data):
+        converted_data = {}
+        for key, value in data.iteritems():
+            if key in self._transform_map:
+                new_value = self._transform_map[key].convert(value)
+                converted_data[key] = new_value
+            else:
+                converted_data[key] = value
+        return converted_data
+
 class TableSpecBuilder(object):
     def __init__(self, table_name, **kwargs):
         self._name = table_name
@@ -183,13 +213,16 @@ class TableSpecBuilder(object):
             self._extra_params[key] = value
 
         self._tablespec = TableSpec(self._name, **kwargs)
+        self._transform_map = {}
 
 
     def add_data_field(self, f_name, f_type, *field_args):
         args = ['NOT NULL']
         args.extend(field_args)
         self._tablespec.add_data_field(FieldSpec(f_name, f_type, *args))
+        self._tablespec.add_to_transform_map(f_name, f_type)
         return self
+
 
 
     def add_meta_field(self, f_name, f_type, *field_args):
