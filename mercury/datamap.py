@@ -86,10 +86,10 @@ class FieldValueMap(object):
 
 
 class DataTypeTransformer:
-    def __init__(self):
+    def __init__(self, log):
         self._csv_record_map_builder = csvutils.CSVRecordMapBuilder()
         self._csv_record_map = None
-
+        self._log = log
 
     def build(self, type_dict, **kwargs):
         for f_name, f_type in type_dict.iteritems():
@@ -100,7 +100,7 @@ class DataTypeTransformer:
 
     def transform(self, source_record, **kwargs):
         txfrmd_record = self._csv_record_map.convert_dict(source_record, **kwargs)
-        log = logging.getLogger()
+        log = self._log
         log.debug('Transforming record.')
         log.debug(txfrmd_record)
         return txfrmd_record
