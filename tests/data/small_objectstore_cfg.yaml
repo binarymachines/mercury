@@ -1,0 +1,58 @@
+# YAML config file for versioned data objectstore
+
+
+globals:
+  project_home: $PRX_HOME  
+  service_module: prx_services
+  store_module: prx_objectstore
+  source_topic: test_objstore_0
+  cluster_nodes:
+    - 172.31.17.24:9092
+    - 172.31.18.160:9092
+    - 172.31.17.250:9092
+
+
+service_objects:
+  pgsql:
+    class: PostgresServiceObject
+    init_params:
+        - name: host
+          value: $PGSQL_HOST
+    
+        - name: database
+          value: $PGSQL_DBNAME
+
+        - name: schema
+          value: test
+
+        - name: username
+          value: $PGSQL_USER
+
+        - name: password 
+          value: $PGSQL_PASSWORD
+
+object_db:
+  service_object: pgsql
+  property: database
+
+
+tablespec:
+  table_name: sst_objects
+  schema: test
+  object_id_field: UUID
+  pk_field:
+    name: id
+    type: uuid
+    default: public.gen_random_uuid()
+
+  data_fields:
+  TYPE: varchar(16)
+  UUID: varchar(16)
+  PRICE: float
+  DATE: date
+      
+  meta_fields:
+    generation: int4
+    correction_id: int4
+
+
