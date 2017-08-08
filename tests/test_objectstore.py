@@ -79,9 +79,11 @@ class TimelineGenerationTest(unittest.TestCase):
             session.execute(insert_stmt)
 
 
-    def load_test_data(self, filename, db):
+    def load_test_data(self, filename, tablespec):
         cproc = dmap.ConsoleProcessor()
-        insert_proc = dmap.SQLTableInsertProcessor(db, self.insert_test_record, cproc)
+        #insert_proc = dmap.SQLTableInsertProcessor(db, self.insert_test_record, cproc)
+
+        
         extractor = dmap.CSVFileDataExtractor(insert_proc,
                                               quotechar='"',
                                               delimiter='|')
@@ -199,6 +201,7 @@ class TimelineGenerationTest(unittest.TestCase):
 
         tblspec = obj_store_cfg.tablespec
         self.create_object_table(tblspec, obj_store_cfg.database)
+        self.load_test_data('data/sample_objectstore.csv', obj_store_cfg.database)
         
         self.log.debug(tblspec.insert_statement_template)
                                              
