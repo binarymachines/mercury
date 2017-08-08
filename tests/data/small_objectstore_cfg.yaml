@@ -46,10 +46,10 @@ tablespec:
     default: public.gen_random_uuid()
 
   data_fields:
-  TYPE: varchar(16)
-  UUID: varchar(16)
-  PRICE: float
-  DATE: date
+    TYPE: varchar(16)
+    UUID: varchar(16)
+    PRICE: float
+    DATE: date
       
   meta_fields:
     generation: int4
