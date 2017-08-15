@@ -3,6 +3,7 @@
 
 from snap import common
 import arrow
+import copy
 from datetime import datetime
 
 
@@ -11,11 +12,9 @@ class MethodNotImplementedError(Exception):
         Exception.__init__(self, 'Method %s(...) in class "%s" is not implemented. Please check your subclass(es).' % (method_name, klass.__name__))
 
         
-        
 class NoDataForFieldInSourceRecordError(Exception):
     def __init__(self, field_name, record):
         Exception.__init__(self, 'Data for field "%s" not present in source record: %s' % (field_name, str(record)))
-
 
 
 class IncorrectConverterTypeError(Exception):
@@ -23,104 +22,94 @@ class IncorrectConverterTypeError(Exception):
         Exception.__init__(self, 'Tried to pass an object of type %s to a converter which handles type %s.' % (target_class.__name__, source_class.__name__))
         
 
-class NoSuchCSVFieldException(Exception):
-    def __init__(self, field_name):
-        Exception.__init__(self, 'No field in csv record map named "%s"' % field_name)
-
-
 class DuplicateCSVFieldNameException(Exception):
     def __init__(self, field_name):
         Exception.__init__(self, 'CSV field %s already exists in CSV Record Map Builder.' % field_name)
 
 
+
+class TextFieldConverter(object):
+    def __init__(self, **kwargs):
+        kwreader = common.KeywordArgReader()
+        kwreader.read(**kwargs)
+        self._abort_on_fail = kwreader.get_value('abort_on_fail') or False
+        self._strict = kwreader.get_value('strict') or False
         
-class CSVField(object):
-    def __init__(self, name, field_type):
-        self.name = name
-        self.type = field_type
 
-
-
-class CSVDataConverter(object):
-    def __init__(self, source_class):
-        self.source_class = source_class
-
-        
-    def _convert(self, obj):
+    def _convert(self, src_string):
         raise MethodNotImplementedError('_convert', self.__class__)
 
 
-    def convert(self, obj):
-        '''
-        if not issubclass(self.source_class, obj.__class__):
-            raise IncorrectConverterTypeError(self.source_class, object.__class__)
-        '''
-        return self._convert(obj)
+    def convert(self, src_string):        
+        return self._convert(src_string)
 
     
-class TimestampISOConverter(CSVDataConverter):
-    def __init__(self):
-        CSVDataConverter.__init__(self, datetime)
-    
-    def _convert(self, obj):
-        return '"%s"' %  str(arrow.get(obj).format('YYYY-MM-DD HH:MM:SS'))
-    
+class StringToBooleanConverter(TextFieldConverter):
 
+    def __init__(self, **kwargs):
+        TextFieldConverter.__init__(self, **kwargs)
 
-class DatetimeStringToISOFormatConverter(CSVDataConverter):
-    def __init__(self):
-        CSVDataConverter.__init__(self, str)
-
-        
-    def _convert(self, obj):
-        return arrow.get(obj).isoformat()
-
-    
-        
-class StringToBooleanConverter(CSVDataConverter):
-
-    def __init__(self):
-        CSVDataConverter.__init__(self, str)
-
-    def _convert(self, obj):
-        if obj == 't' or obj == 'true' or obj == 'True':
+    def _convert(self, src_string):
+        if src_string  == 't' or src_string == 'true' or src_string == 'True':
             return True
-        elif obj == 'f' or obj == 'false' or obj == 'False':
+        elif src_string == 'f' or src_string == 'false' or src_string == 'False':
             return False
         else:
             return None
 
 
-class StringToDatetimeConverter(CSVDataConverter):
+class StringToDatetimeConverter(TextFieldConverter):
 
-    def __init__(self, str_format):
-        CSVDataConverter.__init__(self, datetime)
-        self._format = str_format
+    def __init__(self, **kwargs):
+        TextFieldConverter.__init__(self, **kwargs)
+        kwreader = common.KeywordArgReader('format')
+        kwreader.read(**kwargs)        
+        self._format = kwreader.get_value('format')
 
 
     def _convert(self, obj):
-        return datetime.strptime(obj, self._format)
+        return datetime.strptime(src_string, self._format)
         
 
-class StringToIntConverter(CSVDataConverter):
-    def __init__(self):
-        CSVDataConverter.__init__(self, str)
+class StringToIntConverter(TextFieldConverter):
+    def __init__(self, **kwargs):
+        TextFieldConverter.__init__(self, **kwargs)
 
 
-    def _convert(self, obj):
-        return int(obj)
+    def _convert(self, src_string):
+        return int(src_string)
+
+
+
+class StringToFloatConverter(TextFieldConverter):
+    def __init__(self, **kwargs):
+        TextFieldConverter.__init__(self, **kwargs)
+
+
+    def _convert(self, src_string):
+        return float(src_string)
+
     
-
-class StringToFloatConverter(CSVDataConverter):
-    def __init__(self):
-        CSVDataConverter.__init__(self, str)
-
-
-    def _convert(self, obj):
-        return float(obj)
-
     
-    
+class RecordFormatConverter(object):
+    def __init__(self, conversion_table={}, **kwargs):       
+        self._conversion_tbl = conversion_table
+
+
+    def add_field_converter(self, field_name, text_field_converter):
+        self._conversion_tbl[field_name] = text_field_converter
+
+
+    def convert(self, record, **kwargs):
+        output_record = copy.deepcopy(record)
+        for key in self._conversion_tbl.keys():
+            converter = self._conversion_tbl[key]
+            if record.hasKey(key):
+                output_record[key] = converter.convert(record[key])
+
+        return output_record
+        
+
         
 class CSVRecordMap(object):
     def __init__(self, field_array, conversion_tbl={}, **kwargs):

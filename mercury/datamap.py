@@ -49,6 +49,90 @@ class InvalidSupplierRecordException(Exception):
 
 
 
+class TextFieldConverter(object):
+    def __init__(self, **kwargs):
+        kwreader = common.KeywordArgReader()
+        kwreader.read(**kwargs)
+        self._abort_on_fail = kwreader.get_value('abort_on_fail') or False
+        self._strict = kwreader.get_value('strict') or False
+        
+
+    def _convert(self, src_string):
+        raise MethodNotImplementedError('_convert', self.__class__)
+
+
+    def convert(self, src_string):        
+        return self._convert(src_string)
+
+    
+class StringToBooleanConverter(TextFieldConverter):
+
+    def __init__(self, **kwargs):
+        TextFieldConverter.__init__(self, **kwargs)
+
+    def _convert(self, src_string):
+        if src_string  == 't' or src_string == 'true' or src_string == 'True':
+            return True
+        elif src_string == 'f' or src_string == 'false' or src_string == 'False':
+            return False
+        else:
+            return None
+
+
+class StringToDatetimeConverter(TextFieldConverter):
+
+    def __init__(self, **kwargs):
+        TextFieldConverter.__init__(self, **kwargs)
+        kwreader = common.KeywordArgReader('format')
+        kwreader.read(**kwargs)        
+        self._format = kwreader.get_value('format')
+
+
+    def _convert(self, obj):
+        return datetime.strptime(src_string, self._format)
+        
+
+class StringToIntConverter(TextFieldConverter):
+    def __init__(self, **kwargs):
+        TextFieldConverter.__init__(self, **kwargs)
+
+
+    def _convert(self, src_string):
+        return int(src_string)
+
+
+
+class StringToFloatConverter(TextFieldConverter):
+    def __init__(self, **kwargs):
+        TextFieldConverter.__init__(self, **kwargs)
+
+
+    def _convert(self, src_string):
+        return float(src_string)
+
+    
+    
+class RecordFormatConverter(object):
+    def __init__(self, conversion_table={}, **kwargs):       
+        self._conversion_tbl = conversion_table
+
+
+    def add_field_converter(self, field_name, text_field_converter):
+        self._conversion_tbl[field_name] = text_field_converter
+
+
+    def convert(self, record, **kwargs):
+        output_record = copy.deepcopy(record)
+        for key in self._conversion_tbl.keys():
+            converter = self._conversion_tbl[key]
+            if record.hasKey(key):
+                output_record[key] = converter.convert(record[key])
+
+        return output_record
+        
+
+
+
 class FieldValueResolver(object):
     def __init__(self, field_name_string):
         self._field_names = field_name_string.split('|')

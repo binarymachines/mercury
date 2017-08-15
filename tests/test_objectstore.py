@@ -18,12 +18,11 @@ TESTING_SCHEMA = 'test'
 OBJECT_TABLE_NAME = 'objects'
 
 
-# direct_sales_topic_0
 
 class TimelineGenerationTest(unittest.TestCase):
 
     def setUp(self):
-        self.log = logging.getLogger(LOG_ID)        
+        self.log = logging.getLogger(LOG_ID)
         self.env = common.LocalEnvironment('PGSQL_HOST',
                                            'PGSQL_DBNAME',
                                            'PGSQL_USER',
@@ -38,11 +37,11 @@ class TimelineGenerationTest(unittest.TestCase):
         self.objectstore_db.login(self.db_user, self.db_password)
 
         self.tablespec_builder = obs.TableSpecBuilder(OBJECT_TABLE_NAME,
-                                            schema=TESTING_SCHEMA,
-                                            pk_field='id',
-                                            pk_type='uuid',
-                                            object_id_field='event_uuid',
-                                            pk_default='public.gen_random_uuid()')
+                                                      schema=TESTING_SCHEMA,
+                                                      pk_field='id',
+                                                      pk_type='uuid',
+                                                      object_id_field='event_uuid',
+                                                      pk_default='public.gen_random_uuid()')
 
         self.tablespec_builder.add_data_field('event_type', 'varchar(32)')
         self.tablespec_builder.add_data_field('event_uuid', 'varchar(32)')
@@ -56,13 +55,14 @@ class TimelineGenerationTest(unittest.TestCase):
 
         self.create_object_table(self.tablespec_builder.build(), self.objectstore_db)
         self.clear_object_table(self.objectstore_db)
-        
-    def tearDown(self):                
+
+
+    def tearDown(self):
         #self.destroy_object_table(self.objectstore_db)
         pass
 
 
-    def insert_test_record(self, record, db):
+    def insert_test_record(self, record, target_db):
 
         insert_sql = text('''
         insert into "test"."objects"
@@ -75,7 +75,7 @@ class TimelineGenerationTest(unittest.TestCase):
                                             price=record['PRICE'],
                                             objtype=record['TYPE'],
                                             uuid=record['UUID'])
-        with sqlx.txn_scope(db) as session:
+        with sqlx.txn_scope(target_db) as session:
             session.execute(insert_stmt)
 
 
