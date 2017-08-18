@@ -152,10 +152,10 @@ class TimelineGenerationTest(unittest.TestCase):
 
         self.assertEquals(field_count, len(tablespec.fieldnames))
         self.assertEquals(match_count, field_count)
-        
-                          
+
+
     def test_in_memory_accumulator_generates_correct_dataset(self):
-        source_filename = 'data/sample_objectstore.csv'        
+        source_filename = 'data/sample_objectstore.csv'
         self.load_test_data(source_filename, self.objectstore_db)
 
         tablespec = self.tablespec_builder.build()
@@ -168,7 +168,7 @@ class TimelineGenerationTest(unittest.TestCase):
         self.log.debug(acc.get_data())
 
         condensed_record_count = len(acc.get_data().keys())
-        records_in_source = self.get_csv_sourcefile_record_count(source_filename) 
+        records_in_source = self.get_csv_sourcefile_record_count(source_filename)
 
         self.assertEquals(condensed_record_count,
                           records_in_source - 1)

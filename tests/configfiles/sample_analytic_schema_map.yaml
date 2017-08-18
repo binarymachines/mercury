@@ -1,0 +1,105 @@
+#
+# YAML file for configuration of 
+# OLAP schema mapping context
+#
+
+globals:
+  sql_datatype_module: sqlalchemy
+  primary_key_datatype_module: sqlalchemy_utils
+
+
+mappings:
+  sst:
+    fact:
+      name: transactions
+      table_name: olap.f_transactions
+      primary_key_name: id
+      primary_key_type: UUIDType
+      
+    dimensions:
+      reason_code:
+        table_name: d_reason_code
+        primary_key_field_name: id
+        value_field_name: value
+        primary_key_type: Integer
+        fact_table_field_name: reason_code_id
+        id_lookup_function: dimension_id_lookup_func
+
+      class_of_trade:
+        table_name: d_class_of_trade
+        primary_key_field_name: id
+        value_field_name: value
+        primary_key_type: Integer
+        fact_table_field_name: cot_id
+        id_lookup_function: dimension_id_lookup_func
+
+      order_type:
+        table_name: d_order_type
+        primary_key_field_name: id
+        value_field_name: value
+        primary_key_type: Integer
+        fact_table_field_name: order_type_id
+        id_lookup_function: dimension_id_lookup_func
+
+      loc_shipped_to:
+        table_name: d_location
+        primary_key_field_name: id
+        value_field_name: value
+        primary_key_type: Integer
+        fact_table_field_name: location_id
+        id_lookup_function: dimension_id_lookup_func
+
+      agreement_id:
+        table_name: d_agreement_id
+        primary_key_field_name: id
+        value_field_name: value
+        primary_key_type: Integer
+        fact_table_field_name: agreement_category_id
+        id_lookup_function: dimension_id_lookup_func
+
+    non_dimensions:
+      customer_is_340b:
+          fact_field_name: customer_is_340b
+          fact_field_type: Boolean
+
+  scb:
+    fact:
+      name: chargebacks
+      table_name: olap.f_chargebacks
+      primary_key_name: id
+      primary_key_type: UUIDType
+
+    dimensions:
+      loc_billed_to:
+        table_name: d_location
+        primary_key_field_name: id
+        value_field_name: value
+        primary_key_type: Integer
+        fact_table_field_name: location_id
+        id_lookup_function: dimension_id_lookup_func
+
+      class_of_trade:
+        table_name: d_class_of_trade
+        primary_key_field_name: id
+        value_field_name: value
+        primary_key_type: Integer
+        fact_table_field_name: cot_id
+        id_lookup_function: dimension_id_lookup_func
+
+      agreement_id:
+        table_name: d_agreement_id
+        primary_key_field_name: id
+        value_field_name: value
+        primary_key_type: Integer
+        fact_table_field_name: agreement_category_id
+        id_lookup_function: dimension_id_lookup_func
+
+    non_dimensions:
+      price_is_at_ceiling:
+          fact_field_name: is_340b_ceiling_price
+          fact_field_type: Boolean
+
+      customer_is_340b:
+          fact_field_name: customer_is_340b
+          fact_field_type: Boolean
+

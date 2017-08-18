@@ -1,0 +1,114 @@
+# 
+# YAML config file for Mercury data pipeline service
+#
+#
+
+
+globals:
+        transform_function_module:   jobmgmt_transforms
+        service_module:              mx_services
+        preprocessor_module:         mx_decode
+        port:                        6000
+        debug:                       True
+        logfile:                     mxjobs.log
+        project_directory:           $MERCURY_HOME
+        bind_host:                   0.0.0.0
+
+
+
+                        
+service_objects:        
+        job_manager:
+            class:
+                JobManagementServiceObject
+            init_params:
+                
+
+data_shapes:
+        list_jobs: 
+                fields:
+                    - name: owner_id
+                      type: string
+                      required: True
+                         
+        new_job_shape:
+                fields:
+                    - name: name
+                      type: string
+                      required: True
+
+                    - name: owner_id
+                      type: string
+                      required: True
+
+                    - name: description
+                      type: string
+                      required: True
+
+        status_shape:
+                fields:
+                    - name: job_id
+                      type: string
+                      required: True
+
+        status_update:
+                fields:
+                    - name: job_id
+                      type: string
+                      required: True
+
+                    - name: status
+                      type: string
+                      required: True
+
+
+        default:
+                fields:
+                
+
+transforms:
+        list_jobs:
+            route:              /jobs
+            method:             GET            
+            input_shape:        list_jobs
+            output_mimetype:    application/json
+
+        add_job:
+            route:              /job
+            method:             POST
+            input_shape:        new_job_shape
+            output_mimetype:    application/json
+
+        job_count:
+            route:              /count
+            method:             GET
+            input_shape:        default
+            output_mimetype:    application/json
+
+        job_status:
+            route:              /status
+            method:             GET
+            input_shape:        default
+            output_mimetype:    application/json
+
+        update_job_status:
+            route:              /update
+            method:             POST
+            input_shape:        status_update
+            output_mimetype:    application/json
+
+        all_jobs:
+          route:                /alljobs
+          method:               GET
+          input_shape:          default
+          output_mimetype:      application/json
+          
+
+error_handlers:
+        - error:                NoSuchUserException
+          tx_status_code:       HTTP_NOT_FOUND 
+                
+        - error:                DuplicateEmailAddressException
+          tx_status_code:       HTTP_BAD_REQUEST
+
+

@@ -1,0 +1,385 @@
+# data validation init file for Praxis data ingest
+#
+#
+
+globals:
+    project_home: $PRX_HOME
+    supplier_module: prx_data_suppliers
+    service_object_module: prx_services
+    data_supplier: BaxaltaTransactionDataSupplier
+    supplier_init_params:
+	- name: foo
+	  value: bar
+
+
+service_objects:
+    mssql:
+	class:
+	    SQLServerServiceObject
+	init_params:
+	    - name: host
+	      value: 
+	
+
+record_types:
+    baxalta_direct_sales:
+      GL_CO_CD:
+        type: String
+        required: True
+
+      DOC_TYP_CD:
+        type: String
+        required: True
+
+      SO_NUM:
+        type: String
+        required: True
+
+      SO_LN_NUM:
+        type: String
+        required: True
+
+      SO_DT:
+        type: String
+        required: True
+
+      LN_TYP_CD:
+        type: String
+        required: True
+
+      TRNS_RSN_CD:
+        type: String
+        required: True
+
+      SO_CONNECTION_TYPE:
+        type: String
+        required: True
+
+      AGRMT_ID_ORIG:
+        type: String
+        required: True
+
+      DIRECT_SALES_KEY:
+        type: String
+        required: True
+        
+      INVC_SHPTO_CUST_ADDR_NUM:
+        type: String
+        required: True
+
+      SHIP_TO_STATE:
+        type: String
+        required: True
+
+      CUST_GPR_CTGRY_CD:
+        type: String
+        required: True
+
+      ITEM_NUM:
+        type: String
+        required: True
+
+      SLS_INVCD_ITEM_PTNCY:
+        type: String
+        required: True
+
+      LOT_POTENCY:
+        type: String
+        required: True
+
+      SHPD_QTY_IN_EA:
+        type: String
+        required: True
+
+      PACK_FACTOR:
+        type: String
+        required: True
+
+      PAYMT_TRMS_CD:
+        type: String
+        required: True
+
+      PROMPT_PAY_DISC_AMT:
+        type: String
+        required: True
+
+      ITEM_PRC_FOR_PRCG_UM:
+        type: String
+        required: True
+
+      SLS_TRNS_DOLS:
+        type: String
+        required: True
+
+      SHPD_QTY_IN_SLD_UM:
+        type: String
+        required: True
+
+      SLD_UM_CD:
+        type: String
+        required: True
+
+      PURCHASE_ORDER_NUMBER:
+        type: String
+        required: True
+
+      CUSTOMER_SOLD_TO:
+        type: String
+        required: True
+
+      SO_AGRMT_CD:
+        type: String
+        required: True
+
+      SO_PRICE_HEADER:
+        type: String
+        required: True
+
+
+
+    baxalta_indirect_sales:
+      TCBK_GL_CO_CD:
+        type: String
+        required: True
+
+      GL_CO_CD:
+        type: String
+        required: True
+
+      INDIR_SALES_KEY:
+        type: String
+        required: True
+
+      CHARGEBACK_KEY:
+        type: String
+        required: True
+
+      AGRMT_BUS_UNIT_CD:
+        type: String
+        required: True
+
+      EDOC_NUM:
+        type: String
+        required: True
+
+      EDOC_LN_NUM:
+        type: String
+        required: True
+
+      TC_MATCH_NUM:
+        type: String
+        required: True
+
+      TP_DR_MEMO_NUM:
+        type: String
+        required: True
+
+      TP_DR_MEMO_SER_NUM:
+        type: String
+        required: True
+
+      INVOICE_NUMBER:
+        type: String
+        required: True
+
+      TCBK_ORDER_NUMBER:
+        type: String
+        required: True
+
+      CBK_ORDER_NUMBER:
+        type: String
+        required: True
+
+      TCBK_ORDER_LINE_NUMBER:
+        type: String
+        required: True
+
+      CBK_ORDER_LINE_NUMBER:
+        type: String
+        required: True
+
+      DR_MEMO_CBK_DT:
+        type: String
+        required: True
+
+      INVOICE_DATE:
+        type: String
+        required: True
+
+      ORDER_DATE:
+        type: String
+        required: True
+
+      SLS_PSTD_DT:
+        type: String
+        required: True
+
+      TCBK_DOC_TYP_CD:
+        type: String
+        required: True
+
+      TCBK_ORDER_TYPE:
+        type: String
+        required: True
+
+      CBK_ORDER_TYPE:
+        type: String
+        required: True
+
+      SALE_CRCTN_CD:
+        type: String
+        required: True
+
+      TRNS_TYPE_CD:
+        type: String
+        required: True
+
+      RPROCD_REC_IND_ORIG:
+        type: String
+        required: True
+
+      RPROCD_REC_IND:
+        type: String
+        required: True
+
+      TRADING_PARTNER_NUM:
+        type: String
+        required: True
+
+      CUSTOMER_NUMBER:
+        type: String
+        required: True
+
+      SHPTO_CUSTOMER_NUMBER:
+        type: String
+        required: True
+
+      TP_HQ_NUM:
+        type: String
+        required: True
+
+      CUSTOMER_STATE:
+        type: String
+        required: True
+
+      CUST_GPR_CTGRY_CD:
+        type: String
+        required: True
+
+      COT_IND:
+        type: String
+        required: True
+
+      SO_CONNECTION_TYPE:
+        type: String
+        required: True
+
+      SO_AGRMT_CD:
+        type: String
+        required: True
+
+      SO_PRICE_HEADER:
+        type: String
+        required: True
+
+      EC_ADJT_NAME_OLD:
+        type: String
+        required: True
+
+      PRODUCT_ID:
+        type: String
+        required: True
+
+      ACTL_EC_EXT_PRC_BAX_UM:
+        type: String
+        required: True
+
+      JDE_EC_EXT_PRC_BAX_UM:
+        type: String
+        required: True
+
+      PACKAGE_QTY:
+        type: String
+        required: True
+
+      PRODUCT_POTENCY:
+        type: String
+        required: True
+
+      WHSLE_ACQ_COST:
+        type: String
+        required: True
+
+      CHARGEBACK_AMOUNT:
+        type: String
+        required: True
+
+      TCBK_REVRSL_DT:
+        type: String
+        required: True
+
+      TCBK_RVRSL_EDOC_NUM:
+        type: String
+        required: True
+
+      TCBK_RVRSL_EDOC_LN_NUM:
+        type: String
+        required: True
+
+      REBILL_EDOC_NUM:
+        type: String
+        required: True
+
+      REBILL_EDOC_LN_NUM:
+        type: String
+        required: True
+
+      REBILL_DT:
+        type: String
+        required: True
+
+      REF_PRICE:
+        type: String
+        required: True
+
+      FMV_PRICE:
+        type: String
+        required: True
+
+      EC_PRCG_EFCTV_DT:
+        type: String
+        required: True
+
+      INDIR_SALES_KEY_ORIG:
+        type: String
+        required: True
+
+      CHARGEBACK_AMOUNT_ORIG:
+        type: String
+        required: True
+
+      PACKAGE_QTY_ORIG:
+        type: String
+        required: True
+
+      ACTL_EC_EXT_PRC_BAX_UM_ORIG:
+        type: String
+        required: True
+
+      JDE_EC_EXT_PRC_BAX_UM_ORIG:
+        type: String
+        required: True
+
+
+     
+
+
+
+
+
+
+ 
+  
+
+
+

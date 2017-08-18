@@ -2,7 +2,7 @@
 
 import unittest
 import context
-from snap import datamap as dmap
+import datamap as dmap
 from snap import common
 import datasources
 import sys

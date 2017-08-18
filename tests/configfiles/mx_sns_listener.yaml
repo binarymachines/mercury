@@ -1,0 +1,145 @@
+# 
+# YAML config file for Praxis data pipeline service
+#
+#
+
+
+globals:
+        transform_function_module:   prx_transforms
+        service_module:              prx_services
+        preprocessor_module:         prx_decode
+        port:                        5000
+        debug:                       True
+        logfile:                     prx.log
+        project_directory:           $PRAXIS_HOME
+        bind_host:                   0.0.0.0
+
+
+nginx_servers:
+        local_dev:
+                hostname:       localhost
+                port:           8080
+                uwsgi_sock:     /tmp/uwsgi.sock
+
+
+uwsgi_environments:
+# you can create an arbitrary number of environments here and generate init files for them by name
+# using the uwsgi initfile generator script
+        dev:
+                base_directory:         ~/workshop/python/project_snap
+
+                # python_home should be the parent of your python bin and lib dirs. 
+                # If you are using virtualenv, it should be your active venv directory
+                python_home:            ~/.virtualenvs/snap            
+
+                socket_directory:       /tmp
+
+                # this is separate from the application and webserver logs
+                log_directory:          /var/log/uwsgi
+        prod:
+                base_directory:         $SNAP_BASE
+                python_home:            $SNAP_PYTHON_HOME
+                socket_directory:       $SNAP_SOCKET
+                log_directory:          $SNAP_LOG
+
+                                
+
+service_objects:
+        postgres:
+            class:
+                PostgresServiceObject
+            init_params:
+                - name: host
+                  value: $POSTGRESQL_HOST
+
+                - name: username
+                  value: praxisdba
+
+                - name: password
+                  value: $POSTGRESQL_PASSWORD
+
+                - name: database
+                  value: praxis
+
+                - name: schema
+                  value: ingest
+                  
+        couchbase:
+            class: 
+                CouchbaseServiceObject
+            init_params:
+                - name: host
+                  value: $COUCHBASE_HOST
+
+                - name: data_bucket_name
+                  value: prx_data
+
+                - name: journal_bucket_name
+                  value: prx_journal
+
+                - name: cache_bucket_name
+                  value: prx_cache
+
+        s3:
+            class:
+                S3ServiceObject
+            init_params: 
+                - name: bucket
+                  value: labs.data.praxis
+
+                - name: local_temp_path
+                  value: /tmp
+
+        ingest:
+            class:
+                IngestServiceObject
+            init_params:
+                - name: client
+                  value: baxalta
+
+                - name: input_dir
+                  value: $PRAXIS_DATA_DIR
+
+                - name: output_bucket
+                  value: 'labs.data.praxis'
+
+data_shapes:
+        default:
+                fields:
+                         
+transforms:
+        notify_ingest:
+            route:              /notify
+            method:             POST            
+            input_shape:        default
+            output_mimetype:    application/json
+                        
+
+error_handlers:
+        - error:                NoSuchUserException
+          tx_status_code:       HTTP_NOT_FOUND 
+                
+        - error:                DuplicateEmailAddressException
+          tx_status_code:       HTTP_BAD_REQUEST
+
+
+#---------------------------------------------------
+#
+# This section contains optional config structures
+# for Serpentine application components.
+#
+#---------------------------------------------------
+
+
+datasources:
+        schedules:
+            type:           menu   
+            table:          schedules
+            name_field:     name            # default
+            value_field:    id              # default
+            
+        schedule_index:
+            type:           table
+            table:          schedules
+            class:          ScheduleIndexDataSource
+            fields:         id, name, begin_date, end_date, date_created, export_date, is_active

@@ -57,23 +57,26 @@ class TelegrafErrorHandler(object):
 
 
 class IngestRecordHeader(object):
-    def __init__(self, record_type, stream_id, asset_id, **kwargs):
+    def __init__(self, **kwargs):
+
+        kwreader = common.KeywordArgReader('record_type', 'pipeline_id')
+        kwreader.read(**kwargs)
+
         self._version = 1
-        self._record_type = record_type
-        self._stream_id = stream_id
-        self._asset_id = asset_id
+        self._record_type = kwreader.get_value('record_type')
+        self._pipeline_id = kwreader.get_value('pipeline_id')        
         self._timestamp = datetime.datetime.now().isoformat()
         self._extra_headers = []
         for key, value in kwargs.iteritems():
-            self._extra_headers.append({'name': key, 'value': value})
+            if key not in ['record_type', 'pipeline_id']:
+                self._extra_headers.append({'name': key, 'value': value})
 
 
     def data(self):
         result = {}
         result['version'] = self._version
         result['record_type'] = self._record_type
-        result['stream_id'] = self._stream_id
-        result['asset_id'] = self._asset_id
+        result['pipeline_id'] = self._pipeline_id
         result['ingest_timestamp'] = self._timestamp
         result['extra_headers'] = self._extra_headers
         return result
@@ -182,12 +185,8 @@ class KafkaLoader(object):
     def __init__(self, topic, kafka_ingest_record_writer, **kwargs):
         self._topic = topic
         self._kwriter = kafka_ingest_record_writer
-        kwarg_reader = common.KeywordArgReader('record_type', 'stream_id', 'asset_id')
-        kwarg_reader.read(**kwargs)
-        record_type = kwarg_reader.get_value('record_type')
-        stream_id = kwarg_reader.get_value('stream_id')
-        asset_id = kwarg_reader.get_value('asset_id')
-        self._header = IngestRecordHeader(record_type, stream_id, asset_id)
+        self._header = IngestRecordHeader(**kwargs)
+
 
     def load(self, data):
         msg_builder = IngestRecordBuilder(self._header)
@@ -195,14 +194,12 @@ class KafkaLoader(object):
             msg_builder.add_field(key, value)
         ingest_record = msg_builder.build()
 
-        print '### writing ingest record to kafka topic: %s' % self._topic        
         self._kwriter.write(self._topic, ingest_record)
 
 
+
 class KafkaIngestRecordWriter(object):
-    def __init__(self, kafka_node_array, serializer=json_serializer):
-        #KafkaProducer(bootstrap_servers=['broker1:1234'])
-        # = KafkaProducer(value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+    def __init__(self, kafka_node_array, serializer=json_serializer):        
         self.producer = KafkaProducer(bootstrap_servers=','.join([n() for n in kafka_node_array]),
                                       value_serializer=serializer,
                                       acks=1)
@@ -916,7 +913,7 @@ class KafkaPipelineConfig(object):
 
         self._raw_topic = yaml_config['raw_record_topic']
         self._staging_topic = yaml_config['staging_topic']
-        
+
         if yaml_config.get('user_topics'):
             for entry in yaml_config['user_topics']:
                 self._user_topics[entry['alias']] = entry['name']

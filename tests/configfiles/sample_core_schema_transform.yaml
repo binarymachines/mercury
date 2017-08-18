@@ -1,0 +1,152 @@
+# data transform init file for Praxis service stack
+#
+#
+
+
+globals:
+  project_home: $PRX_HOME
+  lookup_source_module: prx_datasources
+  service_module: prx_services
+
+
+sources:
+  baxalta:
+    class: BaxaltaLookupDatasource
+
+maps:
+  baxalta2sst:
+    settings:
+        - name: use_default_identity_transform
+          value: True
+    lookup_source: 
+      baxalta
+    fields:
+      invoice_number:
+          source: record
+          key: INVOICE_NUMBER|SLS_INVC_NUM
+          
+      transaction_id:
+          source: record
+          key: DIRECT_SALES_KEY|INDIR_SALES_KEY
+
+      contract_id:
+          source: lookup
+          
+      customer_number:
+          source: record
+          key: CUSTOMER_NUMBER|CUSTOMER_SOLD_TO
+
+      shipto_customer_number:
+          source: record
+          key: SHPTO_CUSTOMER_NUMBER
+
+      order_type:
+          source: record
+          key: DOC_TYP_CD
+          
+      transaction_type_code:
+          source: record
+          key: TRNS_TYPE_CD
+
+      credit_or_rebill_code:
+          source: record
+          key: SALE_CRCTN_CD
+
+      chargeback_key:
+          source: record
+          key: CHARGEBACK_KEY
+
+      edoc_number:
+          source: record
+          key: EDOC_NUM
+
+      edoc_line_number:
+          source: record
+          key: EDOC_LN_NUM
+
+      tc_match_number:
+          source: record
+          key: TC_MATCH_NUM
+
+      invoice_date:
+          source: record
+          key: INVOICE_DATE|SLS_INVC_DT
+
+      sale_posted_date:
+          source: record
+          key: SLS_PSTD_DT
+
+      order_date:
+          source: record
+          key: ORDER_DATE
+
+      product_id:
+          source: lookup
+
+      product_name:
+          source: value
+          value: "placeholder value"
+
+      ndc:
+          source: record
+          key: NDC11
+
+      class_of_trade:
+          source: record
+          key: CUST_GPR_CTGRY_CD
+
+      customer_is_340b:
+          source: lookup
+        
+      agreement_id:
+          source: record
+          key: SO_AGRMT_CD
+
+      reason_code:
+          source: record
+          key: TRNS_RSN_CD
+
+      sale_type:          # direct | indirect
+          source: lookup
+
+      pkg_quantity:
+          source: lookup
+
+      medicaid_unit_qty:
+          source: lookup
+
+      price_per_each:
+          source: lookup
+      
+      contract_price:
+          source: record
+          key: SLS_TRNS_DOLS|ACTL_EC_EXT_PRC_BAX_UM
+      
+      wac_price:
+          source: lookup    
+
+      price_is_at_ceiling:
+          source: lookup
+
+      fair_market_value:
+          source: lookup      
+
+      loc_billed_to:
+          source: record
+          key: CUSTOMER_STATE
+
+      loc_shipped_to:
+          source: record
+          key: SHIP_TO_STATE
+
+      payment_terms_code:
+          source: record
+          key: PAYMT_TRMS_CD
+
+      prompt_pay_discount_amt:
+          source: record
+          key: PROMPT_PAY_DISC_AMT|NONCSTMRY_PPD_AMT
+
+      pp_discount_is_customary:
+          source: lookup
+
