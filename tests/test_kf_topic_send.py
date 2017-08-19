@@ -15,25 +15,6 @@ from prx_transforms import CSVToDictionaryConverter
 from prx_services import S3ServiceObject
 
 
-class KafkaLoader(object):
-    def __init__(self, topic, kafka_ingest_log_writer):
-        self.topic = topic
-        self.kloader = kafka_ingest_log_writer
-
-
-    def load(self, data):
-        
-        header = telegraf.IngestRecordHeader('test_ingest_record', 'test_stream_id', 'test_asset_id')
-        msg_builder = telegraf.IngestRecordBuilder(header)
-        for key, value in data.iteritems():
-            msg_builder.add_field(key, value)
-        ingest_record = msg_builder.build()
-
-        print '### writing ingest record to kafka topic: %s' % self.topic
-        print ingest_record
-
-        self.kloader.write(self.topic, ingest_record)
-
 
 def main(args):
     log = logging.getLogger(__name__)

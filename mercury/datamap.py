@@ -453,7 +453,7 @@ class CSVFileDataExtractor(object):
         load_func = kwargs.get('load_function')
         max_lines = int(kwargs.get('max_lines', -1))
 
-        with open(filename, 'rb') as datafile:
+        with open(filename, 'r') as datafile:
             csv_reader = csv.DictReader(datafile,
                                         delimiter=self._delimiter,
                                         quotechar=self._quote_char)
