@@ -47,8 +47,8 @@ class KafkaSendReceiveTest(unittest.TestCase):
                                  record_type='mx_test_record')
         
         local_filename = 'data/sample_objectstore.csv'
-        processor = dmap.WhitespaceCleanupProcessor()
-        extractor = dmap.CSVFileDataExtractor(processor, delimiter='|', quotechar='"')
+        #processor = dmap.WhitespaceCleanupProcessor()
+        extractor = dmap.CSVFileDataExtractor(None, delimiter='|', quotechar='"')
 
         extractor.extract(local_filename, load_function=kloader.load)
         self.kwriter.sync(0.1)

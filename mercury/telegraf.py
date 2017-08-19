@@ -194,7 +194,8 @@ class KafkaLoader(object):
             msg_builder.add_field(key, value)
         ingest_record = msg_builder.build()
 
-        log.debug('writing record to Kafka topic: %s:' % self._topic)
+        log = logging.getLogger(__name__)
+        log.debug('writing record to Kafka topic "%s":' % self._topic)
         log.debug(ingest_record)
         self._kwriter.write(self._topic, ingest_record)
 
