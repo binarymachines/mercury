@@ -25,9 +25,9 @@ class KafkaSendReceiveTest(unittest.TestCase):
 
     def setUp(self):
         knodes = []
-        knodes.append(tg.KafkaNode('54.234.248.7'))
-        knodes.append(tg.KafkaNode('52.203.214.24'))
-        knodes.append(tg.KafkaNode('54.152.11.167'))
+        knodes.append(tg.KafkaNode('172.30.0.164'))
+        knodes.append(tg.KafkaNode('172.30.0.165'))
+        knodes.append(tg.KafkaNode('172.30.0.166'))
 
         self.kwriter = tg.KafkaIngestRecordWriter(knodes)
         self.target_topic = 'mercury_test_topic_%s' % '001' 
@@ -52,7 +52,8 @@ class KafkaSendReceiveTest(unittest.TestCase):
 
         extractor.extract(local_filename, load_function=kloader.load)
         self.kwriter.sync(0.1)
-        print len(self.kwriter.process_write_promise_queue())
+        self.assertTrue(self.kwriter.process_write_promise_queue.size > 0)
+        self.assertEquals(len(self.kwriter.process_write_promise_queue.errors), 0)
 
 
     def test_reader_can_receive_sent_records(self):
