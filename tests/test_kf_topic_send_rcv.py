@@ -1,26 +1,21 @@
 #!/usr/bin/env python
 
-'''Usage: kf_topic_rcv (--topic=<topic>) (--from-offset=<offset>) [max_messages]
 
-
-'''
 
 import context
+import os, sys
+import unittest
 import docopt
 import logging
 import datetime
 from snap import common
-from snap import telegraf as tg
-from snap import datamap
+from mercury import telegraf as tg
+from mercury import datamap as dmap
 from kafka import TopicPartition, OffsetAndMetadata
 
 
-log = logging.getLogger(__name__)
-ch = logging.StreamHandler()
-formatter = logging.Formatter('%(levelname)s:%(message)s')
-ch.setFormatter(formatter)
-log.setLevel(logging.DEBUG)
-log.addHandler(ch)
+LOG_ID = 'kafka_send_rcv_test'
+
 
 def generate_test_key(cb_record, **kwargs):
         return '%s_%s' % ('mx_test', datetime.datetime.now().isoformat())
@@ -48,27 +43,36 @@ class KafkaSendReceiveTest(unittest.TestCase):
     def test_loader_can_send_records(self):
         kloader = tg.KafkaLoader(self.target_topic, 
                                  self.kwriter,
-                                 pipeline='mx_test_pipeline',
+                                 pipeline_id='mx_test_pipeline',
                                  record_type='mx_test_record')
         
-        local_filename = args['--file']
+        local_filename = 'data/sample_objectstore.csv'
         processor = dmap.WhitespaceCleanupProcessor()
         extractor = dmap.CSVFileDataExtractor(processor, delimiter='|', quotechar='"')
 
-        extractor.extract(local_filename, load_function=self.kwriter.load)
+        extractor.extract(local_filename, load_function=kloader.load)
         self.kwriter.sync(0.1)
         print len(self.kwriter.process_promise_write_queue())
 
 
     def test_reader_can_receive_sent_records(self):
         self.fail()
-    
 
 
+logging.basicConfig( stream=sys.stderr)
+log = logging.getLogger(LOG_ID)
+ch = logging.StreamHandler()
+formatter = logging.Formatter('%(levelname)s:%(message)s')
+ch.setFormatter(formatter)
+log.setLevel(logging.DEBUG)
+log.addHandler(ch)
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+'''
 def main(args):
-    
-
-    
 
     # a kafka group is a numbered context shared by some number of consumers
     group = 'test_group_1'
@@ -106,15 +110,10 @@ def main(args):
                                               'mx_test_rec',
                                               generate_test_key,
                                               transformer=data_transformer)
-    '''
+    
     #console_relay = telegraf.ConsoleRelay(transformer=data_transformer)
     console_relay = telegraf.ConsoleRelay()
     kreader.read(console_relay, log)
     #kreader.consumer.commit({ tp: OffsetAndMetadata(offset, None) })
-
-
-if __name__ == '__main__':
-    args = docopt.docopt(__doc__)
-    main(args)
-
+'''
 
