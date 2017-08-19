@@ -17,11 +17,20 @@ from kafka import TopicPartition, OffsetAndMetadata
 LOG_ID = 'kafka_send_rcv_test'
 
 
+logging.basicConfig( stream=sys.stderr)
+log = logging.getLogger(LOG_ID)
+ch = logging.StreamHandler()
+formatter = logging.Formatter('%(levelname)s:%(message)s')
+ch.setFormatter(formatter)
+log.setLevel(logging.DEBUG)
+log.addHandler(ch)
+
+
 def generate_test_key(cb_record, **kwargs):
         return '%s_%s' % ('mx_test', datetime.datetime.now().isoformat())
 
 
-class KafkaSendReceiveTest(unittest.TestCase):
+class KafkaSendReceive(unittest.TestCase):
 
     def setUp(self):
         knodes = []
@@ -60,13 +69,6 @@ class KafkaSendReceiveTest(unittest.TestCase):
         self.fail()
 
 
-logging.basicConfig( stream=sys.stderr)
-log = logging.getLogger(LOG_ID)
-ch = logging.StreamHandler()
-formatter = logging.Formatter('%(levelname)s:%(message)s')
-ch.setFormatter(formatter)
-log.setLevel(logging.DEBUG)
-log.addHandler(ch)
 
 if __name__ == '__main__':
     unittest.main()
