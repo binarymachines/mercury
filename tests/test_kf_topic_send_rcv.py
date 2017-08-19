@@ -52,7 +52,7 @@ class KafkaSendReceiveTest(unittest.TestCase):
 
         extractor.extract(local_filename, load_function=kloader.load)
         self.kwriter.sync(0.1)
-        print len(self.kwriter.process_promise_write_queue())
+        print len(self.kwriter.process_write_promise_queue())
 
 
     def test_reader_can_receive_sent_records(self):
