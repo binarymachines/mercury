@@ -199,7 +199,7 @@ class KafkaLoader(object):
 
 
 class KafkaIngestRecordWriter(object):
-    def __init__(self, kafka_node_array, serializer=json_serializer):        
+    def __init__(self, kafka_node_array, serializer=json_serializer):
         self.producer = KafkaProducer(bootstrap_servers=','.join([n() for n in kafka_node_array]),
                                       value_serializer=serializer,
                                       acks=1)
@@ -222,6 +222,12 @@ class KafkaIngestRecordWriter(object):
 
     def sync(self, timeout=0):
         self.producer.flush(timeout or None)
+
+
+    @property
+    def promise_queue_size(self):
+        return self._promise_queue.size
+
 
     def process_write_promise_queue(self):
         self._promise_queue.run()
@@ -890,6 +896,11 @@ class IngestWritePromiseQueue(threading.Thread):
             results.append(self.process_entry(f))
         self._errors = [r for r in results if r['status'] is not 'ok']
         self._log.info('all futures processed.')
+
+
+    @property
+    def size(self):
+        return len(self._futures)
 
 
     @property
