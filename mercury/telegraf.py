@@ -860,20 +860,14 @@ class IngestWritePromiseQueue(threading.Thread):
 
 
     def append(self, future):
-        futures = []
-        futures.extend(self._futures)
-        futures.append(future)
-        return IngestWritePromiseQueue(self._error_handler,
-                                       self._log, futures,
-                                       debug_mode=self._debug_mode)
-
-    def append_all(self, future_array):
-        futures = []
-        futures.extend(self._futures)
-        futures.extend(future_array)
-        return IngestWritePromiseQueue(self._error_handler,
-                                       self._log, futures,
-                                       debug_mode=self._debug_mode)
+        self._futures.append(future)
+        return self
+               
+               
+    def append_all(self, future_array):                
+        self._futures.extend(future_array)
+        return self
+        
 
 
     def process_entry(self, f):
