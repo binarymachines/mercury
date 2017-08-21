@@ -15,7 +15,7 @@ install-deps:
 	pip install -r requirements.txt
 
 
-load_venv_wrapper:
+load-venv-wrapper:
 	source /usr/local/bin/virtualenvwrapper.sh
 
 test:	
