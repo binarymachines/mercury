@@ -14,6 +14,10 @@ clean:
 install-deps:
 	pip install -r requirements.txt
 
+
+load_venv_wrapper:
+	source /usr/local/bin/virtualenvwrapper.sh
+
 test:	
 	PYTHONPATH=./tests python -m unittest discover -t . ./tests -v
 
