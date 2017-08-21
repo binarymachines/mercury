@@ -1,3 +1,4 @@
+#!/bin/bash
 # -*- mode: shell-script -*-
 #
 # Shell functions to act as wrapper for Ian Bicking's virtualenv
