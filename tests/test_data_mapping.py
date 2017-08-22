@@ -3,7 +3,7 @@
 import unittest
 import context
 from mercury import datamap as dmap
-from mercury import datasources
+import datasources  # this module is defined in the tests directory
 from snap import common
 import sys
 import logging
@@ -22,14 +22,13 @@ INVALID_MAP_NAME = 'bad_map'
 class RecordTransform(unittest.TestCase):
 
     def setUp(self):
-        self.log = logging.getLogger(LOG_ID)        
-        
+        self.log = logging.getLogger(LOG_ID)
+
         self.good_datasource_name = 'SampleDatasource'
         self.bad_datasource_name = 'BadDatasource'
         self.nonexistent_datasource_name = 'NoDatasource'
 
-
-        self.builder = dmap.RecordTransformerBuilder(TRANSFORM_YAML_FILE, 
+        self.builder = dmap.RecordTransformerBuilder(TRANSFORM_YAML_FILE,
                                                      map_name=VALID_MAP_NAME,
                                                      datasource=self.good_datasource_name)
         self.transformer = self.builder.build()
@@ -58,7 +57,7 @@ class RecordTransform(unittest.TestCase):
                          'COLOR': 'blue',
                          'SKU': '123.456.789',
                          'ID': 22}
-        target_record = self.transformer.transform(source_record)        
+        target_record = self.transformer.transform(source_record)
         self.assertEqual(target_record.get('widget_composite_id'), 'foo_123.456.789')
 
 
@@ -98,7 +97,7 @@ class RecordTransform(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    logging.basicConfig( stream=sys.stderr )
-    logging.getLogger(LOG_ID).setLevel( logging.DEBUG )
+    logging.basicConfig(stream=sys.stderr)
+    logging.getLogger(LOG_ID).setLevel(logging.DEBUG)
     unittest.main()
     
