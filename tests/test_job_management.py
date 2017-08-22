@@ -2,8 +2,8 @@
 
 import context
 import unittest
-import mx_utils as mx
-import jobs as j
+from mercury import mx_utils as mx
+from mercury import jobs as j
 
 
 

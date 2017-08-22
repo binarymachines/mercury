@@ -2,9 +2,9 @@
 
 import unittest
 import context
-import datamap as dmap
+from mercury import datamap as dmap
+from mercury import datasources
 from snap import common
-import datasources
 import sys
 import logging
 import yaml
