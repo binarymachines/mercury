@@ -7,7 +7,7 @@ Usage:        test_kf_pipeline_config <configfile>
 
 import docopt
 import re
-import prx_utils as prx
+import mx_utils as mx
 import yaml
 import csv
 from snap import common

@@ -2,7 +2,7 @@
 
 import context
 import unittest
-from snap import telegraf
+import telegraf
 
 
 

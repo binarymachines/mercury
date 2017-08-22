@@ -3,8 +3,10 @@
 
 import context
 import os, unittest
+from snap import common
+import sqldbx
 
-from snap import sqldbx, common
+
 class DatabaseConnectionTest(unittest.TestCase):
 
     def setUp(self):

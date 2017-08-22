@@ -9,8 +9,8 @@ import docopt
 import logging
 import datetime
 from snap import common
-from snap import telegraf
-from snap import datamap
+import telegraf
+import datamap
 from kafka import TopicPartition, OffsetAndMetadata
 from kafka import KafkaConsumer
 
