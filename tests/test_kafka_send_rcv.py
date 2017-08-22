@@ -2,7 +2,7 @@
 
 import context
 import unittest
-import telegraf
+from mercury import telegraf
 
 
 
