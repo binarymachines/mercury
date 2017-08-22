@@ -1,7 +1,8 @@
 import context
 import unittest
 import yaml
-import mx_utils as mx
+from mercury import mx_utils as mx
+
 
 class RecordValidationTest(unittest.TestCase):
     def setUp(self):
@@ -18,19 +19,22 @@ class RecordValidationTest(unittest.TestCase):
 
         self.validator = mx.TextRecordValidationProfile(record_type, schema_config)
 
+
     def tearDown(self):
         pass
+
 
     def test_record_with_schema_error_should_fail(self):
         raw_record = ({"NAME": "sample_widget", "SKU": "skuvalue", "ID": "some_id"})
         status = self.validator.check_record(raw_record)
-
         self.assertFalse(status.is_ok())
+
 
     def test_record_with_n_errors_should_fail_with_n_errcodes(self):
         raw_record = ({"NAME": "sample_widget", "ID": "some_id"})
         status = self.validator.check_record(raw_record)
         self.assertEquals(len(status.get_errors()), 2)
+
 
     def test_record_with_no_errors_should_pass(self):
         input_record = {'NAME': 'foo',
@@ -39,6 +43,7 @@ class RecordValidationTest(unittest.TestCase):
                         'ID': '22' }
         status = self.validator.check_record(input_record)
         self.assertTrue(status.is_ok())
+
 
     def test_record_with_datatype_error_should_fail(self):
         input_record = {'NAME': 'foo',

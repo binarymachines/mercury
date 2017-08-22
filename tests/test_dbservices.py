@@ -4,7 +4,7 @@
 import context
 import os, unittest
 from snap import common
-import sqldbx
+from mercury import sqldbx
 
 
 class DatabaseConnectionTest(unittest.TestCase):

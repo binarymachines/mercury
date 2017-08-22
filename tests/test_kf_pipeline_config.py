@@ -7,12 +7,11 @@ Usage:        test_kf_pipeline_config <configfile>
 
 import docopt
 import re
-import mx_utils as mx
 import yaml
 import csv
 from snap import common
-from snap import telegraf as tg
-
+from mercury import telegraf as tg
+from mercury import mx_utils as mx
 
 
 def main(args):
