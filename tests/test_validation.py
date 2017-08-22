@@ -1,10 +1,7 @@
-import unittest, yaml
 import context
-# NOTE: this will not work until we upd ate the directory structure
-# from context import praxis
-import prx_utils as prx
+import unittest
 import yaml
-
+import mx_utils as mx
 
 class RecordValidationTest(unittest.TestCase):
     def setUp(self):
@@ -19,7 +16,7 @@ class RecordValidationTest(unittest.TestCase):
         if not schema_config:
             raise Exception('no record type "%s" specified in config file' % record_type)
 
-        self.validator = prx.TextRecordValidationProfile(record_type, schema_config)
+        self.validator = mx.TextRecordValidationProfile(record_type, schema_config)
 
     def tearDown(self):
         pass

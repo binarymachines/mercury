@@ -16,7 +16,7 @@ install-deps:
 
 
 load-venv-wrapper:
-	source /usr/local/bin/virtualenvwrapper.sh
+	bash /usr/local/bin/virtualenvwrapper.sh;
 
 test:	
 	PYTHONPATH=./tests python -m unittest discover -t . ./tests -v
