@@ -7,7 +7,7 @@ Usage:        test_record_validation (--configfile=<config_filename>) (--type=<r
 
 import docopt
 import re
-import prx_utils as prx
+import mx_utils as mx
 import yaml
 import csv
 from snap import common
@@ -36,7 +36,6 @@ class FilteredRecordOutputChannel(object):
                 raise err # TODO: incorporate error tracking/reporting
 
 
-    
 class FileOutputChannel(FilteredRecordOutputChannel):
     def __init__(self, **kwargs):
         FilteredRecordOutputChannel.__init__(self, kwargs)
@@ -45,9 +44,9 @@ class FileOutputChannel(FilteredRecordOutputChannel):
             raise Exception('missing keyword argument: "filename"')
 
         mode_string = kwargs.get('mode', '')
-        self._output_file = open(filename, mode)
+        self._output_file = open(filename, mode_string)
 
-        
+
     def _send(self, record):
         self._output_file.write(str(record))
 
@@ -65,12 +64,6 @@ class ConsoleOutputChannel(FilteredRecordOutputChannel):
         print common.jsonpretty(record)
 
 
-    
-
-
-
-
-
 
 def main(args):
     config_filename = args['--configfile']
@@ -84,18 +77,19 @@ def main(args):
     if not schema_config:
         raise Exception('no record type "%s" specified in config file' % record_type)
 
-    validator = prx.TextRecordValidationProfile(record_type, schema_config)
+    validator = mx.TextRecordValidationProfile(record_type, schema_config)
     input_filename = args['<input_file>']
     with open(input_filename, 'rb') as datafile:
         csv_reader = csv.DictReader(datafile, delimiter='|', quotechar='"')
         for raw_record in csv_reader:
-            
+
             clean_record = {}
             for key in raw_record.keys():
                 clean_record[key] = raw_record.get(key).strip()
             print common.jsonpretty(clean_record)
             status = validator.check_record(clean_record)
             print status
+
 
 if __name__=='__main__':
     args = docopt.docopt(__doc__)
