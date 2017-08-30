@@ -4,6 +4,8 @@ import context
 import unittest
 from mercury import mx_utils as mx
 from mercury import jobs as j
+from teamcity import is_running_under_teamcity
+from teamcity.unittestpy import TeamcityTestRunner
 
 
 
@@ -104,4 +106,9 @@ class JobCreationAndManagementTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    if is_running_under_teamcity():
+        runner = TeamcityTestRunner()
+    else:
+        runner = unittest.TextTestRunner()
+        
+    unittest.main(testRunner=runner)

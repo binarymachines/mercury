@@ -12,6 +12,8 @@ from snap import common
 from mercury import telegraf as tg
 from mercury import datamap as dmap
 from kafka import TopicPartition, OffsetAndMetadata
+from teamcity import is_running_under_teamcity
+from teamcity.unittestpy import TeamcityTestRunner
 
 
 LOG_ID = 'kafka_send_rcv_test'
@@ -31,7 +33,7 @@ def generate_test_key(cb_record, **kwargs):
 
 
 class KafkaSendReceive(unittest.TestCase):
-
+ 
     def setUp(self):
         knodes = []
         knodes.append(tg.KafkaNode('172.30.0.164'))
@@ -71,52 +73,10 @@ class KafkaSendReceive(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
-
-
-'''
-def main(args):
-
-    # a kafka group is a numbered context shared by some number of consumers
-    group = 'test_group_1'
-    topic = args['--topic']
-
-    print 'target group is "%s", topic is "%s"' % (group, topic)
-
-    kreader = telegraf.KafkaIngestRecordReader(topic, knodes, group)
-
-    #print dir(kreader.consumer)
-
-    # show how many partitions this topic spans
-    metadata = kreader.consumer.partitions_for_topic(topic)
-    print '### partitions for topic %s:\n%s' % (topic, '\n'.join([str(p) for p in metadata]))
-
-    
-
-    # TopicPartition named tuple consists of the topic and a partition number
-    tp = TopicPartition(topic, 0)
-
-    # manually assign one or more partitions to the consumer --
-    # required if we want to use explicit offsets
-    kreader.consumer.assign([tp])
-
-    offset = int(args['--from-offset'])
-
-    log.info('offset: %d' % offset)
-    kreader.consumer.seek(tp, offset)
-
-    error_handler = telegraf.ConsoleErrorHandler()
-
-    
-    couchbase_relay = telegraf.CouchbaseRelay('172.30.0.1',
-                                              'mx_data',
-                                              'mx_test_rec',
-                                              generate_test_key,
-                                              transformer=data_transformer)
-    
-    #console_relay = telegraf.ConsoleRelay(transformer=data_transformer)
-    console_relay = telegraf.ConsoleRelay()
-    kreader.read(console_relay, log)
-    #kreader.consumer.commit({ tp: OffsetAndMetadata(offset, None) })
-'''
+    if is_running_under_teamcity():
+        runner = TeamcityTestRunner()
+    else:
+        runner = unittest.TextTestRunner()
+        
+    unittest.main(testRunner=runner)
 

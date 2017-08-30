@@ -13,6 +13,9 @@ from mercury import sqldbx as sqlx
 from mercury import datamap as dmap
 from mercury import objectstore as obs
 
+from teamcity import is_running_under_teamcity
+from teamcity.unittestpy import TeamcityTestRunner
+
 LOG_ID = 'test_objectstore'
 TESTING_SCHEMA = 'test'
 OBJECT_TABLE_NAME = 'objects'
@@ -215,5 +218,11 @@ class TimelineGenerationTest(unittest.TestCase):
 if __name__ == '__main__':
     logging.basicConfig( stream=sys.stderr )
     logging.getLogger(LOG_ID).setLevel( logging.DEBUG )
-    unittest.main()
+
+    if is_running_under_teamcity():
+        runner = TeamcityTestRunner()
+    else:
+        runner = unittest.TextTestRunner()
+        
+    unittest.main(testRunner=runner)
     

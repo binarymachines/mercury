@@ -9,6 +9,9 @@ import sys
 import logging
 import yaml
 
+from teamcity import is_running_under_teamcity
+from teamcity.unittestpy import TeamcityTestRunner
+
 
 LOG_ID = 'test_data_mapping'
 TRANSFORM_YAML_FILE = 'data/sample_transform.yaml'
@@ -99,5 +102,12 @@ class RecordTransform(unittest.TestCase):
 if __name__ == '__main__':
     logging.basicConfig(stream=sys.stderr)
     logging.getLogger(LOG_ID).setLevel(logging.DEBUG)
-    unittest.main()
+
+    if is_running_under_teamcity():
+        runner = TeamcityTestRunner()
+    else:
+        runner = unittest.TextTestRunner()
+        
+    unittest.main(testRunner=runner)
+    
     
