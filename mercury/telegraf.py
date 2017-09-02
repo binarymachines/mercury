@@ -919,7 +919,7 @@ class KafkaPipelineConfig(object):
             port = tokens[1]
             self._cluster = self._cluster.add_node(KafkaNode(ip, port))
 
-        self._raw_topic = yaml_config['raw_record_topic']
+        
         self._staging_topic = yaml_config['staging_topic']
 
         if yaml_config.get('user_topics'):
