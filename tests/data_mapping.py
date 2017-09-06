@@ -22,16 +22,22 @@ VALID_MAP_NAME = 'test_map'
 INVALID_MAP_NAME = 'bad_map'
 
 
+
 class RecordTransform(unittest.TestCase):
 
     def setUp(self):
+        self.local_env = common.LocalEnvironment('MERCURY_HOME')
+        self.local_env.init()
+        home_dir = local_env.get_variable('MERCURY_HOME')
+
+        self.yaml_initfile_path = os.path.join(home_dir, TRANSFORM_YAML_FILE)
         self.log = logging.getLogger(LOG_ID)
 
         self.good_datasource_name = 'SampleDatasource'
         self.bad_datasource_name = 'BadDatasource'
         self.nonexistent_datasource_name = 'NoDatasource'
 
-        self.builder = dmap.RecordTransformerBuilder(TRANSFORM_YAML_FILE,
+        self.builder = dmap.RecordTransformerBuilder(self.yaml_initfile_path,
                                                      map_name=VALID_MAP_NAME,
                                                      datasource=self.good_datasource_name)
         self.transformer = self.builder.build()
@@ -71,7 +77,7 @@ class RecordTransform(unittest.TestCase):
                          'ID': 22}
 
         with self.assertRaises(dmap.NoSuchLookupMethodException) as context:
-            tfmr = dmap.RecordTransformerBuilder(TRANSFORM_YAML_FILE,
+            tfmr = dmap.RecordTransformerBuilder(self.yaml_initfile_path,
                                                  map_name=INVALID_MAP_NAME).build()
 
             target_record = tfmr.transform(source_record)
@@ -93,7 +99,7 @@ class RecordTransform(unittest.TestCase):
     def test_record_transformer_builder_throws_exception_on_missing_datasource(self):
 
         with self.assertRaises(dmap.NonexistentDatasourceException) as context:
-            tfmr = dmap.RecordTransformerBuilder(TRANSFORM_YAML_FILE,
+            tfmr = dmap.RecordTransformerBuilder(self.yaml_initfile_path,
                                                  map_name='missing_datasource_map').build()
 
 
