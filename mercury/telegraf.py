@@ -585,13 +585,20 @@ class OLAPSchemaDimension(object):
         return self._pk_type
 
 
+    @property
+    def value_field_name(self):
+        return self._value_field_name
+
+    @property
+    def value_field_type(self):
+        return self._value_
+
     def lookup_id_for_value(self, value, **kwargs):
         return self._lookup_func(value,
                                  self._dim_table_name,
                                  self._key_field_name, 
                                  self._value_field_name, 
                                  **kwargs)
-
 
 
 
@@ -761,7 +768,58 @@ class OLAPSchemaMappingContextBuilder(object):
 
         return mapping_context
             
+
+class OLAPSchemaDDLGenerator(object):
+    fact_ddl_template = '''
+    CREATE TABLE {schema}.{fact_table_name}
+    (
+        {pk_field_name} {pk_field_type} PRIMARY KEY NOT NULL,    
+        {fields}    
+    );
+    '''
+
+    dimension_ddl_template = '''
+    CREATE TABLE {schema}.{dim_table_name}
+    (
+        {pk_field_name} {pk_field_type} PRIMARY KEY NOT NULL,
+        {value_field_name} {value_field_type} NOT NULL
+    )
+    '''
+    
+    
+    def __init__(self, schema_mapping_context):
+        self._context = schema_mapping_context
+        self._schema = 'test'
+        
+
+    def generate_fact_table_ddl(self):
+        field_defs = []
+        for field_name in self._context.dimension_names:
+            field_def = '%s %s NOT NULL' % (field_name, self._context.sqltype_for_field(field_name))
+            field_defs.append(field)
+
+        for field_name in self._context.non_dimension_names:
+            field_def = '%s %s NOT NULL' % (field_name, self._context.sqltype_for_field(field_name))
             
+        field_def_block = ',\n'.join(field_defs)
+        sql = fact_ddl_template.format(schema=self._schema,
+                                      fact_table_name=self._context.fact.table_name,
+                                      pk_field_name=self._context.fact.primary_key_field_name,
+                                      fields=field_def_block)
+        return sql
+
+
+    def generate_dimension_table_ddl(self, dimension_name):
+        dim = self._context.get_dimension(dimension_name)
+        
+        sql = dimension_ddl_template.format(schema=self._schema,
+                                            pk_field_name=dim.primary_key_field_name,
+                                            pk_field_type=self.sqltype(dim.primary_key_field_type),
+                                            value_field_name=dim.value_field_name,
+                                            value_field_type=self.sqltype(dim.value_field_type))
+        return sql
+        
+
 
 class OLAPStarSchemaRelay(DataRelay):
     def __init__(self, persistence_mgr, olap_schema_map_ctx, **kwargs):
