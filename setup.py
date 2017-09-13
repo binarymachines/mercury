@@ -14,13 +14,16 @@ from pip.download import PipSession
 NAME = 'mercury'
 VERSION = '0.9.0'
 PACKAGES = find_packages(where='src')
-DEPENDENCIES=['docopt',
+DEPENDENCIES=['snap-micro',
+              'docopt',
+              'arrow',
               'Flask',
               'itsdangerous',
               'Jinja2',
               'MarkupSafe',
               'PyYAML',
               'SQLAlchemy',
+              'SQLAlchemy-Utils',
               'Werkzeug',
               'requests']
 
