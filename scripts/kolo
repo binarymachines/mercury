@@ -10,7 +10,7 @@
 # comsumes data records from a designated Kafka topic into an OLAP star schema
 # 
 
-import context
+
 import yaml
 import docopt
 import logging

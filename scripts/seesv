@@ -19,7 +19,7 @@
 # against a schema of required fields
 #
 
-import context
+
 import docopt
 from docopt import docopt as docopt_func
 from docopt import DocoptExit

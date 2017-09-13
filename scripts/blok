@@ -7,7 +7,6 @@
 
 # BLOK: Bulk LOader for Kafka
 
-import context
 import docopt
 from mercury import telegraf as tg
 from mercury import datamap as dmap
