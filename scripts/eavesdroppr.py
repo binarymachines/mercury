@@ -22,6 +22,11 @@ class NoSuchEventHandler(Exception):
         Exception.__init__(self, 'No event handler function "%s" exists in handler module "%s". Please check your initfile and code modules.' % (handler_func_name, handler_module))
 
 
+class UnsupportedDBOperation(Exception):
+    def __init__(self, operation):
+        Exception.__init__(self, 'The database operation "%s" is not supported.' % operation)
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -37,6 +42,8 @@ def main(args):
     pgsql_password = local_env.get_variable('PGSQL_PASSWORD')
 
     yaml_config = common.read_config_file(args['<initfile>'])
+
+    print common.jsonpretty(yaml_config)
 
     db_host = yaml_config['globals']['database_host']
     db_name = yaml_config['globals']['database_name']

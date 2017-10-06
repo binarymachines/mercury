@@ -1,0 +1,30 @@
+# initfile for eavesdroppr PGSQL event listener
+
+globals:
+        database_host: 52.202.20.45
+        database_name: testbed
+        debug: True
+        handler_module: 
+
+service_objects:
+
+
+channels:
+        ch_table_insert:
+                handler_function: handle_table_insert
+                db_table_name: instructors
+                db_operation: INSERT
+                pk_field_name: id
+                pk_field_type: bigint
+                db_schema: egress
+                db_proc_name:
+                db_trigger_name:
+                payload_fields:
+                        - id
+                        - first_name
+                        - last_name
+                        - email
+                
+
+
+
