@@ -283,8 +283,9 @@ class RecordTransformerBuilder(object):
 
             field_config = self._transform_config['maps'][self._map_name]['fields'][fieldname]
 
-            if field_config['source'] == 'record':
-                transformer.map_source_to_target_field(field_config['key'], fieldname)
+            if field_config['source'] == 'record':    
+                # if no key is supplied, assume that the fieldname in the source is the same as the target fieldname
+                transformer.map_source_to_target_field(field_config.get('key', fieldname), fieldname)
             elif field_config['source'] == 'lookup':
                 transformer.register_datasource(fieldname, datasource)
             elif field_config['source'] == 'value':
