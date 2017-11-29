@@ -200,7 +200,7 @@ class MySQLDatabase(Database):
     """A Database type for connecting to MySQL instances."""
 
     def __init__(self, host, schema, port=3306):
-        Database.__init__(self, "mysql", host, schema, port)
+        Database.__init__(self, "mysql+mysqlconnector", host, schema, port)
 
 
     def __create_url__(self, dbType, username, password):
