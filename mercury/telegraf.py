@@ -10,7 +10,12 @@ import docopt
 import yaml
 from snap import common
 import sqldbx as sqlx
-import couchbasedbx as cbx
+
+try:
+    import couchbasedbx as cbx
+except:
+    pass
+
 import logging
 import copy
 from kafka import KafkaProducer, KafkaConsumer, KafkaClient

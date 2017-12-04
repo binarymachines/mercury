@@ -232,7 +232,7 @@ class RecordTransformer:
 
         lookup_function_name = 'lookup_%s' % target_field_name
         if not hasattr(datasource, lookup_function_name):
-            raise Exception('The datasource %s has no lookup function "%s(...)". Please check your config file.' % (datasosurce.__class__.__name__, lookup_function_name))
+            raise Exception('The datasource %s has no lookup function "%s(...)". Please check your config file.' % (datasource.__class__.__name__, lookup_function_name))
 
         lookup_function = getattr(datasource, lookup_function_name)
         return lookup_function(target_field_name, source_record, self.value_map)
