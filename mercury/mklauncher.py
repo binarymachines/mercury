@@ -25,7 +25,7 @@ def main(args):
     launcher_template = template_mgr.get_template(TEMPLATE_FILE)    
     output_data = launcher_template.render(launcher_data)
 
-    print output_data
+    print(output_data)
 
     
 if __name__ == '__main__':

@@ -30,14 +30,14 @@ def pull_mixpanel_signals(start_date, end_date, file_descriptor):
     request_headers = { 'Content-Type': 'application/json',
                         'Authorization': 'Basic %s' % auth }
 
-    print 'issuing mixpanel request URL...'
+    print('issuing mixpanel request URL...')
     r = requests.get(MIXPANEL_ENDPOINT, headers=request_headers, params=payload)
     
     if r.status_code != 200:
-        print '### Response body: %s' %r.text
+        print('### Response body: %s' %r.text)
         r.raise_for_status()
     
-    print 'writing output...'
+    print('writing output...')
     for chunk in r.iter_content(chunk_size=4096):
         file_descriptor.write(chunk)
 
@@ -52,12 +52,12 @@ def main(args):
     start_date = arrow.get(start_date_string).format('YYYY-MM-DD')
     end_date = arrow.get(end_date_string).format('YYYY-MM-DD')
 
-    print 'Exporting mixpanel signals from %s to %s, target file is %s...' % (start_date, end_date, output_filename)
+    print('Exporting mixpanel signals from %s to %s, target file is %s...' % (start_date, end_date, output_filename))
 
     with open(output_filename, 'wb') as f:
         pull_mixpanel_signals(start_date, end_date, f)
 
-    print 'Done.'
+    print('Done.')
         
 
 if __name__ == '__main__':

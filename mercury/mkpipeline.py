@@ -49,12 +49,11 @@ def main(args):
 
     try:
         key = jrnl_mgr.insert_record(new_pipeline)
-        print 'created pipeline "%s".' % new_pipeline.name
+        print('created pipeline "%s".' % new_pipeline.name)
         exit(0)
     except couchbase.exceptions.KeyExistsError, err:
-        print 'error: there is already a pipeline named "%s".' % pipeline_name
+        print('error: there is already a pipeline named "%s".' % pipeline_name)
         exit(1)
-
 
 
 if __name__ == '__main__':

@@ -34,10 +34,10 @@ def main(args):
             if not num_records_cleared % 100000:
                 print '%d records cleared.' % num_records_cleared
         except Exception, err:
-            print '%s thrown while clearing record ID %s: %s' % (err.__class__.__name, key, err.message)
+            print('%s thrown while clearing record ID %s: %s' % (err.__class__.__name, key, err.message))
 
-    print '%d records cleared.' % num_records_cleared
-    print 'exiting.'
+    print('%d records cleared.' % num_records_cleared)
+    print('exiting.')
         
 
     

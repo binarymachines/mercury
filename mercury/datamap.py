@@ -329,7 +329,7 @@ class ConsoleProcessor(DataProcessor):
         DataProcessor.__init__(self, processor)
 
     def _process(self, record):
-        print common.jsonpretty(record)
+        print(common.jsonpretty(record))
         return record
 
 

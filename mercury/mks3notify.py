@@ -104,7 +104,7 @@ def main(args):
                                             target_arn,
                                             tmgr).add_event(S3Event.object_created_any())
 
-    print builder.build()
+    print(builder.build())
     
         
 

@@ -237,7 +237,7 @@ def write_to_star_schema(fact_record, fact_table):
     
 
 def main(args):
-    print args
+    print(args)
     init_filename = args['<initfile>']
     segment_num = -1
     if args.get('--segment') is not None:
@@ -257,7 +257,7 @@ def main(args):
     log_filename = tdx.generate_logfile_name(job_id)
     log = tdx.init_logging('METL_load', os.path.join(log_directory, log_filename), logging.DEBUG)
 
-    print '%s script started at %s, logging to %s...' % (LOG_TAG, datetime.datetime.now().isoformat(), log_filename)
+    print('%s script started at %s, logging to %s...' % (LOG_TAG, datetime.datetime.now().isoformat(), log_filename))
     
     service_objects = snap.initialize_services(yaml_config, log)
     so_registry = common.ServiceObjectRegistry(service_objects)
@@ -330,7 +330,7 @@ def main(args):
     log.info('%d orders processed into %d fact records.' % (num_orders_processed, num_facts_compiled))
     log.info('Total running time %s' % (tdx.hms_string(end_time - start_time)))
 
-    print 'Exiting.'
+    print('Exiting.')
     
     
 if __name__ == '__main__':

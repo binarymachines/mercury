@@ -154,7 +154,7 @@ class journal(ContextDecorator):
         
 
     def __enter__(self):
-        print 'writing oplog START record...'
+        print('writing oplog START record...')
         record = self.start_entry.data()
         record['op_name'] = self.op_name
         self.oplog_writer.write(**record)
@@ -162,12 +162,12 @@ class journal(ContextDecorator):
 
 
     def __exit__(self, typ, val, exc_traceback):        
-        print typ
-        print val
+        print(typ)
+        print(val)
         traceback.print_tb(exc_traceback)
         
         if self.end_entry:
-            print 'writing oplog END record:...'
+            print('writing oplog END record:...')
             record = self.end_entry.data()
             record['op_name'] = self.op_name
             self.oplog_writer.write(**record)
@@ -188,7 +188,7 @@ class delta_journal(ContextDecorator):
     def __enter__(self):
         record = self.oplog_entry.data()
         record.op_name = self.op_name
-        print 'writing oplog record. Original record is:\n%s' % record
+        print('writing oplog record. Original record is:\n%s' % record)
         self.oplog_entry_key = self.oplog_writer.write(**record)
         return self
 

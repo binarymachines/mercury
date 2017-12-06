@@ -182,7 +182,7 @@ def scb_to_direct_olap(pipeline_config, pgsql_host, pgsql_username, pgsql_passwo
 
 
 def ingest_with_mapping_context(mapping_context, pipeline_config, pgsql_host, pgsql_username, pgsql_password, log_name, source_topic):
-    print mapping_context
+    print(mapping_context)
     db = sqldbx.PostgreSQLDatabase(pgsql_host, 'praxis')
     db.login(pgsql_username, pgsql_password)
     pmgr = sqldbx.PersistenceManager(db)
@@ -195,7 +195,7 @@ def ingest_with_mapping_context(mapping_context, pipeline_config, pgsql_host, pg
 
     # show how many partitions this topic spans
     metadata = kreader.consumer.partitions_for_topic(topic)
-    print '### partitions for topic %s:\n%s' % (topic, '\n'.join([str(p) for p in metadata]))
+    print('### partitions for topic %s:\n%s' % (topic, '\n'.join([str(p) for p in metadata])))
 
     tp = TopicPartition(topic, 0)
     kreader.consumer.assign([tp])
@@ -225,7 +225,7 @@ def main(args):
         pipeline_config = tg.KafkaPipelineConfig(yaml_config)
 
     log_name = log_file + "_" + rectype + "_" + src_topic
-    print 'logging to: %s' % log_name
+    print('logging to: %s' % log_name)
     logging.basicConfig(filename=log_file, level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
 
     if rectype == 'direct_sales':

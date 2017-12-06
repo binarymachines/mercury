@@ -29,9 +29,9 @@ def main(args):
         if null_mode:
             null_pairs = nb_reporter.filter_with_null_output(src_file)
             for null_pair in null_pairs:
-                print common.jsonpretty({'line_number': null_pair[0],
+                print(common.jsonpretty({'line_number': null_pair[0],
                                          'field': null_pair[1]
-                                         })
+                                         }))
         elif readable_dict_mode:
             readable_lines = nb_reporter.filter_with_readable_output(src_file)
             for line in readable_lines:
@@ -42,7 +42,7 @@ def main(args):
                 for r_index, field in enumerate(fields):
                     record_dict[field] = value_array[r_index]
 
-                print common.jsonpretty(record_dict)
+                print(common.jsonpretty(record_dict))
 
         elif readable_line_mode:
             proc = Dictionary2CSVProcessor(fields, "|", dmap.WhitespaceCleanupProcessor())
@@ -56,10 +56,8 @@ def main(args):
                     record_dict[field] = value_array[r_index]
                 proc.process(record_dict)
 
-
-
         else:
-            print "Choose an option flag for record info output"
+            print("Choose an option flag for record info output")
 
 
 if __name__ == '__main__':

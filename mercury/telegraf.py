@@ -158,9 +158,9 @@ class KafkaOffsetManagementContext(object):
         consumer_group = kwargs.get('consumer_group', 'test_group')
         kreader = KafkaIngestRecordReader(topic, kafka_cluster.node_array, consumer_group)
 
-        print '### partitions for topic %s: %s' % (topic, kreader.consumer.partitions)
+        print('### partitions for topic %s: %s' % (topic, kreader.consumer.partitions))
         part1 = kreader.consumer.partitions[0]
-        print '### last committed offset for first partition: %s' % kreader.consumer.committed(part1)
+        print('### last committed offset for first partition: %s' % kreader.consumer.committed(part1))
 
 
     @property
@@ -416,7 +416,7 @@ class DataRelay(object):
         self.pre_send(kmsg_header, logger, **kwargs)
         if self._transformer:
             data_to_send = self._transformer.transform(kafka_message.value['body'])
-            print '## Data to send: %s \n\n' % str(data_to_send)
+            print('## Data to send: %s \n\n' % str(data_to_send))
         else:
             data_to_send = kafka_message.value['body']
         self._send(kmsg_header, data_to_send, logger, **kwargs)
@@ -430,7 +430,7 @@ class ConsoleRelay(DataRelay):
 
 
     def _send(self, src_message_header, message_data, logger):
-        print '### record at offset %d: %s' % (src_message_header.offset, message_data)
+        print('### record at offset %d: %s' % (src_message_header.offset, message_data))
 
 
 
@@ -664,7 +664,7 @@ class OLAPSchemaMappingContext(object):
 
     def get_fact_values(self, source_record, **kwargs):
         data = {}
-        #print '### source record info: %s'%  source_record
+        #print('### source record info: %s'%  source_record)
 
         for src_record_field_name in self._direct_mappings.keys():
             non_dimension_field = self._direct_mappings[src_record_field_name]
@@ -837,8 +837,8 @@ class OLAPStarSchemaRelay(DataRelay):
         fact_data = self._schema_mapping_context.get_fact_values(kafka_message.get('body'), 
                                                                  persistence_manager=self._pmgr)
 
-        print '### OLAP fact data:'
-        print common.jsonpretty(fact_data)
+        print('### OLAP fact data:')
+        print(common.jsonpretty(fact_data))
 
         insert_query_template = '''
         INSERT INTO {fact_table} ({field_names})
@@ -847,11 +847,11 @@ class OLAPStarSchemaRelay(DataRelay):
 
         data_placeholder_segment = ', '.join([':%s' % name for name in fact_data.keys()])
 
-        print '### initial rendering of insert statement: '
+        print('### initial rendering of insert statement: ')
         iqtemplate_render = insert_query_template.format(fact_table=self._schema_mapping_context.fact.table_name,
                                                          field_names=','.join(fact_data.keys()),
                                                          data_placeholders=data_placeholder_segment)
-        print iqtemplate_render
+        print(iqtemplate_render)
 
         insert_statement = text(iqtemplate_render)
         insert_statement = insert_statement.bindparams(**fact_data)                                                     
@@ -865,7 +865,7 @@ class ConsoleErrorHandler(object):
         pass
 
     def handle_error(self, exception_obj):
-        print str(exception_obj)
+        print(str(exception_obj))
 
 
 

@@ -39,7 +39,7 @@ class TransformProcessor(dmap.DataProcessor):
 
     def _process(self, data_dict):        
         output = self._transformer.transform(data_dict)
-        #print common.jsonpretty(output)
+        #print(common.jsonpretty(output))
         return output
 
 
@@ -54,7 +54,7 @@ class Dictionary2CSVProcessor(dmap.DataProcessor):
 
     def _process(self, data_dict):
         if self._record_count == 0:
-            print self._delimiter.join(self._header_fields)
+            print(self._delimiter.join(self._header_fields))
         else:
             record = []
             for field in self._header_fields:
@@ -62,7 +62,7 @@ class Dictionary2CSVProcessor(dmap.DataProcessor):
                 if data is None:
                     data = ''
                 record.append(str(data))
-            print self._delimiter.join(record)
+            print(self._delimiter.join(record))
 
         self._record_count += 1
         return data_dict
@@ -333,7 +333,7 @@ def resolve_initfile_args(arg_dict):
         cooked_value_tokens = []
         for tok in raw_value_tokens:
             if tok is not None:
-                #print 'adding cooked value token: %s...' % common.load_config_var(tok)
+                #print('adding cooked value token: %s...' % common.load_config_var(tok))
                 cooked_value_tokens.append(common.load_config_var(tok))
         output_args[key] = os.path.sep.join(cooked_value_tokens)
     return output_args
@@ -368,13 +368,13 @@ def main(args):
         schema_config_file = args.get('--schema')
         required_fields = get_required_fields(record_type, schema_config_file)
         data_supplier = load_data_supplier(record_type, schema_config_file, 'INDIR_SALES_KEY')
-        print data_supplier.get_service_object('mssql').db.list_tables()
+        print(data_supplier.get_service_object('mssql').db.list_tables())
         #     def __init__(self, required_record_fields, data_supplier, processor=None):
         repair_processor = RecordRepairProcessor(required_fields, data_supplier, processor=dmap.WhitespaceCleanupProcessor())
         get_schema_compliance_with_lookup(src_datafile, schema_config_file, record_type, repair_processor)
 
     elif interactive_mode:
-        print 'PLACEHOLDER: seesv interactive mode'
+        print('PLACEHOLDER: seesv interactive mode')
         return
 
     elif initfile_mode:
@@ -388,13 +388,13 @@ def main(args):
         main(cooked_args)
 
     elif test_mode:
-        #print 'testing data in source file %s for schema compliance...' % src_datafile
+        #print('testing data in source file %s for schema compliance...' % src_datafile)
         schema_config_file = args.get('--schema')
         with open(schema_config_file) as f:
             record_config = yaml.load(f)
             record_type = args.get('--rtype')
             schema_config = record_config['record_types'][record_type]
-            print get_schema_compliance_stats(src_datafile, schema_config, record_type, dmap.WhitespaceCleanupProcessor())
+            print(get_schema_compliance_stats(src_datafile, schema_config, record_type, dmap.WhitespaceCleanupProcessor()))
 
     elif filter_mode:
         # Filter source records for schema compliance

@@ -53,7 +53,7 @@ SUPPORTED_DB_OPS = ['INSERT', 'UPDATE']
 def main(args):
     yaml_config = common.read_config_file(args['<initfile>'])
     if args['--channel'] == False:
-        print '\n'.join(yaml_config['channels'].keys())
+        print('\n'.join(yaml_config['channels'].keys()))
         return 0
 
     event_channel = args['<event_channel>']
@@ -81,18 +81,18 @@ def main(args):
     pk_type = channel_config['pk_field_type']
 
     if args['--proc']:
-        print PROC_TEMPLATE.format(schema=db_schema,
+        print(PROC_TEMPLATE.format(schema=db_schema,
                                    pk_field_name=pk_field,
                                    pk_field_type=pk_type,
                                    channel_name=event_channel,
-                                   json_build_func=json_func)
+                                   json_build_func=json_func))
 
     elif args['--trigger']:
-        print TRIGGER_TEMPLATE.format(schema=db_schema,
+        print(TRIGGER_TEMPLATE.format(schema=db_schema,
                                       table_name=table_name,
                                       trigger_name=trigger_name,
                                       db_proc_name=proc_name,
-                                      db_op=operation)
+                                      db_op=operation))
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)

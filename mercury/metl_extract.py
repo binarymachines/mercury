@@ -85,12 +85,12 @@ def export_redshift_records_to_csv(category_name,
                                            export_file_prefix,
                                            options_string="delimiter '|' escape allowoverwrite")
         
-    print 'Export complete.'
-    print 'Downloading CSV file(s) from S3...'
+    print('Export complete.')
+    print('Downloading CSV file(s) from S3...')
     temp_download_dir = os.path.join(os.getcwd(), 'temp')
 
     # download from S3
-    s3 = boto3.client('s3')    
+    s3 = boto3.client('s3')
     csv_filenames = []
 
     temp_csv_filetuples = []
@@ -251,7 +251,7 @@ def main(args):
     log_filename = tdx.generate_logfile_name(job_id)
     logger = tdx.init_logging(LOG_TAG, os.path.join(log_directory, log_filename), logging.DEBUG)
 
-    print '%s script started at %s, logging to %s...' % (LOG_TAG, datetime.datetime.now().isoformat(), log_filename)
+    print('%s script started at %s, logging to %s...' % (LOG_TAG, datetime.datetime.now().isoformat(), log_filename))
     
     service_objects = snap.initialize_services(yaml_config, logger)
     so_registry = common.ServiceObjectRegistry(service_objects)
@@ -317,7 +317,7 @@ def main(args):
     logger.info('Total running time %s' % (tdx.hms_string(end_time - start_time)))
     pipeline_info_mgr.record_job_end(job_dbkey)
     
-    print 'exiting.'
+    print('exiting.')
     
 
 if __name__ == '__main__':

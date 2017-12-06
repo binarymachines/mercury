@@ -42,8 +42,8 @@ def main(args):
         exporter = tdx.RedshiftS3Exporter(conn)
         s3paths = exporter.export_records_as_csv(users_query, 'tdx/dim_tables/users_', rsec)
 
-        print s3paths
-        print rsec.generate_copy_statement('d_users', s3paths['manifest'])
+        print(s3paths)
+        print(rsec.generate_copy_statement('d_users', s3paths['manifest']))
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)

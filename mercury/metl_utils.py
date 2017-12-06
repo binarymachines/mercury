@@ -89,7 +89,7 @@ def csv_external_to_internal(external_ids):
 
 def redshift_console_login(redshift_service_obj):
     prompt = 'Connecting to database host: %s, db: %s as user: %s.' % (redshift_service_obj.host, redshift_service_obj.port, redshift_service_obj.username)    
-    print prompt
+    print(prompt)
     password = getpass.getpass()
     redshift_service_obj.login(password)
 

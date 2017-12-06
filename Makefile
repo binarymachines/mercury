@@ -6,7 +6,7 @@ TEST_PATH=./tests
 RECIPEPREFIX= # prefix char is a space, on purpose; do not delete
 PHONY=clean
 VIRTUALENV_NAME=mercury_test
-VIRTUALENV_ROOT=~/.test_virtualenvs
+VIRTUALENV_ROOT=~/.virtualenvs
 
 
 clean:
@@ -22,7 +22,7 @@ install-deps:
 test_env:
 	mkdir -p $(VIRTUALENV_ROOT)
 	virtualenv --no-site-packages $(VIRTUALENV_ROOT)/$(VIRTUALENV_NAME)
-	cd ~/.virtualenv/mercury_test/bin
+	cd $(VIRTUALENV_ROOT)/$(VIRTUALENV_NAME)/bin
 	python $(VIRTUALENV_ROOT)/$(VIRTUALENV_NAME)/bin/activate_this.py
 	$(VIRTUALENV_ROOT)/$(VIRTUALENV_NAME)/bin/pip install -r requirements.txt
 

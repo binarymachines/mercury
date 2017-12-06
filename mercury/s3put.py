@@ -21,16 +21,13 @@ def main(args):
         bucket_path = os.path.basename(local_filename)
 
     s3 = boto3.resource('s3')
-    print 'uploading file %s to bucket %s with key [%s]...' % (local_filename, bucket_name, bucket_path)
+    print('uploading file %s to bucket %s with key [%s]...' % (local_filename, bucket_name, bucket_path))
     with open(local_filename) as f:
         s3.meta.client.put_object(Bucket=bucket_name, Body=f, Key=bucket_path)
 
-    print 'done.'
+    print('done.')
+
     
-
-
-
-
 if __name__=='__main__':
     args = docopt.docopt(__doc__)
     main(args)

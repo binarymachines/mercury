@@ -269,7 +269,7 @@ def main(args):
     log_filename = metl.generate_logfile_name(job_id)
     log = metl.init_logging(LOG_TAG, os.path.join(log_directory, log_filename), logging.INFO)
 
-    print '%s script started at %s, logging to %s...' % (LOG_TAG, datetime.datetime.now().isoformat(), log_filename)
+    print('%s script started at %s, logging to %s...' % (LOG_TAG, datetime.datetime.now().isoformat(), log_filename))
     
     service_objects = snap.initialize_services(yaml_config, log)
     so_registry = common.ServiceObjectRegistry(service_objects)

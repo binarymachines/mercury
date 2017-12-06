@@ -111,13 +111,7 @@ def main(args):
     map = rmb.build()
 
     for d in dates:
-        print map.dictionary_to_row(d, delimiter='|')
-
-    #print map.header(delimiter='|')
-        
-        
-    
-
+        print(map.dictionary_to_row(d, delimiter='|'))
 
         
 if __name__=='__main__':

@@ -70,7 +70,7 @@ def main():
     #
     if args['-l'] or args['--list']:        
         for key in configs.keys():
-            print configs[key]
+            print(configs[key])
 
         exit(0)
         
@@ -81,17 +81,17 @@ def main():
 
     if args['<configfile>'] and not config_name:
         if len(configs.keys()) > 1:
-            print 'Multiple configurations found. Please specify one.'
+            print('Multiple configurations found. Please specify one.')
             exit(0)        
         output = config_template.render(nginx_config=configs.values()[0])
         
     else:
         if not configs.get(config_name):
-            print 'No nginx configuration labeled "%s" in %s.' % (config_name, config_filename)
+            print('No nginx configuration labeled "%s" in %s.' % (config_name, config_filename))
             exit(0)
         output = config_template.render(nginx_config=configs[config_name])
         
-    print output
+    print(output)
     exit(0)
         
 

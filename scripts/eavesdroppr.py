@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
         
         
 def main(args):
-    print args
+    print(args)
 
     local_env = common.LocalEnvironment('PGSQL_USER', 'PGSQL_PASSWORD')
     local_env.init()
@@ -43,7 +43,7 @@ def main(args):
 
     yaml_config = common.read_config_file(args['<initfile>'])
 
-    print common.jsonpretty(yaml_config)
+    print(common.jsonpretty(yaml_config))
 
     db_host = yaml_config['globals']['database_host']
     db_name = yaml_config['globals']['database_name']
@@ -72,11 +72,9 @@ def main(args):
     service_objects = common.ServiceObjectRegistry(snap.initialize_services(yaml_config, logger))
     
     pubsub.listen(channel_id)
-    print 'listening on channel "%s"...' % channel_id
+    print('listening on channel "%s"...' % channel_id)
     for event in pubsub.events():
-        print event.payload
-    
-
+        print(event.payload)
 
         
 if __name__ == '__main__':

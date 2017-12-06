@@ -112,7 +112,7 @@ class OrientDBPersistenceManager(object):
                 return resultset.keys()[0]
             return None
         except Exception, err:
-            print 'Database error attempting to commit transaction. %s' % err.message
+            print('Database error attempting to commit transaction. %s' % err.message)
             txn.rollback()
             raise err
 

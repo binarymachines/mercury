@@ -46,7 +46,7 @@ def export_redshift_records_to_csv(category_name,
         
     export_file_prefix = '/'.join(['tdx', 'cache_preload_export', category_name])
 
-    print 'Exporting %s from Redshift to CSV...' % category_name
+    print('Exporting %s from Redshift to CSV...' % category_name)
 
 
     redshift_export_context.export_records(db_connection,                                            
@@ -54,8 +54,8 @@ def export_redshift_records_to_csv(category_name,
                                            export_file_prefix,
                                            options_string="delimiter '|' escape allowoverwrite")
         
-    print 'Export complete.'
-    print 'Downloading CSV file(s) from S3...'
+    print('Export complete.')
+    print('Downloading CSV file(s) from S3...')
     temp_download_dir = os.path.join(os.getcwd(), 'temp')
 
     # download from S3
@@ -67,13 +67,13 @@ def export_redshift_records_to_csv(category_name,
     for key in s3.list_objects(Bucket=redshift_export_context.s3_bucket_name, Prefix=export_file_prefix)['Contents']:
         obj_name = key['Key']
 
-        print 'bucket object: %s' % obj_name
-        print 's3 prefix: %s' % export_file_prefix
+        print('bucket object: %s' % obj_name)
+        print('s3 prefix: %s' % export_file_prefix)
         
         fileobj = tempfile.mkstemp(obj_name.split('/')[1])
         temp_csv_filetuples.append(fileobj)
 
-        print 'Downloading %s...' % fileobj[1]
+        print('Downloading %s...' % fileobj[1])
         with open(fileobj[1], "wb") as f:
             s3.download_fileobj(redshift_export_context.s3_bucket_name, obj_name, f)
 
@@ -97,11 +97,11 @@ def preload_date_records(filename, couchbase_cache, delimiter='|'):
                 couchbase_cache.bucket.insert(cache_key, {'id': date_key })
                 num_records_preloaded += 1
                 if not num_records_preloaded % 1000:
-                    print '%d date records preloaded.' % num_records_preloaded
+                    print('%d date records preloaded.' % num_records_preloaded)
             except couchbase.exceptions.KeyExistsError, err:
                 pass
 
-    print '%d date records preloaded.' % num_records_preloaded
+    print('%d date records preloaded.' % num_records_preloaded)
 
 
     
@@ -120,11 +120,11 @@ def preload_user_records(filename, couchbase_cache, delimiter='|'):
                 couchbase_cache.bucket.insert(cache_key, {'id': user_key })
                 num_records_preloaded += 1
                 if not num_records_preloaded % 100000:
-                    print '%d user records preloaded.' % num_records_preloaded
+                    print('%d user records preloaded.' % num_records_preloaded)
             except couchbase.exceptions.KeyExistsError, err:
                 pass
 
-    print '%d user records preloaded.' % num_records_preloaded
+    print('%d user records preloaded.' % num_records_preloaded)
     
 
     
@@ -143,11 +143,11 @@ def preload_brand_records(filename, couchbase_cache, delimiter='|'):
                 couchbase_cache.bucket.insert(cache_key, {'id': brand_key })
                 num_records_preloaded += 1
                 if not num_records_preloaded % 100000:
-                    print '%d brand records preloaded.' % num_records_preloaded
+                    print('%d brand records preloaded.' % num_records_preloaded)
             except caouchbase.exceptions.KeyExistsError, err:
                 pass
             
-    print '%d brand records preloaded.' % num_records_preloaded
+    print('%d brand records preloaded.' % num_records_preloaded)
 
 
 
@@ -166,11 +166,11 @@ def preload_platform_records(filename, couchbase_cache, delimiter='|'):
                 couchbase_cache.bucket.insert(cache_key, {'id': platform_key })
                 num_records_preloaded += 1
                 if not num_records_preloaded % 100000:
-                    print '%d platform records preloaded.' % num_records_preloaded
+                    print('%d platform records preloaded.' % num_records_preloaded)
             except couchbase.exceptions.KeyExistsError, err:
                 pass
             
-    print '%d platform records preloaded.' % num_records_preloaded
+    print('%d platform records preloaded.' % num_records_preloaded)
 
 
     
@@ -220,11 +220,11 @@ def main(args):
             preload_platform_records(filename, couchbase_cache)
 
 
-    print '### export filemap:'
-    print tdx.jsonpretty(json.dumps(filemap))
+    print('### export filemap:')
+    print(tdx.jsonpretty(json.dumps(filemap)))
             
     end_time = time.time()
-    print 'Total running time %s' % (tdx.hms_string(end_time - start_time))
+    print('Total running time %s' % (tdx.hms_string(end_time - start_time)))
 
     
 if __name__ == '__main__':

@@ -69,13 +69,13 @@ class MessageStats(object):
       @staticmethod
       def load(messageKey, appConfig, redisServer):
           results = redisServer.instance.hget(appConfig.messageStatsTableName, messageKey)
-          #print '>>> message stats for ID %s: %s' % (messageKey.uuid, results)          
+          #print('>>> message stats for ID %s: %s' % (messageKey.uuid, results))
           return MessageStats(ast.literal_eval(results))
 
 
       def save(self, messageKey, appConfig, redisServer):
           redisServer.instance.hset(appConfig.messageStatsTableName, messageKey, self.data)
-          print 'saved message stats %s under ID %s' % (self.data, messageKey)
+          print('saved message stats %s under ID %s' % (self.data, messageKey))
 
 
       def __repr__(self):
@@ -287,7 +287,7 @@ class MessageID():
 
         
         newID =  MessageID(uuid, segment)
-        print '>>> loaded new message ID object %s' % newID
+        print('>>> loaded new message ID object %s' % newID)
         return newID
         
 

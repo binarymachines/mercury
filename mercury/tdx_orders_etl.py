@@ -54,7 +54,7 @@ def main(args):
         load.main(load_params)
         
     except Exception, err:
-        print 'ETL run failed with %s: %s' % (err.__class__.__name__, err.message)
+        print('ETL run failed with %s: %s' % (err.__class__.__name__, err.message))
         exc_type, exc_value, exc_traceback = sys.exc_info()
         traceback.print_tb(exc_traceback, limit=1, file=sys.stderr)
         traceback.print_exception(exc_type, exc_value, exc_traceback,

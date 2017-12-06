@@ -97,10 +97,10 @@ def main(args):
     excel_file = args['<excel_file>']
     workbook = xl.load_workbook(excel_file)
 
-    #print dir(workbook)
+    #print(dir(workbook))
 
     if args['sheets']:
-        print '\n'.join(workbook.get_sheet_names())
+        print('\n'.join(workbook.get_sheet_names()))
         exit()
 
     wksht_name = args['--sheet']
@@ -109,7 +109,7 @@ def main(args):
     if args['--row']:
         rownum = args['--row']
         rowdata = get_row(worksheet, int(rownum))
-        print '\n'.join(rowdata)
+        print('\n'.join(rowdata))
 
 
     if args['--rows']:
@@ -119,12 +119,12 @@ def main(args):
         else:
             delimiter = args['--delimiter']
         rowdata = get_rows(worksheet, range_string, delimiter)
-        print '\n'.join(rowdata)
+        print('\n'.join(rowdata))
 
     if args['--col']:
         col_name = args['--col']
         coldata = get_column(worksheet, col_name)
-        print '\n'.join(coldata)
+        print('\n'.join(coldata))
 
     if args['--cols']:
         col_string = args['--cols']
@@ -136,7 +136,7 @@ def main(args):
         if ',' in col_string:
             column_names = col_string.split(',')
             coldata = get_columns(worksheet, column_names, delimiter)
-            print '\n'.join(coldata)
+            print('\n'.join(coldata))
         '''
         elif '-' in col_string:
             column_names = []
@@ -145,12 +145,10 @@ def main(args):
             last_col = first_last_cols[1]   
         '''
 
-        
-
 
     if args['--cell']:
         cell_id = args['--cell']
-        print get_cell(worksheet, cell_id)
+        print(get_cell(worksheet, cell_id))
 
 
 

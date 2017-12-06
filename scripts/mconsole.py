@@ -25,8 +25,8 @@ def docopt_cmd(func):
             # The DocoptExit is thrown when the args do not match.
             # We print a message to the user and the usage block.
 
-            print '\nPlease specify one or more valid command parameters.'
-            print e
+            print('\nPlease specify one or more valid command parameters.')
+            print(e)
             return
 
         except SystemExit:
@@ -163,7 +163,7 @@ class MConsoleCLI(Cmd):
         pass
 
     def do_EOF(self, arg):
-        print '\n'
+        print('\n')
         return True
 
 
@@ -171,9 +171,8 @@ class MConsoleCLI(Cmd):
     def do_mkstage(self, arg):
         '''Usage:    mkstage (extract | transform | load)
         '''
-        print arg
-        #print 'make pipeline stage for %s' % 
-        pass
+        print(arg)
+
     
 
 

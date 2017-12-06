@@ -34,7 +34,7 @@ def main(args):
     j2env = jinja2.Environment(loader = jinja2.FileSystemLoader('templates'))
     template_mgr = common.JinjaTemplateManager(j2env)
     initfile_template = template_mgr.get_template('snap.conf.j2')
-    print initfile_template.render(template_data)
+    print(initfile_template.render(template_data))
 
 
 if __name__ == '__main__':

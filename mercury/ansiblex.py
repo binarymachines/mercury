@@ -96,7 +96,7 @@ class DefaultResultCallback(CallbackBase):
         This method could store the result in an instance attribute for retrieval later
         """
         host = result._host
-        print json.dumps({host.name: result._result}, indent=4)
+        print(json.dumps({host.name: result._result}, indent=4))
 
 
 
@@ -145,7 +145,7 @@ class AnsibleContext(object):
             )
             result = tqm.run(play)
 
-            print 'executed playbook, terminated with code %d.' % result
+            print('executed playbook, terminated with code %d.' % result)
         
         finally:
             if tqm is not None:

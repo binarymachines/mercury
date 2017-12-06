@@ -110,8 +110,8 @@ class ForgeCLI(Cmd):
 
 
     def do_quit(self, *cmd_args):
-        print '%s CLI exiting.' % self.name
-        print metl.jsonpretty(self.facts)
+        print('%s CLI exiting.' % self.name)
+        print(metl.jsonpretty(self.facts))
         raise SystemExit
 
 
@@ -120,10 +120,10 @@ class ForgeCLI(Cmd):
 
     def create_dimension_for_fact(self, fact_name):
         fields = []
-        print 'Creating a new dimension for fact %s...' % fact_name
+        print('Creating a new dimension for fact %s...' % fact_name)
         dim_name = cli.InputPrompt('Enter a name for this dimension').show()
         if dim_name:
-            print 'Add 1 or more fields to this dimension.'
+            print('Add 1 or more fields to this dimension.')
             while True:
                 field_name = cli.InputPrompt('field name').show()
                 if not field_name:
@@ -131,7 +131,7 @@ class ForgeCLI(Cmd):
                 field_type = cli.MenuPrompt('field type', attribute_type_options).show()
                 if not field_type:
                     break
-                print '> Added new field "%s" to fact dimension %s->%s.' % (field_name, fact_name, dim_name)
+                print('> Added new field "%s" to fact dimension %s->%s.' % (field_name, fact_name, dim_name))
                 fields.append(Field(field_name, field_type))
                 should_continue = cli.InputPrompt('Add another field (Y/n)?', 'y').show()
                 if should_continue == 'n':
@@ -172,28 +172,28 @@ class ForgeCLI(Cmd):
 
     def do_mkfact(self, *cmd_args):
         if not len(*cmd_args):
-            print 'mkfact command requires the fact name.'
+            print('mkfact command requires the fact name.')
             return
         fact_name = cmd_args[0]
         self.facts[fact_name] = {'dimensions': [], 'fields': []}
             
-        print 'Creating new fact: %s' % fact_name
+        print('Creating new fact: %s' % fact_name)
         self.update_fact(fact_name)
             
 
     def do_lsfact(self, *cmd_args):
-        print '> Current facts:'
-        print ' \n'.join(self.facts.keys())
+        print('> Current facts:')
+        print(' \n'.join(self.facts.keys()))
 
 
     def do_chfact(self, *cmd_args):
         if not len(*cmd_args):
-            print 'chfact command requires the fact name.'
+            print('chfact command requires the fact name.')
             return
 
         fact_name = cmd_args[0]
         if not self.facts.get(fact_name):
-            print 'no fact registered with name "".' % fact_name
+            print('no fact registered with name "".' % fact_name)
             return
 
         self.update_fact(fact_name)
