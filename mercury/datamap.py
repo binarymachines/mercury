@@ -5,9 +5,9 @@ import sys
 import csv
 from snap import snap, common
 import yaml
-import sqldbx as sqlx
+from mercury import sqldbx as sqlx
 import logging
-import csvutils
+from mercury import csvutils
 
 
 class NoSuchTargetFieldException(Exception):

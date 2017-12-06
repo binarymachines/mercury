@@ -9,7 +9,7 @@ import json
 import docopt
 import yaml
 from snap import common
-import sqldbx as sqlx
+from mercury import sqldbx as sqlx
 
 import logging
 import copy
