@@ -6,4 +6,5 @@
 main.py
 dist/*
 build/*
+*.egg-info
 snap_micro.egg-info/*
