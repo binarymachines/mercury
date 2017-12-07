@@ -325,7 +325,7 @@ class KafkaIngestRecordReader(object):
                 if checkpoint_mode and message_counter % checkpoint_frequency == 0:
                     data_relay.checkpoint(logger, **kwargs)
                     checkpoint_timer.reset()
-            except Exception, err:
+            except Exception as err:
                 logger.debug('Kafka message reader threw an exception from its DataRelay while processing message %d: %s' % (message_counter, str(err)))
                 logger.debug('Offending message: %s' % str(message))
                 #traceback.print_exc()
@@ -343,7 +343,7 @@ class KafkaIngestRecordReader(object):
             try:
                 logger.info('Kafka message reader issuing final checkpoint command at %s...' % datetime.datetime.now().isoformat())
                 data_relay.checkpoint(logger, **kwargs)
-            except Exception, err:
+            except Exception as err:
                 logger.error('Final checkpoint command threw an exception: %s' % str(err))
             finally:    
                 checkpoint_timer.stop()
@@ -400,7 +400,7 @@ class DataRelay(object):
         try:
             self._checkpoint(logger, **kwargs)
             logger.info('data relay passed checkpoint at %s' % datetime.datetime.now().isoformat())
-        except Exception, err:
+        except Exception as err:
             logger.error('data relay failed checkpoint with error:')
             logger.error(err)
 
