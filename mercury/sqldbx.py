@@ -16,7 +16,6 @@ Base = declarative_base()
 
 import types
 import os
-import exceptions
 import sys
 from contextlib import contextmanager
 
