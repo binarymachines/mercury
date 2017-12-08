@@ -176,7 +176,7 @@ class DataTypeTransformer:
         self._log = log
 
     def build(self, type_dict, **kwargs):
-        for f_name, f_type in type_dict.iteritems():
+        for f_name, f_type in type_dict.items():
             self._csv_record_map_builder.add_field(f_name, f_type)
 
         self._csv_record_map = self._csv_record_map_builder.build(**kwargs)
@@ -240,7 +240,7 @@ class RecordTransformer:
 
     def transform(self, source_record, **kwargs):
         target_record = {}
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             target_record[key] = value
 
         for target_field_name in self.target_record_fields:
@@ -353,7 +353,7 @@ class WhitespaceCleanupProcessor(DataProcessor):
 
     def _process(self, record):
         data = {}
-        for key, value in record.iteritems():
+        for key, value in record.items():
             data[key] = value.strip()
         return data
 
