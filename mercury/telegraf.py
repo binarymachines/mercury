@@ -205,7 +205,8 @@ class KafkaIngestRecordWriter(object):
     def __init__(self, kafka_node_array, serializer=json_serializer):
         self.producer = KafkaProducer(bootstrap_servers=','.join([n() for n in kafka_node_array]),
                                       value_serializer=serializer,
-                                      acks=1)
+                                      acks=1,
+                                      api_version=(0,10))
         log = logging.getLogger(__name__)
         ch = logging.StreamHandler()
         formatter = logging.Formatter('%(levelname)s:%(message)s')
