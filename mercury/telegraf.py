@@ -67,7 +67,7 @@ class IngestRecordHeader(object):
         self._pipeline_id = kwreader.get_value('pipeline_id')        
         self._timestamp = datetime.datetime.now().isoformat()
         self._extra_headers = []
-        for key, value in kwargs.iteritems():
+        for key, value in kwargs.items():
             if key not in ['record_type', 'pipeline_id']:
                 self._extra_headers.append({'name': key, 'value': value})
 
@@ -190,7 +190,7 @@ class KafkaLoader(object):
 
     def load(self, data):
         msg_builder = IngestRecordBuilder(self._header)
-        for key, value in data.iteritems():
+        for key, value in data.items():
             msg_builder.add_field(key, value)
         ingest_record = msg_builder.build()
 
