@@ -12,7 +12,7 @@ from pip.download import PipSession
 
 
 NAME = 'mercury'
-VERSION = '0.9.0'
+VERSION = '0.7.0'
 PACKAGES = find_packages(where='src')
 DEPENDENCIES=['snap-micro',
               'docopt',
