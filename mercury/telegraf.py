@@ -28,7 +28,10 @@ from logging import Formatter
 #import traceback
 from sqlalchemy.sql import bindparam
 
+
+log = logging.getLogger(__name__)
 DEFAULT_SENTRY_DSN = 'https://64488b5074a94219ba25882145864700:9129da74c26a43cd84760d098b902f97@sentry.io/163031'
+
 
 
 class NoSuchPartitionException(Exception):
@@ -42,12 +45,11 @@ class UnregisteredTransferFunctionException(Exception):
 
 
 class TelegrafErrorHandler(object):
-    def __init__(self, log_name, logging_level=logging.DEBUG, sentry_dsn=DEFAULT_SENTRY_DSN):
-        self._sentry_logger = logging.getLogger(log_name)
+    def __init__(self, logging_level=logging.DEBUG, sentry_dsn=DEFAULT_SENTRY_DSN):
         self._client = Client(sentry_dsn)
         sentry_handler = SentryHandler()
         sentry_handler.setLevel(logging_level)
-        self._sentry_logger.addHandler(sentry_handler)
+        log.addHandler(sentry_handler)
 
 
     @property
@@ -194,7 +196,6 @@ class KafkaLoader(object):
             msg_builder.add_field(key, value)
         ingest_record = msg_builder.build()
 
-        log = logging.getLogger(__name__)
         log.debug('writing record to Kafka topic "%s":' % self._topic)
         log.debug(ingest_record)
         self._kwriter.write(self._topic, ingest_record)
@@ -207,12 +208,6 @@ class KafkaIngestRecordWriter(object):
                                       value_serializer=serializer,
                                       acks=1,
                                       api_version=(0,10))
-        log = logging.getLogger(__name__)
-        ch = logging.StreamHandler()
-        formatter = logging.Formatter('%(levelname)s:%(message)s')
-        ch.setFormatter(formatter)
-        log.setLevel(logging.DEBUG)
-        log.addHandler(ch)
 
         error_handler = ConsoleErrorHandler()
         self._promise_queue = IngestWritePromiseQueue(error_handler, log, debug_mode=True)
@@ -240,7 +235,7 @@ class KafkaIngestRecordWriter(object):
 
 
 class CheckpointTimer(threading.Thread):
-    def __init__(self, checkpoint_function, log, **kwargs):
+    def __init__(self, checkpoint_function, **kwargs):
         threading.Thread.__init__(self)
         kwreader = common.KeywordArgReader('checkpoint_interval').read(**kwargs)
         self._seconds = 0
@@ -248,17 +243,16 @@ class CheckpointTimer(threading.Thread):
         self._checkpoint_function = checkpoint_function
         self._interval = kwreader.get_value('checkpoint_interval')
         self._checkpoint_function_args = kwargs
-        self._log = log
 
         
     def run(self):        
         self._stopped = False
-        self._log.info('starting checkpoint timer at %s.' % datetime.datetime.now().isoformat())
+        log.info('starting checkpoint timer at %s.' % datetime.datetime.now().isoformat())
         while not self._stopped:
             time.sleep(1)
             self._seconds += 1
             if self. _seconds >= self._interval:
-                self._checkpoint_function(self._log, **self._checkpoint_function_args)
+                self._checkpoint_function(**self._checkpoint_function_args)
                 self.reset()
 
 
@@ -269,12 +263,43 @@ class CheckpointTimer(threading.Thread):
 
     def reset(self):        
         self._seconds = 0
-        self._log.info('resetting checkpoint timer at %s.' % datetime.datetime.now().isoformat())
+        log.info('resetting checkpoint timer at %s.' % datetime.datetime.now().isoformat())
 
 
     def stop(self):
         self._stopped = True
-        self._log.info('stopping checkpoint timer at %s.' % datetime.datetime.now().isoformat())
+        log.info('stopping checkpoint timer at %s.' % datetime.datetime.now().isoformat())
+
+
+
+class RecordFilter(object):
+    def __init__(self, kafka_writer, **kwargs):
+        kwreader = common.KeywordArgReader('pass_topic')
+        kwreader.read(**kwargs)
+        self.pass_topic = kwreader.get_value('pass_topic')
+        self.fail_topic = kwargs.get('fail_topic')
+        self._kwriter = kafka_writer
+
+
+    def should_pass_message(self, kafka_message, **kwargs):
+        '''Override in subclass'''
+        return False
+
+
+    def process(self, kafka_message, **kwargs):
+        header_data = {}
+        header_data['topic'] = kafka_message.topic
+        header_data['partition'] = kafka_message.partition
+        header_data['offset'] = kafka_message.offset
+        header_data['key'] = kafka_message.key
+
+        kmsg_header = KafkaMessageHeader(header_data)
+
+        if self.should_pass_message(kafka_message):
+            self._kwriter.write(self.pass_topic, kafka_message.value)
+        else:
+            if self.fail_topic:
+                self._kwriter.write(self.fail_topic, kafka_message.value)
 
 
 
@@ -297,9 +322,34 @@ class KafkaIngestRecordReader(object):
 
         #self._consumer.subscribe(topic)
         #self._num_commits = 0
-        
 
-    def read(self, data_relay, logger, **kwargs): # insist on passing a checkpoint_frequency as kwarg?
+
+    def prefilter(self, src_message_header, **kwargs):
+        pass
+
+
+    def postfilter(self, src_message_header, **kwargs):
+        pass
+
+
+    def filter(self, record_filter, **kwargs):
+        message_counter = 0
+        num_commits = 0
+        error_count = 0
+        for message in self._consumer:
+            try:
+                record_filter.process(message)
+                self._consumer.commit()
+                num_commits += 1
+            except Exception as err:
+                log.debug('Kafka message reader threw an exception from its RecordFilter while processing message %d: %s' % (message_counter, str(err)))
+                log.debug('Offending message: %s' % str(message))
+                error_count += 1
+            finally:
+                message_counter += 1
+
+
+    def read(self, data_relay, **kwargs): # insist on passing a checkpoint_frequency as kwarg?
 
         # if we are in checkpoint mode, issue a checkpoint signal every <interval> seconds
         # or every <frequency> records, whichever is shorter
@@ -310,7 +360,7 @@ class KafkaIngestRecordReader(object):
         checkpoint_timer = None
         if checkpoint_frequency > 0:
             checkpoint_mode = True
-            checkpoint_timer = CheckpointTimer(data_relay.checkpoint, logger, **kwargs)
+            checkpoint_timer = CheckpointTimer(data_relay.checkpoint, **kwargs)
             checkpoint_timer.start()
 
         message_counter = 0
@@ -319,22 +369,22 @@ class KafkaIngestRecordReader(object):
 
         for message in self._consumer:
             try:
-                data_relay.send(message, logger)                
+                data_relay.send(message)
                 if message_counter % self._commit_interval == 0:
                     self._consumer.commit()
                     num_commits += 1
                 if checkpoint_mode and message_counter % checkpoint_frequency == 0:
-                    data_relay.checkpoint(logger, **kwargs)
+                    data_relay.checkpoint(**kwargs)
                     checkpoint_timer.reset()
             except Exception as err:
-                logger.debug('Kafka message reader threw an exception from its DataRelay while processing message %d: %s' % (message_counter, str(err)))
-                logger.debug('Offending message: %s' % str(message))
+                log.debug('Kafka message reader threw an exception from its DataRelay while processing message %d: %s' % (message_counter, str(err)))
+                log.debug('Offending message: %s' % str(message))
                 #traceback.print_exc()
                 error_count += 1
             finally:
                 message_counter += 1
 
-        logger.info('%d committed reads from topic %s, %d messages processed, %d errors.' % (num_commits, self._topic, message_counter, error_count))
+        log.info('%d committed reads from topic %s, %d messages processed, %d errors.' % (num_commits, self._topic, message_counter, error_count))
         
         # issue a last checkpoint on our way out the door
         # TODO: find out if what's really needed here is a Kafka consumer
@@ -342,10 +392,10 @@ class KafkaIngestRecordReader(object):
 
         if checkpoint_mode:
             try:
-                logger.info('Kafka message reader issuing final checkpoint command at %s...' % datetime.datetime.now().isoformat())
-                data_relay.checkpoint(logger, **kwargs)
+                log.info('Kafka message reader issuing final checkpoint command at %s...' % datetime.datetime.now().isoformat())
+                data_relay.checkpoint(**kwargs)
             except Exception as err:
-                logger.error('Final checkpoint command threw an exception: %s' % str(err))
+                log.error('Final checkpoint command threw an exception: %s' % str(err))
             finally:    
                 checkpoint_timer.stop()
 
@@ -372,41 +422,40 @@ class KafkaIngestRecordReader(object):
         return self._topic
 
 
-
 class DataRelay(object):
     def __init__(self, **kwargs):
         self._transformer = kwargs.get('transformer')
 
 
-    def pre_send(self, src_message_header, logger, **kwargs):
+    def pre_send(self, src_message_header, **kwargs):
         pass
 
 
-    def post_send(self, src_message_header, logger, **kwargs):
+    def post_send(self, src_message_header, **kwargs):
         pass
 
 
-    def _send(self, src_message_header, data, logger, **kwargs):
+    def _send(self, src_message_header, data, **kwargs):
         '''Override in subclass
         '''
         pass
 
 
-    def _checkpoint(self, logger, **kwargs):
+    def _checkpoint(self, **kwargs):
         '''Override in subclass'''
         pass
 
 
-    def checkpoint(self, logger, **kwargs):
+    def checkpoint(self, **kwargs):
         try:
-            self._checkpoint(logger, **kwargs)
-            logger.info('data relay passed checkpoint at %s' % datetime.datetime.now().isoformat())
+            self._checkpoint(**kwargs)
+            log.info('data relay passed checkpoint at %s' % datetime.datetime.now().isoformat())
         except Exception as err:
-            logger.error('data relay failed checkpoint with error:')
-            logger.error(err)
+            log.error('data relay failed checkpoint with error:')
+            log.error(err)
 
 
-    def send(self, kafka_message, logger, **kwargs):
+    def send(self, kafka_message, **kwargs):
         header_data = {}
         header_data['topic'] = kafka_message.topic
         header_data['partition'] = kafka_message.partition
@@ -414,15 +463,14 @@ class DataRelay(object):
         header_data['key'] = kafka_message.key
 
         kmsg_header = KafkaMessageHeader(header_data)
-        self.pre_send(kmsg_header, logger, **kwargs)
+        self.pre_send(kmsg_header, **kwargs)
         if self._transformer:
             data_to_send = self._transformer.transform(kafka_message.value['body'])
             print('## Data to send: %s \n\n' % str(data_to_send))
         else:
             data_to_send = kafka_message.value['body']
-        self._send(kmsg_header, data_to_send, logger, **kwargs)
-        self.post_send(kmsg_header, logger, **kwargs)
-
+        self._send(kmsg_header, data_to_send, **kwargs)
+        self.post_send(kmsg_header, **kwargs)
 
 
 class ConsoleRelay(DataRelay):
@@ -430,7 +478,7 @@ class ConsoleRelay(DataRelay):
         DataRelay.__init__(self, **kwargs)
 
 
-    def _send(self, src_message_header, message_data, logger):
+    def _send(self, src_message_header, message_data):
         print('### record at offset %d: %s' % (src_message_header.offset, message_data))
 
 
@@ -445,7 +493,7 @@ class ObjectstoreDBRelay(DataRelay):
         self._insert_sql = text(self.tablespec.insert_statement_template)
         
         
-    def _send(self, src_message_header, data, logger, **kwargs):
+    def _send(self, src_message_header, data, **kwargs):
         '''execute insert statement against objectstore DB'''
 
         rec_data = self.tablespec.convert_data(data)
@@ -466,7 +514,7 @@ class K2Relay(DataRelay):
         self._target_topic = target_topic
 
 
-    def _send(self, kafka_message, logger):
+    def _send(self, kafka_message):
         self._target_log_writer.write(self._target_topic, kafka_message.value)
 
 
@@ -501,7 +549,7 @@ class BulkTransferAgent(object):
         if not transfer_func:
             raise UnregisteredTransferFunctionException(operation_name)
 
-        transfer_func(self._svc_registry, log, **kwargs)
+        transfer_func(self._svc_registry, **kwargs)
 
 
 def dimension_id_lookup_func(value, dim_table_name, key_field_name, value_field_name, **kwargs):
@@ -831,9 +879,9 @@ class OLAPStarSchemaRelay(DataRelay):
         pass
 
 
-    def _send(self, msg_header, kafka_message, logger, **kwargs):
-        logger.debug("writing kafka log message to db...")
-        logger.debug('### kafka_message keys: %s' % '\n'.join(kafka_message.keys()))
+    def _send(self, msg_header, kafka_message, **kwargs):
+        log.debug("writing kafka log message to db...")
+        log.debug('### kafka_message keys: %s' % '\n'.join(kafka_message.keys()))
         outbound_record = {}
         fact_data = self._schema_mapping_context.get_fact_values(kafka_message.get('body'), 
                                                                  persistence_manager=self._pmgr)
@@ -885,12 +933,11 @@ class IngestWritePromiseQueue(threading.Thread):
        and then handles the results of failed requests in a background thread
     '''
 
-    def __init__(self, error_handler, log, futures = [], **kwargs):
+    def __init__(self, error_handler, futures = [], **kwargs):
         threading.Thread.__init__(self)
         self._futures = futures
         self._error_handler = error_handler
         self._errors = []
-        self._log = log
         self._sentry_logger = kwargs.get('sentry_logger')
         self._debug_mode = False
         if kwargs.get('debug_mode'):
@@ -918,21 +965,21 @@ class IngestWritePromiseQueue(threading.Thread):
         if not f.succeeded:
             result['status'] = 'error'
             result['message'] = f.exception.message
-            self._log.error('write promise failed with exception: %s' % str(f.exception))
+            log.error('write promise failed with exception: %s' % str(f.exception))
             self._sentry_logger.error('write promise failed with exception: %s' % str(f.exception))
             self._error_handler.handle_error(f.exception)
         return result
 
 
     def run(self):
-        self._log.info('processing %d Futures...' % len(self._futures))
+        log.info('processing %d Futures...' % len(self._futures))
         results = []
         for f in self._futures:
             while not f.is_done:
                 time.sleep(self._future_retry_wait_time)
             results.append(self.process_entry(f))
         self._errors = [r for r in results if r['status'] is not 'ok']
-        self._log.info('all futures processed.')
+        log.info('all futures processed.')
 
 
     @property

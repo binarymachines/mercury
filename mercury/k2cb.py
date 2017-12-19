@@ -4,7 +4,9 @@
 
 from telegraf import DataRelay
 import couchbasedbx as cbx
+import logging
 
+log = logging.getLogger(__name__)
 
 
 class CouchbaseRelay(DataRelay):
@@ -16,11 +18,11 @@ class CouchbaseRelay(DataRelay):
         self._couchbase_mgr.register_keygen_function(self._record_type, keygen_function)
 
 
-    def _send(self, src_message_header, message_data, logger):
+    def _send(self, src_message_header, message_data):
         builder = cbx.CouchbaseRecordBuilder(self._record_type)
         builder.from_json(message_data)
         cb_record = builder.build()
         key = self._couchbase_mgr.insert_record(cb_record)
-        logger.info('new record key: %s' % key)
+        log.info('new record key: %s' % key)
 
 
