@@ -210,7 +210,7 @@ class KafkaIngestRecordWriter(object):
                                       api_version=(0,10))
 
         error_handler = ConsoleErrorHandler()
-        self._promise_queue = IngestWritePromiseQueue(error_handler, log, debug_mode=True)
+        self._promise_queue = IngestWritePromiseQueue(error_handler, debug_mode=True)
 
 
     def write(self, topic, ingest_record):
