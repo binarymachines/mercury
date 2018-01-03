@@ -17,7 +17,11 @@ Base = declarative_base()
 import types
 import os
 import sys
+import time
 from contextlib import contextmanager
+
+
+DEFAULT_DB_CONNECT_RETRIES = 3
 
 
 class NoSuchTableError(Exception):
@@ -131,13 +135,26 @@ class Database:
         """Connect as the specified user."""
 
         url = self.__create_url__(self.dbType, username, password)
-        self.engine = sqla.create_engine(url, echo=False)
-        if schema:
-            self.metadata = sqla.MetaData(self.engine, schema=schema)
-        else:
-            self.metadata = sqla.MetaData(self.engine)
-        self.metadata.reflect(bind=self.engine)
-        self._session_factory = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
+
+        retries = 0
+        connected = False
+        while not connected and retries < DEFAULT_DB_CONNECT_RETRIES:
+            try:
+                self.engine = sqla.create_engine(url, echo=False)
+                if schema:
+                    self.metadata = sqla.MetaData(self.engine, schema=schema)
+                else:
+                    self.metadata = sqla.MetaData(self.engine)
+                self.metadata.reflect(bind=self.engine)
+                self._session_factory = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
+                connected = True
+            except:
+                time.sleep(1)
+                retries += 1
+
+        if not connected:
+            raise Exception('Unable to connect to %s DB on host %s:%s.' % (self.dbType, self.host, str(self.port)))
+
         
 
     def get_metadata(self):
