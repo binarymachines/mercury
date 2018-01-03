@@ -148,7 +148,8 @@ class Database:
                 self.metadata.reflect(bind=self.engine)
                 self._session_factory = sessionmaker(bind=self.engine, autoflush=False, autocommit=False)
                 connected = True
-            except:
+            except Exception as e:
+                print(e)
                 time.sleep(1)
                 retries += 1
 
