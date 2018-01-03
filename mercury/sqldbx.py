@@ -21,7 +21,7 @@ import time
 from contextlib import contextmanager
 
 
-DEFAULT_DB_CONNECT_RETRIES = 3
+DEFAULT_DB_CONNECT_RETRIES = 10
 
 
 class NoSuchTableError(Exception):
