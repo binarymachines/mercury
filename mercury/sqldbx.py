@@ -150,6 +150,8 @@ class Database:
                 connected = True
             except Exception as e:
                 print(e)
+                print(e.__class__.__name__)
+                print(e.__dict__)
                 time.sleep(1)
                 retries += 1
 
