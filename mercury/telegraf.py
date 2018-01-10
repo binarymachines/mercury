@@ -96,6 +96,11 @@ class IngestRecordBuilder(object):
         return self
 
 
+    def add_fields(self, **kwargs):
+        self.source_data.update(kwargs)
+        return self
+
+
     def build(self):
         result = {}
         result['header'] = self.header.data()
@@ -272,37 +277,65 @@ class CheckpointTimer(threading.Thread):
 
 
 
-class RecordFilter(object):
-    def __init__(self, kafka_writer, **kwargs):
-        kwreader = common.KeywordArgReader('pass_topic')
+def filter(filter_function, records, **kwargs):
+    return (rec for rec in records if filter_function(rec, **kwargs))
+
+
+def file_generator(**kwargs):
+    filename = kwargs.get('filename')
+    with open(filename) as f:
+        while True:
+            line = f.readline()
+            if line:
+                yield line
+            else:
+                return
+
+
+class RecordSource(object):
+    def __init__(self, **kwargs):
+        kwreader = common.KeywordArgReader('generator', 'services')
         kwreader.read(**kwargs)
-        self.pass_topic = kwreader.get_value('pass_topic')
-        self.fail_topic = kwargs.get('fail_topic')
-        self._kwriter = kafka_writer
+        self._generator = kwargs['generator']
+        self._services = kwargs['services']
 
 
-    def should_pass_message(self, kafka_message, **kwargs):
-        '''Override in subclass'''
-        return False
-
-
-    def process(self, kafka_message, **kwargs):
-        header_data = {}
-        header_data['topic'] = kafka_message.topic
-        header_data['partition'] = kafka_message.partition
-        header_data['offset'] = kafka_message.offset
-        header_data['key'] = kafka_message.key
-
-        kmsg_header = KafkaMessageHeader(header_data)
-
-        if self.should_pass_message(kafka_message):
-            self._kwriter.write(self.pass_topic, kafka_message.value)
+    def records(self, **kwargs):
+        kwargs.update({'services': self._services})
+        data = self._generator(**kwargs)
+        filter_func = kwargs.get('filter')
+        if filter_func:
+            return (filter(filter_func, data, **kwargs))
         else:
-            if self.fail_topic:
-                self._kwriter.write(self.fail_topic, kafka_message.value)
+            return (record for record in data)
 
 
+class TopicFork(object):
+    def __init__(self, **kwargs):
+        kwreader = common.KeywordArgReader('true_topic',
+                                           'false_topic',
+                                           'qualifier',
+                                           'service_objects')
+        kwreader.read(**kwargs)
+        self.true_topic = kwargs['true_topic']
+        self.false_topic = kwargs['false_topic']
+        self.qualifier = kwargs['qualifier']
+        self.services = kwargs['service_objects']
 
+
+    def split(self, record_generator, **kwargs):
+        kwreader = common.KeywordArgReader('kafka_writer')
+        kwreader.read(**kwargs)
+        kafka_writer = kwreader['kafka_writer']
+        kwargs.update({'services': self.services})
+        for record in record_generator:
+            if self.qualifier.qualify(record, **kwargs):
+                kafka_writer.write(self.true_topic, record)
+            else:
+                kafka_writer.write(self.false_topic, record)
+
+
+'''
 class KafkaIngestRecordReader(object):
     def __init__(self,
                  topic,
@@ -319,17 +352,6 @@ class KafkaIngestRecordReader(object):
                                        value_deserializer=deserializer,
                                        auto_offset_reset='earliest',
                                        consumer_timeout_ms=5000)
-
-        #self._consumer.subscribe(topic)
-        #self._num_commits = 0
-
-
-    def prefilter(self, src_message_header, **kwargs):
-        pass
-
-
-    def postfilter(self, src_message_header, **kwargs):
-        pass
 
 
     def filter(self, record_filter, **kwargs):
@@ -420,6 +442,7 @@ class KafkaIngestRecordReader(object):
     @property
     def topic(self):
         return self._topic
+'''
 
 
 class DataRelay(object):
