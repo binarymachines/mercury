@@ -326,7 +326,7 @@ class TopicFork(object):
     def split(self, record_generator, **kwargs):
         kwreader = common.KeywordArgReader('kafka_writer')
         kwreader.read(**kwargs)
-        kafka_writer = kwreader['kafka_writer']
+        kafka_writer = kwargs['kafka_writer']
         kwargs.update({'services': self.services})
         for record in record_generator:
             if self.qualify(record, **kwargs):
