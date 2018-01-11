@@ -224,11 +224,17 @@ class RecordTransformer:
 
     def lookup(self, target_field_name, source_record):
         record_value = source_record.get(target_field_name)
+        '''
         if record_value != None and record_value != '':
             return record_value
+        '''
+
         datasource = self.datasources.get(target_field_name)
         if not datasource:
-            raise NoDatasourceForFieldException(target_field_name)
+            if not source_record.has_key(target_field_name):
+                raise NoDatasourceForFieldException(target_field_name)
+
+            return record_value
 
         lookup_function_name = 'lookup_%s' % target_field_name
         if not hasattr(datasource, lookup_function_name):
