@@ -312,14 +312,14 @@ class RecordSource(object):
 
 class TopicFork(object):
     def __init__(self, **kwargs):
-        kwreader = common.KeywordArgReader('true_topic',
-                                           'false_topic',
+        kwreader = common.KeywordArgReader('accept_topic',
+                                           'reject_topic',
                                            'qualifier',
                                            'service_objects')
         kwreader.read(**kwargs)
-        self.true_topic = kwargs['true_topic']
-        self.false_topic = kwargs['false_topic']
-        self.qualifier = kwargs['qualifier']
+        self.accept_topic = kwargs['accept_topic']
+        self.reject_topic = kwargs['reject_topic']
+        self.qualify = kwargs['qualifier']
         self.services = kwargs['service_objects']
 
 
@@ -329,46 +329,29 @@ class TopicFork(object):
         kafka_writer = kwreader['kafka_writer']
         kwargs.update({'services': self.services})
         for record in record_generator:
-            if self.qualifier.qualify(record, **kwargs):
-                kafka_writer.write(self.true_topic, record)
+            if self.qualify(record, **kwargs):
+                kafka_writer.write(self.accept_topic, record)
             else:
-                kafka_writer.write(self.false_topic, record)
+                kafka_writer.write(self.reject_topic, record)
 
 
-'''
+
 class KafkaIngestRecordReader(object):
     def __init__(self,
                  topic,
-                 kafka_node_array,
-                 group=None,
-                 deserializer=json_deserializer,
+                 *kafka_nodes,
                  **kwargs):
 
         self._topic = topic
         # commit on every received message by default
         self._commit_interval = kwargs.get('commit_interval', 1)
+        deserializer = kwargs.get('deserializer', json_deserializer)
+        group = kwargs.get('group', None)
         self._consumer = KafkaConsumer(group_id=group,
-                                       bootstrap_servers=','.join([n() for n in kafka_node_array]),
+                                       bootstrap_servers=','.join([n() for n in kafka_nodes]),
                                        value_deserializer=deserializer,
                                        auto_offset_reset='earliest',
                                        consumer_timeout_ms=5000)
-
-
-    def filter(self, record_filter, **kwargs):
-        message_counter = 0
-        num_commits = 0
-        error_count = 0
-        for message in self._consumer:
-            try:
-                record_filter.process(message)
-                self._consumer.commit()
-                num_commits += 1
-            except Exception as err:
-                log.debug('Kafka message reader threw an exception from its RecordFilter while processing message %d: %s' % (message_counter, str(err)))
-                log.debug('Offending message: %s' % str(message))
-                error_count += 1
-            finally:
-                message_counter += 1
 
 
     def read(self, data_relay, **kwargs): # insist on passing a checkpoint_frequency as kwarg?
@@ -442,7 +425,7 @@ class KafkaIngestRecordReader(object):
     @property
     def topic(self):
         return self._topic
-'''
+
 
 
 class DataRelay(object):
