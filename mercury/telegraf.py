@@ -123,7 +123,7 @@ def json_serializer(value):
 
 
 def json_deserializer(value):
-    return json.loads(value)
+    return json.loads(value.decode('utf-8'))
 
 
 class KafkaMessageHeader(object):
@@ -920,6 +920,7 @@ class ConsoleErrorHandler(object):
         pass
 
     def handle_error(self, exception_obj):
+        print('error in telegraf data operation:')
         print(str(exception_obj))
 
 
