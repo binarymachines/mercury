@@ -4,6 +4,7 @@
 import sys
 import csv
 from snap import snap, common
+import datetime
 import yaml
 from mercury import sqldbx as sqlx
 import logging

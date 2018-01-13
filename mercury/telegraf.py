@@ -320,7 +320,7 @@ class TopicFork(object):
         self.accept_topic = kwargs['accept_topic']
         self.reject_topic = kwargs['reject_topic']
         self.qualify = kwargs['qualifier']
-        self.services = kwargs['service_objects']
+        self.services = kwargs['services']
 
 
     def split(self, record_generator, **kwargs):
@@ -334,6 +334,86 @@ class TopicFork(object):
             else:
                 kafka_writer.write(self.reject_topic, record)
 
+
+class TopicFilter(object):
+    def __init__(self, **kwargs):
+        kwreader = common.KeywordArgReader('target_topic',
+                                           'qualifier',
+                                           'services')
+        kwreader.read(**kwargs)
+        self.target_topic = kwargs['target_topic']
+        self.qualify = kwargs['qualifier']
+        self.services = kwargs['services']
+
+
+    def process(self, record_generator, **kwargs):
+        kwreader = common.KeywordArgReader('kafka_writer')
+        kwreader.read(**kwargs)
+        kafka_writer = kwargs['kafka_writer']
+        kwargs.update({'services': self.services})
+        for record in record_generator:
+            if self.qualify(record, **kwargs):
+                kafka_writer.write(self.target_topic, record)
+
+
+class TopicRouter(object):
+    def __init__(self, **kwargs):
+        kwreader = common.KeywordArgReader('services')
+        kwreader.read(**kwargs)
+        self.services = kwargs['services']
+        self.targets = {}
+
+
+    def register_target(self, qualifier_function, target_topic, precedence=0):
+        self.targets[(precedence, qualifier_function)] = target_topic
+
+        # The default behavior is to test each record against each qualifier in
+        # self.targets. In some cases it may be helpful to attempt matches in a definite order.
+        # We do this by registering higher precedence numbers to the qualifiers we wish to call first.
+
+
+    def process(self,
+                record_generator,
+                respect_precedence_order=False,
+                allow_multi_target_match=True,
+                **kwargs):
+        if not self.targets:
+            raise Exception('Empty target table. You must register at least one target in order to process records.')
+
+        kwreader = common.KeywordArgReader('kafka_writer')
+        kwreader.read(**kwargs)
+        kafka_writer = kwargs['kafka_writer']
+        default_topic = kwargs.get('default_topic')
+        kwargs.update({'services': self.services})
+
+        for record in record_generator:
+
+            # The default behavior is that one record may be dispatched to multiple target topics if it passes
+            # multiple qualifiers. If we don't want to test a record against all registered qualifiers, but instead break
+            # after the first match, then we set the allow_multi_target_match param to False. Then we will
+            # break out of the inner loop as soon as a qualifier returns True, or after all qualifiers
+            # have returned False.
+            #
+            # If the respect_precedence_order param is True, the record will be tested against qualifiers
+            # in descending order of precedence.
+
+            if respect_precedence_order:
+                qualifier_tuples = sorted(self.targets.keys(), reverse=True)
+            else:
+                qualifier_tuples = self.targets.keys()
+
+            for key in qualifier_tuples:
+                qualifier_func = key[1]
+                topic = self.targets[key]
+                matching_target_found = False
+                if qualifier_func(record, **kwargs):
+                    matching_target_found = True
+                    kafka_writer.write(topic, record)
+                    if not allow_multi_target_match:
+                        break
+
+            if not matching_target_found and default_topic:
+                kafka_writer.write(default_topic, record)
 
 
 class KafkaIngestRecordReader(object):
