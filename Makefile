@@ -75,7 +75,8 @@ docker-pull: FORCE
 	docker pull binarymachines/mercury:${IMAGE_VERSION}
 
 docker-pull-all: docker-pull FORCE
-	docker pull bamx/mysql-5.7
+    docker pull redis
+    docker pull couchbase
 	docker pull postgres
 	docker pull spotify/kafka
 
@@ -83,7 +84,7 @@ docker-push: FORCE
 	docker push binarymachines/mercury:${IMAGE_VERSION}
 
 docker-tag-latest: FORCE
-	docker tag binarymachines/mercury:${IMAGE_VERSION} conveyor:latest
+	docker tag binarymachines/mercury:${IMAGE_VERSION} binarymachines:latest
 
 docker-test: FORCE
 	./docker-test.sh
@@ -116,23 +117,20 @@ typing: FORCE
 		echo -e "\n########## type check (mypy) PASSED ##########\n"'
 
 
-#test-setup: FORCE
-#    ${COMPOSE} run --rm conveyor
-
 test: FORCE
-	${COMPOSE} run --rm conveyor behave /opt/bamx/src/tests/behave/features
+	${COMPOSE} run --rm mercury behave /opt/mercury/src/tests/behave/features
 
 pip-compile: FORCE
 	# NOTE: Fix file ownership at the end, instead of running the whole
 	# container as the host user/group. Due to an upstream limitation,
 	# `pip-compile` needs write access to `/root` for pip caching.
 	# https://github.com/jazzband/pip-tools/issues/395
-	${COMPOSE} run --rm conveyor /bin/sh -c \
+	${COMPOSE} run --rm mercury /bin/sh -c \
 		"pip-compile --rebuild --generate-hashes --output-file conf/deps/requirements.txt conf/deps/requirements-unpinned.txt && \
 		chown ${HOST_UID}:${HOST_GID} conf/deps/requirements.txt"
 
 clean: FORCE
-	${COMPOSE} run --rm conveyor find . -name '*.pyc' -delete
+	${COMPOSE} run --rm mercury find . -name '*.pyc' -delete
 
 FORCE:  # https://www.gnu.org/software/make/manual/html_node/Force-Targets.html#Force-Targets
 
