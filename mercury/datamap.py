@@ -4,6 +4,7 @@
 import sys
 import csv
 from snap import snap, common
+import inspect
 import datetime
 import yaml
 from mercury import sqldbx as sqlx
@@ -131,6 +132,44 @@ class RecordFormatConverter(object):
 
         return output_record
         
+
+
+class RenameTo(object):
+    def __init__(self, target):
+        self._new_name = None
+        self._transform = None
+        if callable(target):
+            self._transform = target
+        elif target:
+            self._new_name = target
+
+    def __call__(self, name):
+        if self._new_name:
+            return self._new_name
+        elif self._transform:
+            return self._transform(name)
+        else:
+            return name
+
+
+class RecordFieldNameMapper(object):
+    def __init__(self, renaming_map):
+        self._map = renaming_map
+
+
+    def remap(self, input_record, **kwargs):
+        include_unmapped_fields = kwargs.get('include_unmapped_fields', False)
+
+        output_record = {}
+        for input_key, value in input_record.iteritems():
+            if self._map.get(input_key):
+                rename = self._map[input_key]
+                output_key = rename(input_key)
+                output_record[output_key] = value
+            else:
+                if include_unmapped_fields:
+                    output_record[input_key] = value
+        return output_record
 
 
 

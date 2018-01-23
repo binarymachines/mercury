@@ -1,13 +1,19 @@
 # Makefile for Mercury data management framework
 
-
 HOST=127.0.0.1
 TEST_PATH=./tests
-RECIPEPREFIX= # prefix char is a space, on purpose; do not delete
 PHONY=clean
 VIRTUALENV_NAME=mercury_test
 VIRTUALENV_ROOT=~/.virtualenvs
+IMAGE_VERSION = latest
+PROJECT = mercury
+COMPOSE = docker-compose -p ${PROJECT}
+DOCKER = docker exec -it $(WEB) bash -c
+HOST_UID = `id -u`
+HOST_GID = `id -g`
 
+
+# -------------- Basic targets --------------
 
 clean:
 	find . -name '*.pyc' -exec rm --force {} +
@@ -52,3 +58,81 @@ clean-dist:
 
 pypi-upload:
 	twine upload -r dist/*
+
+
+#-------------- Docker-aware build targets --------------
+
+
+docker-build: FORCE
+	docker build -t binarymachines/mercury:${IMAGE_VERSION} -f conf/Dockerfile \
+		--build-arg "BINARY_BUILD_VERSION=${IMAGE_VERSION}" .
+
+docker-build-clean: FORCE
+	docker build --no-cache -t binarymachines/mercury:${IMAGE_VERSION} -f conf/Dockerfile \
+                --build-arg "BINARY_BUILD_VERSION=${IMAGE_VERSION}" .
+
+docker-pull: FORCE
+	docker pull binarymachines/mercury:${IMAGE_VERSION}
+
+docker-pull-all: docker-pull FORCE
+	docker pull bamx/mysql-5.7
+	docker pull postgres
+	docker pull spotify/kafka
+
+docker-push: FORCE
+	docker push binarymachines/mercury:${IMAGE_VERSION}
+
+docker-tag-latest: FORCE
+	docker tag binarymachines/mercury:${IMAGE_VERSION} conveyor:latest
+
+docker-test: FORCE
+	./docker-test.sh
+
+
+# ----- Dockerized local development -----
+
+up: FORCE
+	${COMPOSE} up -d --no-build mercury
+
+down: FORCE
+	${COMPOSE} down --remove-orphans -v
+
+rm: FORCE
+	docker-compose rm -f
+
+bounce: down rm up
+
+sh: FORCE
+	${COMPOSE} run --rm mercury /bin/sh
+
+lint: FORCE
+	${COMPOSE} run --rm mercury /bin/sh -c \
+		'flake8 --config=/opt/bamx/test/flake8.ini && \
+		echo -e "\n########## code style (flake8) PASSED ##########\n"'
+
+typing: FORCE
+	${COMPOSE} run --rm mercury /bin/sh -c \
+		'mypy --config-file=/opt/bamx/test/mypy.ini /opt/bamx/src && \
+		echo -e "\n########## type check (mypy) PASSED ##########\n"'
+
+
+#test-setup: FORCE
+#    ${COMPOSE} run --rm conveyor
+
+test: FORCE
+	${COMPOSE} run --rm conveyor behave /opt/bamx/src/tests/behave/features
+
+pip-compile: FORCE
+	# NOTE: Fix file ownership at the end, instead of running the whole
+	# container as the host user/group. Due to an upstream limitation,
+	# `pip-compile` needs write access to `/root` for pip caching.
+	# https://github.com/jazzband/pip-tools/issues/395
+	${COMPOSE} run --rm conveyor /bin/sh -c \
+		"pip-compile --rebuild --generate-hashes --output-file conf/deps/requirements.txt conf/deps/requirements-unpinned.txt && \
+		chown ${HOST_UID}:${HOST_GID} conf/deps/requirements.txt"
+
+clean: FORCE
+	${COMPOSE} run --rm conveyor find . -name '*.pyc' -delete
+
+FORCE:  # https://www.gnu.org/software/make/manual/html_node/Force-Targets.html#Force-Targets
+

@@ -76,4 +76,3 @@ class RedisServiceObject():
         key = redisx.compose_key(pipeline_id, self.generator_to_user_map_name)
         self.log.info('generated redis key for generator-to-user map: "%s"' % key)
         return redisx.Hashtable(key, self.redis_server)
-        
