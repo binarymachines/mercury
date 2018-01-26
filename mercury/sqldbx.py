@@ -240,7 +240,8 @@ class PostgreSQLDatabase(Database):
 
 class RedshiftDatabase(Database):
     """A Database type for connecting to Redshift clusters."""
-    def __init__(self, "redshift+psycopg2", host, schema, port)
+    def __init__(self, host, schema, port=5439):
+        Database.__init__(self, "redshift+psycopg2", host, schema, port)
 
 
 class NoSuchPluginError(Exception):
