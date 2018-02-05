@@ -117,9 +117,9 @@ class Database:
         self.port = port
         self.schema = schema
         self.engine = None
-        self.metadata = None        
+        self.metadata = None
         self._session_factory = None
-    
+
 
     def __create_url__(self, dbType, username, password):
         """Implement in subclasses to provide database-type-specific connection URLs."""
@@ -130,8 +130,8 @@ class Database:
         """Return the connection URL without user credentials."""
         return 'jdbc:%s://%s:%s/%s' % (self.dbType, self.host, self.port, self.schema)
 
-    
-    def login(self, username, password, schema=None):    
+
+    def login(self, username, password, schema=None):
         """Connect as the specified user."""
 
         url = self.__create_url__(self.dbType, username, password)
@@ -158,7 +158,7 @@ class Database:
         if not connected:
             raise Exception('Unable to connect to %s DB on host %s:%s.' % (self.dbType, self.host, str(self.port)))
 
-        
+
 
     def get_metadata(self):
         return self.metadata
@@ -166,19 +166,19 @@ class Database:
     def get_engine(self):
         return self.engine
 
-    def get_session(self):        
+    def get_session(self):
         return self._session_factory()
 
     def list_tables(self):
         return self.metadata.tables.keys()
 
     def get_table(self, name):
-        """Passthrough call to SQLAlchemy reflection logic. 
+        """Passthrough call to SQLAlchemy reflection logic.
 
         Arguments:
         name -- The name of the table to retrieve. Must exist in the current schema.
 
-        Returns: 
+        Returns:
         The requested table as an SQLAlchemy Table object.
         """
 
@@ -243,6 +243,9 @@ class RedshiftDatabase(Database):
     def __init__(self, host, schema, port=5439):
         Database.__init__(self, "redshift+psycopg2", host, schema, port)
 
+    def __create_url__(self, dbType, username, password):
+        return "%s://%s:%s@%s:%d/%s" % (self.dbType, username, password, self.host, self.port, self.schema)
+
 
 class NoSuchPluginError(Exception):
     def __init__(self, pluginName):
@@ -283,13 +286,13 @@ class PersistenceManager:
 
         return sqlalchemy.schema.Table(tableName, self.metaData, autoload = True)
 
-    
+
     def str_to_class(self, objectTypeName):
         """A rudimentary class loader function.
 
-        Arguments: 
+        Arguments:
         objectTypeName -- a fully qualified name for the class to be loaded,
-        in the form 'packagename.classname'. 
+        in the form 'packagename.classname'.
 
         Returns:
         a Python Class object.
@@ -346,8 +349,8 @@ class PersistenceManager:
 
         self.modelAliasMap[modelAlias] = modelClassName
         self._typeMap[modelClassName] = dbTable
-        
-    
+
+
     def map_parent_to_child(self, parentTypeName, parentTableName, parentTypeRefName, childTypeName, childTableName, childTypeRefName, **kwargs):
         """Create a parent-child (one to many relationship between two DB-mapped entities in SQLAlchemy's O/R mapping layer.
 
@@ -355,7 +358,7 @@ class PersistenceManager:
 
         Returns:
         """
-    
+
         parentTable = Table(parentTableName, self.metaData, autoload=True)
         parentObjectType = self.str_to_class(parentTypeName)
 
@@ -401,26 +404,26 @@ class PersistenceManager:
 
         self.mapTypeToTable(parentTypeName, parentTable.name, model_alias = parentAlias)
         self.mapTypeToTable(peerTypeName, peerTable.name, model_alias = peerAlias)
-       
+
 
 
     def get_table_for_type(self, modelName):
         if modelName not in self.modelAliasMap:
             raise NoTypeMappingError(modelName)
-        
+
         return self._typeMap[self.modelAliasMap[modelName]]
 
     def retrieve_all(self, objectTypeName, session):
         objClass = self.str_to_class(objectTypeName)
         resultSet = session.query(objClass).all()
         return resultSet
-    
+
     def insert(self, object, session):
         session.add(object)
 
     def update(self, object, session):
         session.flush()
-        
+
     def delete(self, object, session):
         session.delete(object)
 
@@ -436,25 +439,21 @@ class PersistenceManager:
         plugin = self.pluginTable[pluginName]
         if plugin == None:
             raise NoSuchPluginError(pluginName)
-    
+
         try:
             return plugin.performOperation(self, targetObject)
         except AttributeError as err:
             raise PluginMethodError(pluginName, 'execute')
 
-    
+
 class PersistenceManagerPlugin:
     def __init__(self):
         pass
-        
+
     def perform_operation(self, persistenceMgr, object):
         method = getattr(self, 'execute')
-        
+
         return method(persistenceMgr, object)
 
     def __execute__(persistenceMgr, object):  # override in subclasses
         pass
-
-
-
-
