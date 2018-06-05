@@ -446,14 +446,57 @@ class PersistenceManager:
             raise PluginMethodError(pluginName, 'execute')
 
 
-class PersistenceManagerPlugin:
-    def __init__(self):
-        pass
+    class DBTask(object):
+    def __init__(self, name='anonymous DB task'):
+        self.name = name
+        self._id = None
+    
+    def _get_uuid(self):
+        # can be overridden in descendant classes
+        return uuid.uuid4()
+    
+    def __str__(self):
+        return 'dbtask[%s]:%s' % (self.name, self.uuid)
+    
+    @property
+    def uuid(self):
+        if not self._id:
+            self._id = self._get_uuid()
+        return self._id
+        
 
-    def perform_operation(self, persistenceMgr, object):
-        method = getattr(self, 'execute')
+class ConnectionPoolManager(Object):
+    def __init__(self, hostname, db_name, username, password, port='5432'):
+        #self.connect_string = 'postgresql://'+user+':'+password+'@'+host+':'+port+'/'+dbname
+        #conn = create_engine(connect_string, pool_size=20, max_overflow_size=0)
+        self.hostname = hostname
+        self.dbname = db_name
+        self.username = username
+        self.password = password
+        self.port = port
+        self.connection_pool = pool.QueuePool(self._getconn,
+                                             max_overflow=10,
+                                             pool_size=5)
+        self.connection_table = {}
+        
+    
+    def _get_connection(self): # can override in subclasses
+        c = psycopg2.connect(username=self.username,
+                            host=self.hostname,
+                            dbname=self.dbname,
+                            password=self.password,
+                            port=self.port)
+        return c
 
-        return method(persistenceMgr, object)
+    
+    def get_connection(self, db_task):
+        conn = self._get_connection()
+        self.connection_table[db_task.uuid()] = conn
+        return conn
+    
 
-    def __execute__(persistenceMgr, object):  # override in subclasses
-        pass
+@contextmanager
+def get_connection(connection_pool_mgr, db_task):    
+    conn = connection_mgr.get_connection(db_task)
+    yield conn
+    connection_mgr.close_connection(db_task)
