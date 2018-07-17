@@ -5,14 +5,12 @@ from functools import wraps
 import os
 import datetime
 import traceback
-from couchbasedbx import *
-
+#from couchbasedbx import *
 
 
 
 def generate_op_record_key(oplog_record):
     return '%s_%s' % (oplog_record.record_type, datetime.datetime.utcnow().isoformat()) 
-
 
 
 class OpLogField(object):
@@ -25,7 +23,6 @@ class OpLogField(object):
     def data(self):
         return { self.name : self._value() }
 
-    
 
 class OpLogEntry(object):
     def __init__(self, **kwargs):
@@ -44,18 +41,16 @@ class OpLogEntry(object):
         return result
     
 
-    
 class TimestampField(OpLogField):
     def __init__(self):
         OpLogField.__init__(self, 'timestamp')
         #self.time = datetime.datetime.now().isoformat() 
 
-        
+
     def _value(self):
         return datetime.datetime.now().isoformat()
 
     
-
 class StatusField(OpLogField):
     def __init__(self, status_name):
         OpLogField.__init__(self, 'status')
@@ -66,7 +61,6 @@ class StatusField(OpLogField):
         return self.status
 
 
-    
 class PIDField(OpLogField):
     def __init__(self):
         OpLogField.__init__(self, 'pid')
@@ -76,7 +70,6 @@ class PIDField(OpLogField):
     def _value(self):
         return self.process_id
 
-    
     
 class RecordPageField(OpLogField):
     def __init__(self, reading_frame):
@@ -88,27 +81,23 @@ class RecordPageField(OpLogField):
                  'page_size': self.reading_frame.size
         }
 
-    
 
 class OpLogWriter(object):
     def write(self, **kwargs):
         '''implement in subclasses'''
         pass
 
-        
     def update(self, key, **kwargs):
         '''optional: implement in subclass if we need dealing with a delta journal'''
         raise Exception('OpLogWriter.update() method not implemented in this class.')
 
 
-    
 class OpLogLoader(object):
     def load_oplog_entry(self, entry_key):
         '''implement in subclass'''
         pass
 
-
-
+'''
 class CouchbaseOpLogWriter(OpLogWriter):
     def __init__(self, record_type_name, couchbase_persistence_mgr, **kwargs):
         self.record_type_name = record_type_name
@@ -119,7 +108,7 @@ class CouchbaseOpLogWriter(OpLogWriter):
     def write(self, **kwargs):
         op_record = CouchbaseRecordBuilder(self.record_type_name).add_fields(kwargs).build()
         return self.pmgr.insert_record(op_record)
-
+'''
 
 
 class ContextDecorator(object):
@@ -154,7 +143,7 @@ class journal(ContextDecorator):
         
 
     def __enter__(self):
-        print('writing oplog START record...')
+        # write the start record
         record = self.start_entry.data()
         record['op_name'] = self.op_name
         self.oplog_writer.write(**record)
@@ -162,18 +151,14 @@ class journal(ContextDecorator):
 
 
     def __exit__(self, typ, val, exc_traceback):        
-        print(typ)
-        print(val)
-        traceback.print_tb(exc_traceback)
-        
+        #traceback.print_tb(exc_traceback)        
         if self.end_entry:
-            print('writing oplog END record:...')
+            # write end record, if we are doing double-ended journaling
             record = self.end_entry.data()
             record['op_name'] = self.op_name
             self.oplog_writer.write(**record)
 
         return self
-
     
 
 class delta_journal(ContextDecorator):
@@ -197,3 +182,45 @@ class delta_journal(ContextDecorator):
         record = self.oplog_loader.load(self.oplog_entry_key)
         updated_record = self.oplog_entry_update_func(record)
         self.oplog_writer.update(self.oplog_entry_key, **updated_record)
+
+
+class TimeLog(object):
+    def __init__(self):
+        self.op_data = {}
+
+
+    def _elapsed_time_readout(self, start_time, end_time):
+        diff = end_time - start_time
+        days = diff.days # Get Day 
+        hours, remainder = divmod(diff.seconds, 3600) # Get Hour 
+        minutes, seconds = divmod(remainder, 60) # Get Minute & Second 
+
+        return '%d day(s), %d hour(s), %d minute(s), and %d second(s)' % (days, hours, minutes, seconds)
+
+
+    def record_elapsed_time(self, operation_tag, start_time, end_time):
+        if self.op_data.get(operation_tag):
+            raise Exception('attempted to overwrite the operation tag "%s" with new time data.' % operation_tag)
+        self.op_data[operation_tag] = self._elapsed_time_readout(start_time, end_time)
+
+
+    @property
+    def data(self):
+        return self.op_data
+
+
+class stopwatch(ContextDecorator):
+    def __init__(self, operation_tag, time_log):
+        self.time_log = time_log
+        self.tag = operation_tag
+        self.start_time = None
+        self.end_time = None
+
+    def __enter__(self):
+        self.start_time = datetime.datetime.now()     
+        return self
+
+    def __exit__(self, typ, val, exc_traceback):        
+        end_time = datetime.datetime.now()
+        self.time_log.record_elapsed_time(self.tag, self.start_time, end_time)
+
