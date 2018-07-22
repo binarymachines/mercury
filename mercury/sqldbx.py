@@ -447,25 +447,25 @@ class PersistenceManager:
 
 
     class DBTask(object):
-    def __init__(self, name='anonymous DB task'):
-        self.name = name
-        self._id = None
+        def __init__(self, name='anonymous DB task'):
+            self.name = name
+            self._id = None
     
-    def _get_uuid(self):
-        # can be overridden in descendant classes
-        return uuid.uuid4()
+        def _get_uuid(self):
+            # can be overridden in descendant classes
+            return uuid.uuid4()
     
-    def __str__(self):
-        return 'dbtask[%s]:%s' % (self.name, self.uuid)
+        def __str__(self):
+            return 'dbtask[%s]:%s' % (self.name, self.uuid)
     
-    @property
-    def uuid(self):
-        if not self._id:
-            self._id = self._get_uuid()
-        return self._id
+        @property
+        def uuid(self):
+            if not self._id:
+                self._id = self._get_uuid()
+            return self._id
         
 
-class ConnectionPoolManager(Object):
+class ConnectionPoolManager(object):
     def __init__(self, hostname, db_name, username, password, port='5432'):
         #self.connect_string = 'postgresql://'+user+':'+password+'@'+host+':'+port+'/'+dbname
         #conn = create_engine(connect_string, pool_size=20, max_overflow_size=0)

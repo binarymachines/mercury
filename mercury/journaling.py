@@ -5,7 +5,6 @@ from functools import wraps
 import os
 import datetime
 import traceback
-#from couchbasedbx import *
 
 
 
@@ -187,6 +186,7 @@ class delta_journal(ContextDecorator):
 class TimeLog(object):
     def __init__(self):
         self.op_data = {}
+        self.readout_data = {}
 
 
     def _elapsed_time_readout(self, start_time, end_time):
@@ -201,12 +201,20 @@ class TimeLog(object):
     def record_elapsed_time(self, operation_tag, start_time, end_time):
         if self.op_data.get(operation_tag):
             raise Exception('attempted to overwrite the operation tag "%s" with new time data.' % operation_tag)
-        self.op_data[operation_tag] = self._elapsed_time_readout(start_time, end_time)
+        self.op_data[operation_tag] = (start_time, end_time)
 
 
     @property
     def data(self):
         return self.op_data
+
+
+    @property
+    def readout(self):
+        result = {}
+        for operation_tag, start_end_tuple in self.op_data.items():
+            result[operation_tag] = self._elapsed_time_readout(start_end_tuple[0], start_end_tuple[1])
+        return result
 
 
 class stopwatch(ContextDecorator):
@@ -223,4 +231,60 @@ class stopwatch(ContextDecorator):
     def __exit__(self, typ, val, exc_traceback):        
         end_time = datetime.datetime.now()
         self.time_log.record_elapsed_time(self.tag, self.start_time, end_time)
+
+
+class CountLog(object):
+    def __init__(self):
+        self.op_data = {}
+
+    def _count_readout(self, operation_tag, count):
+        return 'operation "%s" executed %d times.' % (operation_tag, count)
+
+    def update_count(self, operation_tag, delta):
+        if self.op_data.get(operation_tag) is None:
+            self.op_data[operation_tag] = delta
+        else:
+            self.op_data[operation_tag] += delta
+
+    @property
+    def data(self):
+        return self.op_data
+
+    @property
+    def readout(self):
+        result = []
+        for operation_tag, op_count in self.op_data.items():
+            result.append(self._count_readout(operation_tag, op_count))
+        return '\n'.join(result)
+
+
+class counter(ContextDecorator):
+    def __init__(self, operation_tag, count_log, count_delta=1):
+        self.count_log = count_log
+        self.tag = operation_tag
+        self.count_delta = count_delta
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, typ, val, exc_traceback):
+        self.count_log.update_count(self.tag, self.count_delta)
+
+
+global_count_log = CountLog()
+global_time_log = TimeLog()
+
+
+@counter('call annotated function', global_count_log)
+def some_func():
+    pass
+
+
+import time
+
+@stopwatch('call timed function', global_time_log)
+def timed_function():
+    time.sleep(2)
+    
+
 
