@@ -24,6 +24,14 @@ channels:
                         - first_name
                         - last_name
                         - email
+
+
+oplog_writers:
+        couchbase:
+                class_name:     CouchbaseOplogWriter
+                record_type_name: extract
+                
+                
                 
 
 
