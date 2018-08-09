@@ -4,6 +4,21 @@ import time
 from journaling import *
 
 
+global_count_log = CountLog()
+global_time_log = TimeLog()
+
+
+@counter('call annotated function', global_count_log)
+def some_func():
+    pass
+
+
+@stopwatch('call timed function', global_time_log)
+def timed_function():
+    time.sleep(2)
+    
+
+
 def main():
     print('hello journal')
     

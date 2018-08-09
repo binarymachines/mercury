@@ -7,45 +7,45 @@ from snap import snap, common
 import inspect
 import datetime
 import yaml
-from mercury import sqldbx as sqlx
+#from mercury import sqldbx as sqlx
 import logging
-from mercury import csvutils
+#from mercury import csvutils
 
 
-class NoSuchTargetFieldException(Exception):
+class NoSuchTargetField(Exception):
     def __init__(self, field_name):
         Exception.__init__(self,
                            'RecordTransformer does not contain the target field %s.' % field_name)
 
 
-class NoDatasourceForFieldException(Exception):
+class NoDatasourceForField(Exception):
     def __init__(self, field_name):
         Exception.__init__(self,
                            'No datasource registered for target field name %s.' % field_name)
 
 
-class NoSuchLookupMethodException(Exception):
+class NoSuchLookupMethod(Exception):
     def __init__(self, datasource_classname, method_name):
         Exception.__init__(self,
                            'Registered datasource %s has no lookup method "%s(...)' % (datasource_classname, method_name))
 
 
-class NonexistentDatasourceException(Exception):
+class NonexistentDatasource(Exception):
     def __init__(self, src_name, module_name):
         Exception.__init__(self, 'No datasource named "%s" in target Python module "%s".' % (src_name, module_name))
 
 
-class MissingSupplierMethodException(Exception):
+class MissingSupplierMethod(Exception):
     def __init__(self, classname, methodname):
         Exception.__init__(self, 'DataSupplier subclass %s contains no supply method "%s".' % (classname, methodname))
 
 
-class InvalidSupplierRequestException(Exception):
+class InvalidSupplierRequest(Exception):
     def __init__(self, field_name):
         Exception.__init__(self, 'Cannot supply a value for a record identifier field (%s).' % field_name)
 
 
-class InvalidSupplierRecordException(Exception):
+class InvalidSupplierRecord(Exception):
     def __init__(self, record_id_field_name):
         Exception.__init__(self, 'Incoming record is missing a value for its identifier field "%s"; cannot supply data.' % record_id_field_name)
 
@@ -210,10 +210,9 @@ class FieldValueMap(object):
 
 
 class DataTypeTransformer:
-    def __init__(self, log):
+    def __init__(self):
         self._csv_record_map_builder = csvutils.CSVRecordMapBuilder()
         self._csv_record_map = None
-        self._log = log
 
     def build(self, type_dict, **kwargs):
         for f_name, f_type in type_dict.items():
@@ -234,8 +233,14 @@ class RecordTransformer:
     def __init__(self):
         self.target_record_fields = set()
         self.datasources = {}
+        self.explicit_datasource_lookup_functions = {}
         self.field_map = {}
         self.value_map = FieldValueMap()
+        self.output_header = []
+
+
+    def set_csv_output_header(self, field_names):
+        self.output_header = field_names
 
 
     def add_target_field(self, target_field_name):
@@ -262,6 +267,11 @@ class RecordTransformer:
         self.datasources[target_field_name] = datasource
 
 
+    def register_datasource_with_explicit_function(self, target_field_name, datasource, function_name):
+        self.datasources[target_field_name] = datasource
+        self.explicit_datasource_lookup_functions[target_field_name] = function_name
+
+
     def lookup(self, target_field_name, source_record):
         record_value = source_record.get(target_field_name)
         '''
@@ -276,8 +286,12 @@ class RecordTransformer:
 
             return record_value
 
-        lookup_function_name = 'lookup_%s' % target_field_name
-        if not hasattr(datasource, lookup_function_name):
+        if self.explicit_datasource_lookup_functions.get(target_field_name):
+            lookup_function_name = self.explicit_datasource_lookup_functions[target_field_name]
+        else:
+            lookup_function_name = 'lookup_%s' % target_field_name
+
+        if not hasattr(datasource, lookup_function_name):            
             raise Exception('The datasource %s has no lookup function "%s(...)". Please check your config file.' % (datasource.__class__.__name__, lookup_function_name))
 
         lookup_function = getattr(datasource, lookup_function_name)
@@ -299,7 +313,6 @@ class RecordTransformer:
         return target_record
 
 
-
 class RecordTransformerBuilder(object):
     def __init__(self, yaml_config_filename, **kwargs):
 
@@ -313,11 +326,9 @@ class RecordTransformerBuilder(object):
 
 
     def load_datasource(self, src_name, transform_config, service_object_registry):
-
         src_module_name = self._transform_config['globals']['lookup_source_module']
         datasource_class_name = self._transform_config['sources'][src_name]['class']
-        klass = common.load_class(datasource_class_name, src_module_name)        
-        #init_params = self._transform_config['sources'][src_name].get('init_params', {})
+        klass = common.load_class(datasource_class_name, src_module_name)                
         return klass(service_object_registry)
 
 
@@ -329,21 +340,32 @@ class RecordTransformerBuilder(object):
         datasource = self.load_datasource(datasource_name, self._transform_config, so_registry)
         transformer = RecordTransformer()
 
-        for fieldname in self._transform_config['maps'][self._map_name]['fields']:
-            transformer.add_target_field(fieldname)
+        for field_config in self._transform_config['maps'][self._map_name]['fields']:
+            for fieldname, field_config in field_config.items():
+                transformer.add_target_field(fieldname)
+                if not field_config:
+                    # if there is no config for this field name, fill the output column with an empty value
+                    transformer.map_const_to_target_field(fieldname, '')
+                elif field_config['source'] == 'record':    
+                    # if no key is supplied, assume that the fieldname in the source is the same as the target fieldname
+                    transformer.map_source_to_target_field(field_config.get('key', fieldname), fieldname)
+                elif field_config['source'].startswith('lookup'):
+                    if field_config['source']==('lookup'): # we infere the lookup function name as lookup_<field_name>(...)
+                        transformer.register_datasource(fieldname, datasource)
+                    else: # the source field gives an explicit function name starting with 'lookup_' 
+                        transformer.register_datasource_with_explicit_function(fieldname,
+                                                                               datasource, 
+                                                                               field_config['source'])
+                elif field_config['source'] == 'value':
+                    transformer.map_const_to_target_field(fieldname, field_config['value'])
+                else:
+                    raise Exception('unrecognized source type "%s." Allowed types are record, lookup, and value.' % field_config['source'])                
 
-            field_config = self._transform_config['maps'][self._map_name]['fields'][fieldname]
-
-            if field_config['source'] == 'record':    
-                # if no key is supplied, assume that the fieldname in the source is the same as the target fieldname
-                transformer.map_source_to_target_field(field_config.get('key', fieldname), fieldname)
-            elif field_config['source'] == 'lookup':
-                transformer.register_datasource(fieldname, datasource)
-            elif field_config['source'] == 'value':
-                transformer.map_const_to_target_field(fieldname, field_config['value'])
-            else:
-                raise Exception('unrecognized source type "%s." Allowed types are record, lookup, and value.' % field_config['source'])                
-
+        output_fields = []
+        for field_config in self._transform_config['maps'][self._map_name]['fields']:
+            for key, value in field_config.items():
+                output_fields.append(key)
+        transformer.set_csv_output_header(output_fields)
         return transformer
 
 
