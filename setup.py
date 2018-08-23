@@ -6,13 +6,16 @@ import codecs
 import os
 import re
 
+
 from setuptools import setup, find_packages
-from pip.req import parse_requirements
-from pip.download import PipSession
+try: # for pip >= 10
+    from pip._internal.req import parse_requirements
+except ImportError: # for pip <= 9.0.3
+    from pip.req import parse_requirements
 
 
 NAME = 'mercury'
-VERSION = '0.7.0'
+VERSION = '0.7.1'
 PACKAGES = find_packages(where='src')
 DEPENDENCIES=['snap-micro',
               'docopt',
@@ -25,7 +28,6 @@ DEPENDENCIES=['snap-micro',
               'PyYAML',
               'SQLAlchemy',
               'SQLAlchemy-Utils',
-              'mysql-connector-python',
               'Werkzeug',
               'requests',
               'boto3',
@@ -38,7 +40,7 @@ def read(fname):
 
 
 setup(
-    name='mercury',
+    name='mercury-toolkit',
     version=VERSION,
     author='Dexter Taylor',
     author_email='binarymachineshop@gmail.com',

@@ -43,12 +43,10 @@ test_teamcity:	test_env
 
 build-dist:
 	python setup.py sdist bdist_wheel
-	mv *.whl dist/
 
 
 build-testdist:
 	python test_setup.py sdist bdist_wheel
-	mv *.whl dist/
 
 
 clean-dist:
@@ -75,8 +73,8 @@ docker-pull: FORCE
 	docker pull binarymachines/mercury:${IMAGE_VERSION}
 
 docker-pull-all: docker-pull FORCE
-    docker pull redis
-    docker pull couchbase
+	docker pull redis
+	docker pull couchbase
 	docker pull postgres
 	docker pull spotify/kafka
 
