@@ -21,7 +21,7 @@ import os, sys
 import csv
 import json
 from snap import snap, common
-import datamap as dmap
+from mercury import datamap as dmap
 import yaml
 import logging
 
