@@ -5,7 +5,7 @@ from functools import wraps
 import os
 import datetime
 import traceback
-from snap import snap, common
+
 
 
 def generate_op_record_key(oplog_record):
@@ -96,34 +96,18 @@ class OpLogLoader(object):
         '''implement in subclass'''
         pass
 
-
 '''
 class CouchbaseOpLogWriter(OpLogWriter):
-    def __init__(self, record_type_name, **kwargs):
+    def __init__(self, record_type_name, couchbase_persistence_mgr, **kwargs):
         self.record_type_name = record_type_name
-        self.persistence_manager = kwargs['persistence_manager']
-        self.persistence_manager.register_keygen_function(self.record_type_name, generate_op_record_key)
+        self.pmgr = couchbase_persistence_mgr
+        self.pmgr.register_keygen_function(self.record_type_name, generate_op_record_key)
 
 
     def write(self, **kwargs):
         op_record = CouchbaseRecordBuilder(self.record_type_name).add_fields(kwargs).build()
         return self.pmgr.insert_record(op_record)
 '''
-
-
-def load_single_oplog_writer(yaml_config):
-    pass
-
-
-def load_oplog_writers(yaml_config_filename):
-    yaml_config = common.read_config_file(yaml_config_filename) 
-    writers = {}
-    if yaml_config.get('oplog_writers'):
-        for writer_name in yaml_config['oplog_writers']:
-            writer_config = yaml_config['oplog_writers'][writer_name]
-            writers[writer_name] = load_single_oplog_writer(writer_config)
-
-    return writers
 
 
 class ContextDecorator(object):
@@ -146,6 +130,7 @@ class ContextDecorator(object):
                 return func(*args, **kwargs)
 
         return wrapper
+
 
 
 class journal(ContextDecorator):
@@ -220,6 +205,16 @@ class TimeLog(object):
 
 
     @property
+    def elapsed_time_data(self):
+        result = {}
+        for operation_tag, start_end_tuple in self.op_data.items():
+            end_time = start_end_tuple[1]
+            start_time = start_end_tuple[0]
+            result[operation_tag] = end_time - start_time
+        return result
+
+
+    @property
     def data(self):
         return self.op_data
 
@@ -285,6 +280,21 @@ class counter(ContextDecorator):
     def __exit__(self, typ, val, exc_traceback):
         self.count_log.update_count(self.tag, self.count_delta)
 
+'''
+global_count_log = CountLog()
+global_time_log = TimeLog()
 
+
+@counter('call annotated function', global_count_log)
+def some_func():
+    pass
+
+
+import time
+
+@stopwatch('call timed function', global_time_log)
+def timed_function():
+    time.sleep(2)
+'''  
 
 

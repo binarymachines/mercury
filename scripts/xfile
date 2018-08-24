@@ -1,0 +1,145 @@
+#!/usr/bin/env python
+
+'''Usage:
+            xfile --config <configfile> --map <map_name>  <datafile> [--limit <max_records>]
+            xfile --config <configfile> --list (sources | maps | globals)          
+            xfile -i
+
+   Options:            
+            -i --interactive   Start up in interactive mode
+'''
+
+#
+# xfile: command line utility for extracting and transforming CSV data
+#
+
+
+import docopt
+from docopt import docopt as docopt_func
+from docopt import DocoptExit
+import os, sys
+import csv
+import json
+from snap import snap, common
+import datamap as dmap
+import yaml
+import logging
+
+
+class TransformProcessor(dmap.DataProcessor):
+    def __init__(self, transformer, data_processor):
+        dmap.DataProcessor.__init__(self, data_processor)
+        self._transformer = transformer
+        self._records = []
+
+
+    def _process(self, data_dict):        
+        output = self._transformer.transform(data_dict)
+        #print(common.jsonpretty(output))
+        return output
+
+
+def build_transformer(map_file_path, mapname):
+    transformer_builder = dmap.RecordTransformerBuilder(map_file_path,
+                                                        map_name=mapname)
+    return transformer_builder.build()
+
+
+def find_env_vars(arg_dict):
+    vars = []
+    for value in arg_dict.values():
+        if not value:
+            continue
+        raw_value_tokens = value.split(os.path.sep)
+        for tok in raw_value_tokens:
+            if tok.startswith('$'):
+                vars.append(tok[1:])
+    return vars
+            
+
+def resolve_initfile_args(arg_dict):
+    '''Resolve filsystem refs such as tilde and dollar-sign'''
+    env_vars = find_env_vars(arg_dict)
+    localenv = common.LocalEnvironment(*env_vars)
+    localenv.init()
+
+    output_args = {}
+    for key, value in arg_dict.iteritems():
+        if not value:
+            continue
+        raw_value_tokens = value.split(os.path.sep)
+        cooked_value_tokens = []
+        for tok in raw_value_tokens:
+            if tok is not None:
+                #print('adding cooked value token: %s...' % common.load_config_var(tok))
+                cooked_value_tokens.append(common.load_config_var(tok))
+        output_args[key] = os.path.sep.join(cooked_value_tokens)
+    return output_args
+
+
+def main(args):
+    logging.basicConfig(filename='exfile.log', level=logging.DEBUG)
+    
+    transform_mode = False
+    list_mode = False
+    interactive_mode = False
+    limit = -1
+
+    if args.get('--config') == True and not args.get('--list'):
+        transform_mode = True
+    if args.get('--interactive') == True:
+        interactive_mode = True
+    if args.get('--limit') == True:
+        limit = int(args['<max_records>'])
+    if args.get('--list') == True:
+        list_mode = True
+    
+    if not transform_mode and not interactive_mode:
+        print('unsupported run mode. Exiting.')
+        return
+    
+    transform_config_file = args.get('<configfile>')
+    yaml_config = common.read_config_file(transform_config_file)
+
+    if transform_mode:
+        transform_map = args.get('<map_name>')
+        datafile = args.get('<datafile>')        
+        xformer = build_transformer(transform_config_file, transform_map)
+
+        rec_source = dmap.RecordSource(dmap.csvfile_record_generator,
+                                       filename=datafile,
+                                       delimiter='\t',
+                                       limit=limit)
+
+        for input_record in rec_source.records():     
+            output_record = xformer.transform(input_record)
+            print(json.dumps(output_record))
+
+        print('%d records scanned.' % xformer.num_records_scanned, file=sys.stderr)
+        print('%d records transformed successfully.' % xformer.num_records_transformed, file=sys.stderr)            
+        print('finished in %s seconds.' % xformer.processing_time_in_seconds, file=sys.stderr)
+        
+    elif list_mode:
+        if args['sources']:
+            for source in yaml_config['sources']:
+                print('::: Lookup datasource "%s": ' % source)
+                print(common.jsonpretty(yaml_config['sources'][source]))
+
+        if args['maps']:
+            for map in yaml_config['maps']:
+                print('::: Transform map "%s":' % map)
+                print(common.jsonpretty(yaml_config['maps'][map]))
+
+        if args['globals']:
+            print('::: Global settings:')
+            print(common.jsonpretty(yaml_config['globals']))
+
+    elif interactive_mode:
+        print('placeholder for interactive mode')
+
+    
+        
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)    
+    main(args)

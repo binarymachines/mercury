@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 
 '''Usage:
-            seesv --xform=<transform_file> --xmap=<transform_map> --schema=<schema_file> --rtype=<record_type> <datafile>
+            seesv --xform=<transform_file> --xmap=<transform_map>  <datafile>
             seesv (-t | -f) --schema=<schema_file> --rtype=<record_type> <datafile>
-            seesv -l --schema=<schema_file> --rtype=<record_type> <datafile>
             seesv -i
-            seesv --initfile=<init_file>
 
    Options:
             -t --test          Test the records in the target file for schema compliance
@@ -343,10 +341,10 @@ def resolve_initfile_args(arg_dict):
 def main(args):
     logging.basicConfig(filename='seesv.log', level=logging.DEBUG)
     test_mode = args.get('--test')
-    filter_mode = args.get('--filter')
-    lookup_mode = args.get('--lookup')
-    initfile_mode = args.get('--initfile') is not None
-    transform_mode = False
+    
+    
+    
+    
     if args.get('--xform'):
         transform_mode = True
     interactive_mode = args.get('--interactive')

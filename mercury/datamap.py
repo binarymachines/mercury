@@ -7,9 +7,13 @@ from snap import snap, common
 import inspect
 import datetime
 import yaml
+from contextlib import ContextDecorator
+import journaling as jrnl
+from journaling import counter, stopwatch, CountLog, TimeLog
 #from mercury import sqldbx as sqlx
 import logging
 #from mercury import csvutils
+
 
 
 class NoSuchTargetField(Exception):
@@ -208,7 +212,7 @@ class FieldValueMap(object):
             raise Exception('No FieldValueResolver registered with value map under the name "%s".' % field_name)
         return resolver.resolve(source_record)
 
-
+'''
 class DataTypeTransformer:
     def __init__(self):
         self._csv_record_map_builder = csvutils.CSVRecordMapBuilder()
@@ -227,9 +231,63 @@ class DataTypeTransformer:
         log.debug('Transforming record.')
         log.debug(txfrmd_record)
         return txfrmd_record
-    
+'''
 
-class RecordTransformer:
+
+def textfile_line_generator(**kwargs):
+    kwreader = common.KeywordArgReader('filename')
+    kwreader.read(**kwargs)
+    filename = kwreader.get_value('filename')
+    with open(filename, 'rt') as f:
+        for raw_line line in f:            
+            line = rawline.rstrip().lstrip()
+            if len(line):
+                yield line
+            else:
+                continue
+
+
+def csvfile_record_generator(**kwargs):
+    kwreader = common.KeywordArgReader('filename')
+    kwreader.read(**kwargs)
+    filename = kwreader.get_value('filename')
+    delimiter = kwargs.get('delimiter') or ','
+    limit = -1
+    if kwargs.get('limit'):
+        limit = int(kwargs['limit'])
+
+    with open(filename) as csvfile:
+        reader = csv.DictReader(csvfile, delimiter=delimiter)
+        record_count = 0
+        for row in reader:
+            if record_count == limit:
+                break
+            yield row
+            record_count += 1
+
+
+class RecordSource(object):
+    def __init__(self, generator_func, **kwargs):
+        self._generator = generator_func
+        if kwargs.get('service_registry'):
+            self._services = kwargs['service_registry']
+        else:
+            self._services = common.ServiceObjectRegistry({})
+        self._genargs = self.generator_args(**kwargs)
+
+    def generator_args(self, **kwargs):
+        '''Prepare any arguments we wish to pass our generator function.
+        Override in subclass; otherwise the generator will be called with
+        the same keyword args passed to the constructor
+        '''
+        return kwargs
+
+    def records(self):                
+        for record in self._generator(**self._genargs):                        
+            yield record
+                        
+
+class RecordTransformer(object):
     def __init__(self):
         self.target_record_fields = set()
         self.datasources = {}
@@ -237,6 +295,52 @@ class RecordTransformer:
         self.field_map = {}
         self.value_map = FieldValueMap()
         self.output_header = []
+        self.event_handlers = {}
+        self.error_handlers = {}
+        self.count_log = jrnl.CountLog()
+        
+        # this stat will show zero unless the process() method is called.
+        # We do not record time stats for individual calls to the transform() method;
+        # "processing_time" is the time spent in the process() method, which invokes transform()
+        # once per inbound record.
+        #
+        # We initialize the elapsed processing time to zero by default.
+        self.time_log = jrnl.TimeLog()
+        current_time = datetime.datetime.now()
+        self.time_log.record_elapsed_time('processing_time', current_time, current_time)
+
+    # we use an inner class to house our method decorators in order to access the (stateful) log objects which are
+    # part of the enclosing instance. Callers are not required to be aware of this mechanism, but it does mean 
+    # that it is not safe for more than one thread to enter a decorated method at a time.
+    class decorators(object):       
+        def processing_counter(func):
+            def wrapper(*args):
+                args[0].count_log.update_count('record_count', 1)                                            
+                result = func(*args)
+                args[0].count_log.update_count('num_transforms', 1)
+                return result
+            return wrapper
+
+        def processing_timer(func):
+            def wrapper(*args):
+                start_time = datetime.datetime.now()
+                func(*args)
+                end_time = datetime.datetime.now()
+                args[0].time_log.record_elapsed_time('processing_time', start_time, end_time)
+
+    @property
+    def num_records_transformed(self):
+        return self.count_log.data['num_transforms']
+
+
+    @property
+    def num_records_scanned(self):
+        return self.count_log.data['record_count']
+
+
+    @property
+    def processing_time_in_seconds(self):
+        return self.time_log.elapsed_time_data['processing_time'].total_seconds()
 
 
     def set_csv_output_header(self, field_names):
@@ -272,6 +376,29 @@ class RecordTransformer:
         self.explicit_datasource_lookup_functions[target_field_name] = function_name
 
 
+    def register_processing_event_handler(self, event_tag, function_name):
+        self.event_handlers[event_tag] = function_name
+
+
+    def register_processing_error_handler(self, exception_class, function_name):        
+        self.error_handlers[exception_class] = function_name
+
+
+    def handle_default_error(exception, source_record):
+        print('Error of type "%s" transforming record: %s' 
+            % (exception.__class__.__name__, exception), file=sys.stderr)
+        print('Offending record:', file=sys.stderr)
+        print(common.jsonpretty(source_record), file=sys.stderr)
+
+
+    def handle_processing_error(self, exception, source_record):
+        error_handler_func = self.error_handlers.get(exception.__class__)
+        if error_handler_func:
+            error_handler_func(exception, source_record)
+        else:
+            self.handle_default_error(exception, source_record)
+
+
     def lookup(self, target_field_name, source_record):
         record_value = source_record.get(target_field_name)
         '''
@@ -298,6 +425,7 @@ class RecordTransformer:
         return lookup_function(target_field_name, source_record, self.value_map)
 
 
+    @decorators.processing_counter
     def transform(self, source_record, **kwargs):
         target_record = {}
         for key, value in kwargs.items():
@@ -313,6 +441,26 @@ class RecordTransformer:
         return target_record
 
 
+    @decorators.processing_timer
+    def process(self, record_generator, **kwargs):        
+        success_count = 0
+        
+        for source_record in record_generator:
+            try:
+                target_record = self.transform(source_record, **kwargs)
+                success_count += 1
+                self.handle_processing_event(target_record)
+                success_count += 1
+                yield target_record
+            except Exception as err:
+                self.handle_processing_error(err, source_record)
+
+
+    def reset_logs(self):
+        self.time_log = jrnl.TimeLog()
+        self.count_log = jrnl.CountLog()        
+
+
 class RecordTransformerBuilder(object):
     def __init__(self, yaml_config_filename, **kwargs):
 
@@ -324,9 +472,13 @@ class RecordTransformerBuilder(object):
         with open(yaml_config_filename) as f:
             self._transform_config = yaml.load(f)
 
+        if not self._transform_config['maps'].get(self._map_name):
+            raise Exception('No transform map "%s" found in initfile %s.'
+                            % (self._map_name, yaml_config_filename))
+
 
     def load_datasource(self, src_name, transform_config, service_object_registry):
-        src_module_name = self._transform_config['globals']['lookup_source_module']
+        src_module_name = self._transform_config['globals']['datasource_module']
         datasource_class_name = self._transform_config['sources'][src_name]['class']
         klass = common.load_class(datasource_class_name, src_module_name)                
         return klass(service_object_registry)
