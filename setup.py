@@ -15,7 +15,7 @@ except ImportError: # for pip <= 9.0.3
 
 
 NAME = 'mercury'
-VERSION = '0.7.1'
+VERSION = '0.7.2'
 PACKAGES = find_packages(where='src')
 DEPENDENCIES=['snap-micro',
               'docopt',
@@ -48,7 +48,10 @@ setup(
     scripts=['scripts/blok',
              'scripts/kolo',
              'scripts/seesv',
-             'scripts/xlcr'],
+             'scripts/xlcr',
+             'scripts/mkmap',
+             'scripts/xfile',
+             'scripts/ngst'],
     packages=find_packages(),
     install_requires=DEPENDENCIES,
     test_suite='tests',
