@@ -25,7 +25,7 @@ import docopt
 from docopt import docopt as docopt_func
 from docopt import DocoptExit
 from snap import snap, common
-import datamap as dmap
+from mercury import datamap as dmap
 import yaml
 
 

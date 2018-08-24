@@ -2,10 +2,10 @@
 
 # 
 '''Usage:   
-        blok.py --rtype=<record_type> --pconfig=<pipeline_config_file> --topic=<topic> <source_datafile>
+        kload --rtype=<record_type> --pconfig=<pipeline_config_file> --topic=<topic> <source_datafile>
 '''
 
-# BLOK: Bulk LOader for Kafka
+# kload: Bulk Loader for Kafka
 
 import docopt
 from mercury import telegraf as tg
