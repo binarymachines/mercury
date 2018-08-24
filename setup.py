@@ -15,7 +15,7 @@ except ImportError: # for pip <= 9.0.3
 
 
 NAME = 'mercury'
-VERSION = '0.7.6'
+VERSION = '0.7.7'
 PACKAGES = find_packages(where='src')
 DEPENDENCIES=['snap-micro',
               'docopt',

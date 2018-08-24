@@ -9,7 +9,7 @@ import datetime
 import yaml
 from contextlib import ContextDecorator
 from mercury import journaling as jrnl
-from journaling import counter, stopwatch, CountLog, TimeLog
+from mercury.journaling import counter, stopwatch, CountLog, TimeLog
 import logging
 
 
