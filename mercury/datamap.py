@@ -239,7 +239,7 @@ def textfile_line_generator(**kwargs):
     kwreader.read(**kwargs)
     filename = kwreader.get_value('filename')
     with open(filename, 'rt') as f:
-        for raw_line line in f:            
+        for raw_line in f:            
             line = rawline.rstrip().lstrip()
             if len(line):
                 yield line
