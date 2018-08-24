@@ -15,7 +15,7 @@ except ImportError: # for pip <= 9.0.3
 
 
 NAME = 'mercury'
-VERSION = '0.7.2'
+VERSION = '0.7.3'
 PACKAGES = find_packages(where='src')
 DEPENDENCIES=['snap-micro',
               'docopt',
@@ -45,10 +45,10 @@ setup(
     author='Dexter Taylor',
     author_email='binarymachineshop@gmail.com',
     platforms=['any'],
-    scripts=['scripts/blok',
-             'scripts/kolo',
+    scripts=['scripts/kload',
+             'scripts/k2olap',
              'scripts/seesv',
-             'scripts/xlcr',
+             'scripts/xlseer',
              'scripts/mkmap',
              'scripts/xfile',
              'scripts/ngst'],
