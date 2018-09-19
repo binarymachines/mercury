@@ -1,30 +1,62 @@
 #!/usr/bin/env python
 
 '''Usage:
-            filtr -x <expression> [datafile>] [--limit <max_records>]
-         
+            filtr -x <expression> -v <value> [datafile] [--limit <max_records>]
+            filtr --fmodule <filter_module> --ffunc <filter_function> [datafile] [--limit <max_records>]
+
 '''
 
 #
 # filtr: command line utility for filtering record streams
 #
 
-
-import docopt
-from docopt import docopt as docopt_func
-from docopt import DocoptExit
 import os, sys
 import csv
 import json
+import re
+import copy
+from collections import namedtuple, OrderedDict
+import docopt
+from docopt import docopt as docopt_func
+from docopt import DocoptExit
+
 from snap import snap, common
 from mercury import datamap as dmap
 import yaml
 import logging
 
+rx_var_placeholder = re.compile(r'\~[a-zA-Z\-_]+')
+lambda_template = 'lambda {var}: {exp}'
+
+
+ExpansionTuple = namedtuple('ExpansionTuple', 'placeholder varname')
+
+def expand_lambda_template(raw_expression):
+    
+    #raise Exception('invalid format for predicate placeholder variable. Please check your command line.')
+    
+    lambda_vars = OrderedDict()
+    for match in rx_var_placeholder.finditer(raw_expression):        
+        placeholder = match.group()        
+        lambda_vars[placeholder]=placeholder[1:]        
+
+    expr = raw_expression    
+    for key, value in lambda_vars.items():
+        expr = expr.replace(key, value)
+
+    vars = [lambda_vars[k] for k in lambda_vars.keys()]
+    vars_string = ','.join(vars)
+    return lambda_template.format(var=vars_string, exp=expr)
 
 
 def main(args):
-    print(common.jsonpretty(args))
+    if args['-x']:
+        # expression mode
+        expression = args['<expression>']
+        lstring = expand_lambda_template(expression)        
+        filter_func = eval(lstring)
+        values = args['<value>'].split(',')
+        print('The output of the filter predicate is %s.' % filter_func(*values))
 
 
 if __name__ == '__main__':
