@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 '''Usage:
-            filtr -x <expression> -v <value> [datafile] [--limit <max_records>]
-            filtr --fmodule <filter_module> --ffunc <filter_function> [datafile] [--limit <max_records>]
+            filtr -x <expression> [--datafile <datafile>] [--limit=<max_records>]
+            filtr --fmodule <filter_module> --ffunc <filter_function> [datafile] [--limit=<max_records>]
 
 '''
 
@@ -26,15 +26,13 @@ import yaml
 import logging
 
 rx_var_placeholder = re.compile(r'\~[a-zA-Z\-_]+')
-lambda_template = 'lambda {var}: {exp}'
+lambda_template = 'lambda {vars}: {exp}'
 
 
 ExpansionTuple = namedtuple('ExpansionTuple', 'placeholder varname')
 
-def expand_lambda_template(raw_expression):
-    
-    #raise Exception('invalid format for predicate placeholder variable. Please check your command line.')
-    
+def expand_lambda_template(raw_expression):    
+    #raise Exception('invalid format for predicate placeholder variable. Please check your command line.')    
     lambda_vars = OrderedDict()
     for match in rx_var_placeholder.finditer(raw_expression):        
         placeholder = match.group()        
@@ -46,17 +44,43 @@ def expand_lambda_template(raw_expression):
 
     vars = [lambda_vars[k] for k in lambda_vars.keys()]
     vars_string = ','.join(vars)
-    return lambda_template.format(var=vars_string, exp=expr)
+    return lambda_template.format(vars=vars_string, exp=expr)
 
 
 def main(args):
+    limit = -1
+    if args.get('--limit') is not None:
+        limit = int(args['--limit'])
+
     if args['-x']:
         # expression mode
         expression = args['<expression>']
         lstring = expand_lambda_template(expression)        
         filter_func = eval(lstring)
-        values = args['<value>'].split(',')
-        print('The output of the filter predicate is %s.' % filter_func(*values))
+        print(lstring, file=sys.stderr)
+        if args['--datafile']:
+            with open(args['<datafile>']) as f:
+                for line in f:
+                    record = line.lstrip().rstrip()
+                    if filter_func(record):
+                        print(record)
+        else:
+            # if no datafile provided, read records from stdin
+            record_count = 0
+            while True:
+                if record_count == limit:
+                    break
+                raw_line = sys.stdin.readline()
+                line = raw_line.lstrip().rstrip()
+                if not len(line):
+                    break
+                if filter_func(line):
+                    print(line)
+                record_count += 1
+
+
+        #values = args['<value>'].split(',')
+        #print('The output of the filter predicate is %s.' % filter_func(*values))
 
 
 if __name__ == '__main__':
