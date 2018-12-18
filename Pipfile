@@ -27,7 +27,6 @@ requests = "==2.9.2"
 rsa = "==3.4.2"
 "s3transfer" = "==0.1.10"
 six = "==1.10.0"
-snap-micro = "*"
 teamcity-messages = "==1.21"
 mysql-connector-python = "==8.0.5"
 Flask = "==0.10.1"
@@ -37,8 +36,9 @@ PyYAML = "==3.12"
 SQLAlchemy = "==1.0.14"
 SQLAlchemy-Utils = "==0.32.14"
 Werkzeug = "==0.11.9"
+snap-micro = "*"
 
 [dev-packages]
 
 [requires]
-python_version = "3.6"
+python_version = ">=3.5"

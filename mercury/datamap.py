@@ -5,6 +5,7 @@ import sys
 import csv
 from snap import snap, common
 import inspect
+import copy
 import datetime
 import yaml
 from contextlib import ContextDecorator
@@ -63,7 +64,7 @@ class TextFieldConverter(object):
         
 
     def _convert(self, src_string):
-        raise MethodNotImplementedError('_convert', self.__class__)
+        raise NotImplementedError()
 
 
     def convert(self, src_string):        
@@ -94,7 +95,7 @@ class StringToDatetimeConverter(TextFieldConverter):
 
 
     def _convert(self, obj):
-        return datetime.strptime(src_string, self._format)
+        return datetime.datetime.strptime(obj, self._format)
         
 
 class StringToIntConverter(TextFieldConverter):
@@ -239,7 +240,7 @@ def textfile_line_generator(**kwargs):
     filename = kwreader.get_value('filename')
     with open(filename, 'rt') as f:
         for raw_line in f:            
-            line = rawline.rstrip().lstrip()
+            line = raw_line.rstrip().lstrip()
             if len(line):
                 yield line
             else:
@@ -257,7 +258,7 @@ def csvfile_record_generator(**kwargs):
 
     with open(filename) as csvfile:
         reader = csv.DictReader(csvfile, delimiter=delimiter)
-        record_count = 0
+        record_count = 0        
         for row in reader:
             if record_count == limit:
                 break
@@ -311,19 +312,21 @@ class RecordTransformer(object):
     # we use an inner class to house our method decorators in order to access the (stateful) log objects which are
     # part of the enclosing instance. Callers are not required to be aware of this mechanism, but it does mean 
     # that it is not safe for more than one thread to enter a decorated method at a time.
-    class decorators(object):       
-        def processing_counter(func):
+    class decorators(object): 
+        @staticmethod      
+        def processing_counter(wrapped_func):
             def wrapper(*args):
                 args[0].count_log.update_count('record_count', 1)                                            
-                result = func(*args)
+                result = wrapped_func(*args)
                 args[0].count_log.update_count('num_transforms', 1)
                 return result
             return wrapper
 
-        def processing_timer(func):
+        @staticmethod
+        def processing_timer(wrapped_func):
             def wrapper(*args):
                 start_time = datetime.datetime.now()
-                func(*args)
+                wrapped_func(*args)
                 end_time = datetime.datetime.now()
                 args[0].time_log.record_elapsed_time('processing_time', start_time, end_time)
 
@@ -352,7 +355,7 @@ class RecordTransformer(object):
 
     def map_source_to_target_field(self, source_field_designator, target_field_name):
         if not target_field_name in self.target_record_fields:
-            raise NoSuchTargetFieldException(target_field_name)
+            raise NoSuchTargetField(target_field_name)
         resolver = FieldValueResolver(source_field_designator)
         self.field_map[target_field_name] = resolver
         self.value_map.add_resolver(resolver, target_field_name)
@@ -360,7 +363,7 @@ class RecordTransformer(object):
 
     def map_const_to_target_field(self, target_field_name, value):
         if not target_field_name in self.target_record_fields:
-            raise NoSuchTargetFieldException(target_field_name)
+            raise NoSuchTargetField(target_field_name)
         self.field_map[target_field_name] = ConstValueResolver(value)
 
 
@@ -383,7 +386,7 @@ class RecordTransformer(object):
         self.error_handlers[exception_class] = function_name
 
 
-    def handle_default_error(exception, source_record):
+    def handle_default_error(self, exception, source_record):
         print('Error of type "%s" transforming record: %s' 
             % (exception.__class__.__name__, exception), file=sys.stderr)
         print('Offending record:', file=sys.stderr)
@@ -397,6 +400,8 @@ class RecordTransformer(object):
         else:
             self.handle_default_error(exception, source_record)
 
+    def handle_processing_event(self, source_record):
+        pass
 
     def lookup(self, target_field_name, source_record):
         record_value = source_record.get(target_field_name)
@@ -408,7 +413,7 @@ class RecordTransformer(object):
         datasource = self.datasources.get(target_field_name)
         if not datasource:
             if not source_record.has_key(target_field_name):
-                raise NoDatasourceForFieldException(target_field_name)
+                raise NoDatasourceForField(target_field_name)
 
             return record_value
 
@@ -493,15 +498,19 @@ class RecordTransformerBuilder(object):
 
         for field_config in self._transform_config['maps'][self._map_name]['fields']:
             for fieldname, field_config in field_config.items():
+
                 transformer.add_target_field(fieldname)
                 if not field_config:
-                    # if there is no config for this field name, fill the output column with an empty value
-                    transformer.map_const_to_target_field(fieldname, '')
+                    # if there is no config for this target field name, default to same field in source                    
+                    transformer.map_source_to_target_field(fieldname, fieldname)
+
                 elif field_config['source'] == 'record':    
                     # if no key is supplied, assume that the fieldname in the source is the same as the target fieldname
-                    transformer.map_source_to_target_field(field_config.get('key', fieldname), fieldname)
+                    source_fieldname = field_config.get('key', fieldname)                    
+                    transformer.map_source_to_target_field(source_fieldname, fieldname)
+
                 elif field_config['source'].startswith('lookup'):
-                    if field_config['source']==('lookup'): # we infere the lookup function name as lookup_<field_name>(...)
+                    if field_config['source']==('lookup'): # we infer the lookup function name as lookup_<field_name>(...)
                         transformer.register_datasource(fieldname, datasource)
                     else: # the source field gives an explicit function name starting with 'lookup_' 
                         transformer.register_datasource_with_explicit_function(fieldname,
