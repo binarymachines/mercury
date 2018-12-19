@@ -55,7 +55,7 @@ clean-dist:
 
 
 pypi-upload:
-	twine upload -r dist/*
+	twine upload -r dist/* --repository pypi
 
 
 #-------------- Docker-aware build targets --------------
