@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 
 '''Usage:
-            filtr -x <expression> [--datafile <datafile>] [--limit=<max_records>]
+            filtr -x <expression> [--datafile <datafile>] [--skip <skip_count> ] [--limit=<max_records>]
             filtr -x <expression> -p 
-            filtr --fmodule <filter_module> --servicemodule <svc_module> --rfunc <rule_func> [datafile] [--limit=<max_records>]
+            filtr --fmodule <filter_module> [--servicemodule <svc_module>] --ffunc <filter_function> [datafile] [--limit=<max_records>]
             filtr --config <configfile> --list (rules | functions | services)
-            filtr --config <configfile> -r <filter_rule> [--limit=<max_records>]
+            filtr --config <configfile> -r <filter_rule> [--limit=<max_records>]                        
 
    Options:
             -p   --preview      in expression mode, show the generated lambda
