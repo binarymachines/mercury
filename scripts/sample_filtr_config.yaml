@@ -1,0 +1,18 @@
+# sample YAML config for filtr script utility
+
+globals:
+        filter_module: 
+        service_module:
+
+
+service_objects:
+  
+
+rules:
+  more_than_2:
+    function: x_more_than_2
+    skip: 10
+    
+
+
+

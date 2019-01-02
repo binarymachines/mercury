@@ -2,8 +2,13 @@
 
 '''Usage:
             filtr -x <expression> [--datafile <datafile>] [--limit=<max_records>]
-            filtr --fmodule <filter_module> --ffunc <filter_function> [datafile] [--limit=<max_records>]
+            filtr -x <expression> -p 
+            filtr --fmodule <filter_module> --servicemodule <svc_module> --rfunc <rule_func> [datafile] [--limit=<max_records>]
+            filtr --config <configfile> --list (rules | functions | services)
+            filtr --config <configfile> -r <filter_rule> [--limit=<max_records>]
 
+   Options:
+            -p   --preview      in expression mode, show the generated lambda
 '''
 
 #
@@ -55,9 +60,11 @@ def main(args):
     if args['-x']:
         # expression mode
         expression = args['<expression>']
-        lstring = expand_lambda_template(expression)        
+        lstring = expand_lambda_template(expression)
+        if args['-p']: # preview mode simply prints the lambda expression
+            print(lstring, file=sys.stderr)
+            return    
         filter_func = eval(lstring)
-        print(lstring, file=sys.stderr)
         if args['--datafile']:
             with open(args['<datafile>']) as f:
                 for line in f:
@@ -77,10 +84,6 @@ def main(args):
                 if filter_func(line):
                     print(line)
                 record_count += 1
-
-
-        #values = args['<value>'].split(',')
-        #print('The output of the filter predicate is %s.' % filter_func(*values))
 
 
 if __name__ == '__main__':
