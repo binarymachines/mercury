@@ -86,9 +86,11 @@ def main(args):
     limit = -1
 
     if args.get('--delimiter'):
-        field_delimiter = args['<delimiter>']
+        raw_delimiter = args['<delimiter>']
     else:
-        field_delimiter = ','
+        raw_delimiter = ','
+
+    field_delimiter=str(raw_delimiter).encode('utf-8')
 
     if args.get('--config') == True and not args.get('--list'):
         transform_mode = True
