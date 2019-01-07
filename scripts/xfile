@@ -85,13 +85,12 @@ def main(args):
     interactive_mode = False
     limit = -1
 
+    field_delimiter = ','        
     if args.get('--delimiter'):
-        raw_delimiter = args['<delimiter>']
-    else:
-        raw_delimiter = ','
+        field_delimiter = args['<delimiter>']
 
-    field_delimiter=str(raw_delimiter).encode('utf-8')
-
+    print('### using delimiter "%s"' % field_delimiter, file=sys.stderr)
+  
     if args.get('--config') == True and not args.get('--list'):
         transform_mode = True
     if args.get('--interactive') == True:
