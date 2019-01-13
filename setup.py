@@ -15,7 +15,7 @@ except ImportError: # for pip <= 9.0.3
 
 
 NAME = 'mercury'
-VERSION = '0.7.8'
+VERSION = '0.7.9'
 PACKAGES = find_packages(where='src')
 DEPENDENCIES=['snap-micro',
               'docopt',
@@ -33,7 +33,8 @@ DEPENDENCIES=['snap-micro',
               'boto3',
               'botocore',
               'raven',
-              'redis']
+              'redis',
+              'sh']
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
@@ -51,7 +52,9 @@ setup(
              'scripts/xlseer',
              'scripts/mkmap',
              'scripts/xfile',
-             'scripts/ngst'],
+             'scripts/ngst',
+             'scripts/j2sqlgen',
+             'scripts/bqex'],
     packages=find_packages(),
     install_requires=DEPENDENCIES,
     test_suite='tests',
