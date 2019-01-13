@@ -29,6 +29,12 @@ from mercury import datamap as dmap
 import yaml
 
 
+class NoSuchDatastore(Exception):
+    def __init__(self, datastore_name):
+        Exception.__init__(self, 'No datastore registered as "%s" in config file.' 
+                           % datastore_name)
+
+
 class DataStore(object):
     def __init__(self, service_object_registry, **kwargs):
         self.service_object_registry = service_object_registry

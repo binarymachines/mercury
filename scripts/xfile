@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 
 '''Usage:
-            xfile --config <configfile> [--delimiter <delimiter>] --map <map_name>  <datafile> [--limit <max_records>]
+            xfile --config <configfile> [--delimiter <delimiter>] --map <map_name>  <datafile> [--limit <max_records>]            
+            xfile --config <configfile> [--delimiter <delimiter>] --map <map_name> -s [--limit <max_records>]            
             xfile --config <configfile> --list (sources | maps | globals)          
             xfile -i
 
    Options:            
-            -i --interactive   Start up in interactive mode
+            -i,--interactive   :Start up in interactive mode
+            -s,--stream        :Run in streaming mode
 '''
 
 #
@@ -83,6 +85,7 @@ def main(args):
     transform_mode = False
     list_mode = False
     interactive_mode = False
+    stream_input_mode = False
     limit = -1
 
     field_delimiter = ','        
@@ -91,12 +94,15 @@ def main(args):
 
     print('### using delimiter "%s"' % field_delimiter, file=sys.stderr)
   
+    if args.get('--stream'):
+        stream_input_mode = True
     if args.get('--config') == True and not args.get('--list'):
         transform_mode = True
     if args.get('--interactive') == True:
         interactive_mode = True
     if args.get('--limit') == True:
         limit = int(args['<max_records>'])
+        print('### limit = %s' % limit)
     if args.get('--list') == True:
         list_mode = True
     
@@ -109,13 +115,19 @@ def main(args):
 
     if transform_mode:
         transform_map = args.get('<map_name>')
-        datafile = args.get('<datafile>')        
         xformer = build_transformer(transform_config_file, transform_map)
 
-        rec_source = dmap.RecordSource(dmap.csvfile_record_generator,
-                                       filename=datafile,
-                                       delimiter=field_delimiter,
-                                       limit=limit)
+        if stream_input_mode: # read input from stdin
+            rec_source = dmap.RecordSource(dmap.csvstream_record_generator,                                           
+                                           delimiter=field_delimiter,
+                                           limit=limit)
+            
+        else: # read input from file
+            datafile = args.get('<datafile>')                    
+            rec_source = dmap.RecordSource(dmap.csvfile_record_generator,
+                                           filename=datafile,
+                                           delimiter=field_delimiter,
+                                           limit=limit)
 
         for input_record in rec_source.records():     
             output_record = xformer.transform(input_record)

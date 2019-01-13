@@ -6,6 +6,7 @@ from mercury import datamap as dmap
 import datasources  # this module is defined in the tests directory
 from snap import common
 import sys
+import os
 import logging
 import yaml
 
@@ -28,7 +29,7 @@ class RecordTransform(unittest.TestCase):
     def setUp(self):
         self.local_env = common.LocalEnvironment('MERCURY_HOME')
         self.local_env.init()
-        home_dir = local_env.get_variable('MERCURY_HOME')
+        home_dir = self.local_env.get_variable('MERCURY_HOME')
 
         self.yaml_initfile_path = os.path.join(home_dir, TRANSFORM_YAML_FILE)
         self.log = logging.getLogger(LOG_ID)

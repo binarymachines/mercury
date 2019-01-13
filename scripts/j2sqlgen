@@ -1,0 +1,227 @@
+#!/usr/bin/env python
+
+'''
+     Usage:  
+        j2sqlgen --config <configfile> --source <schemafile> --table <tablename>
+        j2sqlgen --config <configfile> --source <schemafile> --tables <comma_delim_tbl_list>
+        j2sqlgen --config <configfile> --source <schemafile> --list_tables
+
+'''
+
+import os, sys
+import json
+from snap import common
+import docopt
+
+
+BIGQUERY_STRING_TYPES = ['STRING']
+
+TABLE_DDL_TEMPLATE = '''
+CREATE TABLE {schema}.{tablename} (
+{table_body}
+);
+'''
+
+
+def is_string_type(type_name):
+    if type_name in BIGQUERY_STRING_TYPES:
+        return True
+    return False
+
+
+class DuplicateColumn(Exception):
+    def __init__(self, column_name):
+        Exception.__init__(self, 'TableSpec already contains column "%s".' % column_name)
+
+
+class ColumnSpec(object):
+    def __init__(self, column_name, column_type, is_nullable=True, is_pk=False, **kwargs):
+        self.name = column_name
+        self.datatype = column_type
+        self.nullable = is_nullable
+        self.length = kwargs.get('length', '') # can be null; usually only applies to string types
+        self.is_primary_key = is_pk
+        self.default_value = kwargs.get('default', '')
+            
+    def sql(self):
+        null_clause = ''
+        if not self.nullable:
+            null_clause = 'NOT NULL'
+        if self.default_value is None: 
+            default_clause = ''
+        else:
+            default_clause = 'DEFAULT %s' % self.default_value
+    
+        if self.length:
+            length_clause = '(%s)' % self.length
+        else:
+            length_clause = ''
+
+        #print('## generating column "%s"...' % self.name)
+        #print('## datatype: %s' % self.datatype)
+        if self.default_value:
+            field_line = '{name} {datatype}{length} {null} {default}'.format(name=self.name,
+                                                                    datatype=self.datatype,
+                                                                    length=length_clause,
+                                                                    null=null_clause,
+                                                                    default=self.default_value)
+        else:
+            field_line = '{name} {datatype}{length} {null}'.format(name=self.name,
+                                                                    datatype=self.datatype,
+                                                                    length=length_clause,
+                                                                    null=null_clause)                                            
+        return field_line.lstrip().rstrip()                                                                   
+
+
+class TableSpec(object):
+    def __init__(self, table_name, schema_name):
+        self.name = table_name
+        self.schema = schema_name
+        self.columns = []
+
+
+    def has_pk(self):
+        for columnspec in self.columns:
+            if columnspec.is_primary_key:
+                return True
+        return False
+
+
+    def generate_pk_column(self, table_creation_context):
+        return ColumnSpec(table_creation_context.pk_name,
+                          table_creation_context.pk_type,
+                          False,
+                          True,
+                          default=table_creation_context.pk_default)
+
+
+
+    def add_column(self, column_name, column_type, **kwargs):
+        if self.get_column(column_name):
+            raise DuplicateColumn(column_name)
+
+        nullable = kwargs.get('is_nullable', True)
+        is_pk = False        
+        self.columns.append(ColumnSpec(column_name, column_type, nullable, is_pk, **kwargs))
+
+
+    def get_column(self, column_name):
+        for c in self.columns:
+            if c.name == column_name:
+                return c
+        return None
+
+
+    def remove_column(self, column_name):
+        c = self.get_column(column_name)
+        if c:
+            self.columns.remove(c)
+            return True
+        return False
+
+
+class TableCreateContext(object):
+    def __init__(self, **kwargs):
+        kwreader = common.KeywordArgReader('autocreate_pk_if_missing',
+                                           'default_pk_name',
+                                           'default_pk_type',                                           
+                                           'default_varchar_length')
+
+        kwreader.read(**kwargs)
+        self.autocreate_pk = kwreader.get_value('autocreate_pk_if_missing')
+        self.pk_type = kwreader.get_value('default_pk_type')
+        self.pk_name = kwreader.get_value('default_pk_name')
+        self.pk_default = kwargs.get('default_pk_value')
+        self.default_varchar_length = kwreader.get_value('default_varchar_length')
+        self.type_map = {}
+
+    def map_column_type(self, source_typename, target_typename):
+        self.type_map[source_typename] = target_typename
+
+
+    def get_target_column_type(self, source_column_type):
+        return self.type_map.get(source_column_type, source_column_type)
+
+
+
+def create_tablespec_from_json_config(tablename, json_config, default_schema, creation_context):
+    tspec = TableSpec(tablename, json_config.get('schema_name', default_schema))
+    for column_config in json_config['columns']:
+
+        column_type = creation_context.get_target_column_type(column_config['column_type'])
+        settings = {}
+
+        if is_string_type(column_config['column_type']):            
+            settings['length'] = creation_context.default_varchar_length
+
+        tspec.add_column(column_config['column_name'], 
+                         creation_context.get_target_column_type(column_type),            
+                         **settings)
+    
+    return tspec
+
+
+def generate_sql_for_tablespec(tablespec, table_creation_context):
+    
+    field_lines = []
+    if not tablespec.has_pk() and table_creation_context.autocreate_pk:
+        field_lines.append(tablespec.generate_pk_column(table_creation_context).sql())
+    
+    for column in tablespec.columns:
+        field_lines.append(column.sql())
+        
+    return TABLE_DDL_TEMPLATE.format(schema=tablespec.schema,
+                                     tablename=tablespec.name,
+                                     table_body=',\n'.join(field_lines))
+
+    
+def find_table_config(tablename, json_dbschema):
+    for entry in json_dbschema['tables']:
+        if entry['table_name'] == tablename:
+            return entry
+    return None
+
+
+def main(args):
+    tablenames = []
+    table_specs = []
+
+    json_dbschema = None
+    schema_filename = args['<schemafile>']
+    with open(schema_filename) as f:
+        json_dbschema = json.loads(f.read())
+
+    project_schema = json_dbschema['schema_name']
+    for entry in json_dbschema['tables']:
+            tablenames.append(entry['table_name'])
+
+    if args.get('--list_tables'):
+        print('\n'.join(tablenames))
+        return
+
+    table_creation_settings = {
+        'autocreate_pk_if_missing': True,
+        'default_pk_name': 'id',
+        'default_pk_type': 'UUID',
+        'autocreated_pk_default': None,
+        'default_varchar_length': 64
+    }
+
+    table_creation_context = TableCreateContext(**table_creation_settings)
+    table_creation_context.map_column_type('STRING', 'varchar')
+    table_creation_context.map_column_type('DATE', 'datetime')
+
+    if args.get('--table'):
+        table_name = args['<tablename>']
+        tablecfg = find_table_config(table_name, json_dbschema)
+        if not tablecfg:
+            print('No table "%s" defined in schema file %s.' % (table_name, schema_filename))
+            return
+        tablespec = create_tablespec_from_json_config(table_name, tablecfg, project_schema, table_creation_context)
+
+        print(generate_sql_for_tablespec(tablespec, table_creation_context))
+        return       
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

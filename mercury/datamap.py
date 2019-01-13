@@ -266,6 +266,25 @@ def csvfile_record_generator(**kwargs):
             record_count += 1
 
 
+def csvstream_record_generator(**kwargs):
+    delimiter = kwargs.get('delimiter') or ','
+    limit = -1
+    if kwargs.get('limit'):
+        limit = int(kwargs['limit'])
+
+    stream = csv.DictReader(sys.stdin, delimiter=delimiter)
+    record_count = 0        
+    for record in stream:        
+        if not record:
+            break
+
+        if record_count == limit:
+            break
+
+        yield record
+        record_count += 1
+
+
 class RecordSource(object):
     def __init__(self, generator_func, **kwargs):
         self._generator = generator_func

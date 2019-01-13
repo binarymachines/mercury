@@ -40,6 +40,8 @@ test:	test_env
 test_teamcity:	test_env
 	PYTHONPATH=./tests $(VIRTUALENV_ROOT)/$(VIRTUALENV_NAME)/bin/python -m teamcity.unittestpy discover -t . ./tests -v
 
+version:
+	python mark_version.py > version.py && chmod u+x version.py
 
 build-dist:
 	python setup.py sdist bdist_wheel
@@ -114,10 +116,6 @@ typing: FORCE
 		'mypy --config-file=/opt/bamx/test/mypy.ini /opt/bamx/src && \
 		echo -e "\n########## type check (mypy) PASSED ##########\n"'
 
-
-test: FORCE
-	${COMPOSE} run --rm mercury behave /opt/mercury/src/tests/behave/features
-
 pip-compile: FORCE
 	# NOTE: Fix file ownership at the end, instead of running the whole
 	# container as the host user/group. Due to an upstream limitation,
@@ -127,8 +125,6 @@ pip-compile: FORCE
 		"pip-compile --rebuild --generate-hashes --output-file conf/deps/requirements.txt conf/deps/requirements-unpinned.txt && \
 		chown ${HOST_UID}:${HOST_GID} conf/deps/requirements.txt"
 
-clean: FORCE
-	${COMPOSE} run --rm mercury find . -name '*.pyc' -delete
 
 FORCE:  # https://www.gnu.org/software/make/manual/html_node/Force-Targets.html#Force-Targets
 
