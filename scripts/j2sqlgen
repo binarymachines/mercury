@@ -22,11 +22,29 @@ CREATE TABLE {schema}.{tablename} (
 );
 '''
 
+TABLE_LEVEL_SETTINGS = [
+    'autocreate_pk',
+    'pk_name',
+    'pk_type', 
+    'autocreated_pk_default',
+    'varchar_length',
+    'column_type_map'
+    'column_name_map'
+]
+
+COLUMN_LEVEL_SETTINGS = [
+    'varchar_length'
+    'column_type_map'
+    'column_name_map'
+]
+
 
 def is_string_type(type_name):
     if type_name in BIGQUERY_STRING_TYPES:
         return True
     return False
+
+
 
 
 class DuplicateColumn(Exception):
@@ -57,19 +75,18 @@ class ColumnSpec(object):
         else:
             length_clause = ''
 
-        #print('## generating column "%s"...' % self.name)
-        #print('## datatype: %s' % self.datatype)
-        if self.default_value:
-            field_line = '{name} {datatype}{length} {null} {default}'.format(name=self.name,
-                                                                    datatype=self.datatype,
-                                                                    length=length_clause,
-                                                                    null=null_clause,
-                                                                    default=self.default_value)
-        else:
+        if not self.default_value:
             field_line = '{name} {datatype}{length} {null}'.format(name=self.name,
                                                                     datatype=self.datatype,
                                                                     length=length_clause,
-                                                                    null=null_clause)                                            
+                                                                    null=null_clause)
+        else:
+            print('generating field line for %s with default clause...' % self.name)
+            field_line = '{name} {datatype}{length} {null} DEFAULT {default}'.format(name=self.name,
+                                                                    datatype=self.datatype,
+                                                                    length=length_clause,
+                                                                    null=null_clause,
+                                                                    default=self.default_value)                                                                                                            
         return field_line.lstrip().rstrip()                                                                   
 
 
@@ -92,11 +109,21 @@ class TableSpec(object):
                           table_creation_context.pk_type,
                           False,
                           True,
-                          default=table_creation_context.pk_default)
+                          default=table_creation_context.pk_value)
 
 
+    def insert_pk(self, columnspec):
+        self.columns.insert(0, columnspec)
 
-    def add_column(self, column_name, column_type, **kwargs):
+
+    def add_columnspec(self, columnspec):
+        self.columns.append(columnspec)
+
+
+    def add_column(self, column_name, column_type, creation_context, **kwargs):
+        column_type = creation_context.get_target_column_type(self.name, column_name, column_type)
+        column_name = creation_context.get_target_column_name(self.name, column_name)
+
         if self.get_column(column_name):
             raise DuplicateColumn(column_name)
 
@@ -120,53 +147,88 @@ class TableSpec(object):
         return False
 
 
-class TableCreateContext(object):
-    def __init__(self, **kwargs):
-        kwreader = common.KeywordArgReader('autocreate_pk_if_missing',
-                                           'default_pk_name',
-                                           'default_pk_type',                                           
-                                           'default_varchar_length')
+class TableCreationContext(object):
+    def __init__(self, yaml_config):
 
-        kwreader.read(**kwargs)
-        self.autocreate_pk = kwreader.get_value('autocreate_pk_if_missing')
-        self.pk_type = kwreader.get_value('default_pk_type')
-        self.pk_name = kwreader.get_value('default_pk_name')
-        self.pk_default = kwargs.get('default_pk_value')
-        self.default_varchar_length = kwreader.get_value('default_varchar_length')
-        self.type_map = {}
+        defaults = yaml_config['defaults']
+        self.pk_type = None
+        self.pk_name = None
+        self.pk_value = defaults.get('pk_value')
+        self.autocreate_pk = defaults['autocreate_pk_if_missing']
+        if self.autocreate_pk == True:
+            self.pk_type = defaults['pk_type']
+            self.pk_name = defaults['pk_name']
 
-    def map_column_type(self, source_typename, target_typename):
+        self.default_varchar_length = defaults['varchar_length']             
+        self.type_map = defaults['column_type_map']
+
+        self.overrides = yaml_config['tables']
+
+
+    def map_column_type(self, tablename, source_typename, target_typename):
         self.type_map[source_typename] = target_typename
 
 
-    def get_target_column_type(self, source_column_type):
+    def get_target_column_type(self, table_name, column_name, source_column_type):        
         return self.type_map.get(source_column_type, source_column_type)
 
+
+    def get_target_column_name(self, table_name, column_name):
+        name = column_name
+        if not self.overrides:
+            return name
+
+        if self.overrides.get(table_name):
+            if self.overrides[table_name].get('column_name_map'):
+                name = self.overrides[table_name]['column_name_map'].get(column_name, column_name)
+
+        return name
+
+
+    def get_varchar_length(self, table_name, column_name):
+
+        varchar_length = self.default_varchar_length
+        if not self.overrides:
+            return varchar_length
+
+        if self.overrides.get(table_name):
+            varchar_length = self.overrides[table_name].get('varchar_length', varchar_length)
+            
+            if self.overrides[table_name].get('column_settings'):
+                if self.overrides[table_name]['column_settings'].get(column_name):
+                    varchar_length = self.overrides[table_name]['column_settings'][column_name].get('length', varchar_length)
+
+        return varchar_length
 
 
 def create_tablespec_from_json_config(tablename, json_config, default_schema, creation_context):
     tspec = TableSpec(tablename, json_config.get('schema_name', default_schema))
     for column_config in json_config['columns']:
+        column_name = column_config['column_name']
 
-        column_type = creation_context.get_target_column_type(column_config['column_type'])
+        column_type = creation_context.get_target_column_type(tablename,
+                                                              column_name,
+                                                              column_config['column_type'])
         settings = {}
 
         if is_string_type(column_config['column_type']):            
-            settings['length'] = creation_context.default_varchar_length
+            settings['length'] = creation_context.get_varchar_length(tablename, column_name)
 
-        tspec.add_column(column_config['column_name'], 
-                         creation_context.get_target_column_type(column_type),            
+        tspec.add_column(column_name, 
+                         column_type,
+                         creation_context,
                          **settings)
-    
+
+    if not tspec.has_pk() and creation_context.autocreate_pk:
+        primary_key_col = tspec.generate_pk_column(creation_context)
+        tspec.insert_pk(primary_key_col)
+
     return tspec
 
 
-def generate_sql_for_tablespec(tablespec, table_creation_context):
+def generate_sql(tablespec):
     
     field_lines = []
-    if not tablespec.has_pk() and table_creation_context.autocreate_pk:
-        field_lines.append(tablespec.generate_pk_column(table_creation_context).sql())
-    
     for column in tablespec.columns:
         field_lines.append(column.sql())
         
@@ -183,33 +245,25 @@ def find_table_config(tablename, json_dbschema):
 
 
 def main(args):
-    tablenames = []
-    table_specs = []
 
+    configfile = args['<configfile>']
+    yaml_config = common.read_config_file(configfile)
+    
     json_dbschema = None
     schema_filename = args['<schemafile>']
     with open(schema_filename) as f:
         json_dbschema = json.loads(f.read())
 
+    tablenames = []
     project_schema = json_dbschema['schema_name']
     for entry in json_dbschema['tables']:
-            tablenames.append(entry['table_name'])
+        tablenames.append(entry['table_name'])
 
     if args.get('--list_tables'):
         print('\n'.join(tablenames))
         return
 
-    table_creation_settings = {
-        'autocreate_pk_if_missing': True,
-        'default_pk_name': 'id',
-        'default_pk_type': 'UUID',
-        'autocreated_pk_default': None,
-        'default_varchar_length': 64
-    }
-
-    table_creation_context = TableCreateContext(**table_creation_settings)
-    table_creation_context.map_column_type('STRING', 'varchar')
-    table_creation_context.map_column_type('DATE', 'datetime')
+    table_creation_context = TableCreationContext(yaml_config)    
 
     if args.get('--table'):
         table_name = args['<tablename>']
@@ -217,9 +271,12 @@ def main(args):
         if not tablecfg:
             print('No table "%s" defined in schema file %s.' % (table_name, schema_filename))
             return
-        tablespec = create_tablespec_from_json_config(table_name, tablecfg, project_schema, table_creation_context)
+        tablespec = create_tablespec_from_json_config(table_name,
+                                                      tablecfg,
+                                                      project_schema,
+                                                      table_creation_context)
 
-        print(generate_sql_for_tablespec(tablespec, table_creation_context))
+        print(generate_sql(tablespec))
         return       
 
 if __name__ == '__main__':
