@@ -3,6 +3,7 @@
 
 import sys
 import csv
+import json
 from snap import snap, common
 import inspect
 import copy
@@ -12,7 +13,6 @@ from contextlib import ContextDecorator
 from mercury import journaling as jrnl
 from mercury.journaling import counter, stopwatch, CountLog, TimeLog
 import logging
-
 
 
 
@@ -137,7 +137,6 @@ class RecordFormatConverter(object):
         return output_record
         
 
-
 class RenameTo(object):
     def __init__(self, target):
         self._new_name = None
@@ -176,7 +175,6 @@ class RecordFieldNameMapper(object):
         return output_record
 
 
-
 class FieldValueResolver(object):
     def __init__(self, field_name_string):
         self._field_names = field_name_string.split('|')
@@ -187,14 +185,12 @@ class FieldValueResolver(object):
                 return source_record[name]
 
 
-
 class ConstValueResolver(object):
     def __init__(self, value):
         self._value = value
 
     def resolve(self, source_record):
         return self._value
-
 
 
 class FieldValueMap(object):
@@ -297,7 +293,7 @@ def json_record_generator(**kwargs):
             for line in f:
                 if record_count == limit:
                     break
-                    
+
                 yield json.loads(line)
                 record_count += 1
     else:

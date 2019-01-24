@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
 '''Usage:
-            xfile --config <configfile> [--delimiter <delimiter>] --map <map_name>  <datafile> [--limit <max_records>]            
+            xfile --config <configfile> [--delimiter <delimiter>] --map <map_name>  <datafile> [--limit <max_records>]
             xfile --config <configfile> [--delimiter <delimiter>] --map <map_name> -s [--limit <max_records>]
-            xfile --config <configfile> --json --map <map_name>  <datafile> [--limit <max_records>]                        
-            xfile --config <configfile> --json --map <map_name>  -s [--limit <max_records>]                        
-            xfile --config <configfile> --list (sources | maps | globals)          
+            xfile --config <configfile> --json --map <map_name>  <datafile> [--limit <max_records>]
+            xfile --config <configfile> --json --map <map_name>  -s [--limit <max_records>]
+            xfile --config <configfile> --list (sources | maps | globals)
             xfile -i
 
-   Options:            
+   Options:
             -i,--interactive   :Start up in interactive mode
             -s,--stream        :Run in streaming mode
 '''

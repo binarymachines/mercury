@@ -15,7 +15,7 @@ except ImportError: # for pip <= 9.0.3
 
 
 NAME = 'mercury'
-VERSION = '0.8.0'
+VERSION = '0.8.2'
 PACKAGES = find_packages(where='src')
 DEPENDENCIES=['snap-micro',
               'docopt',
@@ -54,7 +54,8 @@ setup(
              'scripts/xfile',
              'scripts/ngst',
              'scripts/j2sqlgen',
-             'scripts/bqex'],
+             'scripts/bqex',
+             'scripts/bqstream-x'],
     packages=find_packages(),
     install_requires=DEPENDENCIES,
     test_suite='tests',
