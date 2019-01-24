@@ -1,0 +1,137 @@
+#!/usr/bin/env python
+
+'''
+     Usage:  
+        bqstream-x --table <table> --bucket <bucket> [--dir=<directory>] --list
+        bqstream-x [-p] --table <table> --bucket <bucket> [--dir=<directory>] [--d=<delimiter>] <xfile_cfg> <xfile_map> [<ngst_cfg> <ngst_target>]
+        
+     Options: 
+        -p,--parallel     : stream bucket contents in parallel        
+'''
+
+import os, sys
+import json
+import multiprocessing
+from snap import common
+import docopt
+import sh
+from sh import bq  # Google Cloud CLI must already be installed
+from sh import gsutil
+from sh import xfile  # Mercury ETL toolkit must already be installed
+from sh import ngst
+
+
+class Mode():
+    SERIAL = 'serial'
+    PARALLEL = 'parallel'
+
+
+def list_bucket_files_for_table(tablename, bucket_uri, directory):
+    target_uri = os.path.join(bucket_uri, directory, '%s_*.csv' % tablename)
+    filenames = [name.lstrip().rstrip() for name in gsutil.ls(target_uri)]
+    return filenames
+
+
+def get_bucket_filecount_for_table(tablename, bucket_uri, directory):
+    return len(list_bucket_files_for_table(tablename, bucket_uri, directory))
+
+
+def stream_file_contents_to_ngst(file_uri, xfile_configfile, delimiter, xfile_map, ngst_configfile, ngst_target, mode):
+    module = __name__
+    parent = os.getppid()
+    pid = os.getpid()
+
+    xfile_cmd = xfile.bake('--config', xfile_configfile, '--delimiter', delimiter, '--map', xfile_map, '-s')    
+    ngst_cmd = ngst.bake('--config', ngst_configfile, '--target', ngst_target)
+
+    for line in ngst_cmd(xfile_cmd(gsutil('cp', file_uri, '-', _piped=True), _piped=True), _iter=True):
+        if mode == Mode.SERIAL:
+            print(line, file=sys.stderr)
+        else:
+            print('[%s:%s (child_proc_%s)]: %s' % (module, parent, pid, line), file=sys.stderr)
+
+
+def stream_file_contents(file_uri, xfile_configfile, delimiter, xfile_map, mode):
+    module = __name__
+    parent = os.getppid()
+    pid = os.getpid()
+
+    xfile_cmd = xfile.bake('--config', xfile_configfile, '--delimiter', delimiter, '--map', xfile_map, '-s')    
+
+    for line in xfile_cmd(gsutil('cp', file_uri, '-', _piped=True), _iter=True):
+        if mode == Mode.SERIAL:
+            print(line, file=sys.stderr)
+        else:
+            print('[%s:%s (child_proc_%s)]: %s' % (module, parent, pid, line), file=sys.stderr)
+
+
+def main(args):
+    
+    tablename = args['<table>']
+    bucket = args['<bucket>']
+    directory = ''
+    if args.get('--dir') is not None:
+        directory = args['--dir']
+        
+    if args.get('--list'):
+        files = list_bucket_files_for_table(tablename, bucket, directory)
+        print('\n'.join(files))
+        return
+
+    parallel_mode = False
+    if args['--parallel']:
+        parallel_mode = True
+
+
+    xfile_config = args['<xfile_cfg>']
+    xfile_map = args['<xfile_map>']
+    ngst_config = args.get('<ngst_cfg>')
+    ngst_target = args,get('<ngst_target>')
+    delimiter = args.get('--d', ',')
+
+    if parallel_mode:
+        for file_uri in list_bucket_files_for_table(tablename, bucket, directory):
+            if ngst_config and ngst_target:
+                p = Process(target=stream_file_contents_to_ngst,
+                            args=(file_uri,
+                                xfile_config,
+                                delimiter,
+                                xfile_map,
+                                ngst_config,
+                                ngst_target,
+                                Mode.PARALLEL))
+                p.start()
+                p.join()
+            else:
+                p = Process(target=stream_file_contents,
+                            args=(file_uri,
+                                  xfile_config,
+                                  delimiter,
+                                  xfile_map,                                
+                                  Mode.PARALLEL))
+                p.start()
+                p.join()
+
+
+    else:
+        for file_uri in list_bucket_files_for_table(tablename, bucket, directory):
+            if ngst_config and ngst_target:          
+                stream_file_contents_to_ngst(file_uri, 
+                                             xfile_config,
+                                             delimiter,
+                                             xfile_map,
+                                             ngst_config,
+                                             ngst_target,
+                                             Mode.SERIAL)
+            else:
+                stream_file_contents(file_uri, 
+                                     xfile_config,
+                                     delimiter,
+                                     xfile_map,                                    
+                                     Mode.SERIAL)
+
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

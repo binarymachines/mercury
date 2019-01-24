@@ -20,16 +20,12 @@ import sys
 import time
 from contextlib import contextmanager
 
-
 DEFAULT_DB_CONNECT_RETRIES = 10
 
 
 class NoSuchTableError(Exception):
     def __init__(self, tableName, schemaName):
         Exception.__init__(self, "No table named '%s' exists in database schema '%s'." % (tableName, schemaName))
-
-
-
 
 
 class SQLDataTypeBuilder(object):

@@ -285,6 +285,32 @@ def csvstream_record_generator(**kwargs):
         record_count += 1
 
 
+def json_record_generator(**kwargs):
+    limit = -1
+    if kwargs.get('limit'):
+        limit = int(kwargs['limit'])
+    
+    filename = kwargs.get('filename')
+    record_count = 0
+    if filename:
+        with open(filename) as f:
+            for line in f:
+                if record_count == limit:
+                    break
+                    
+                yield json.loads(line)
+                record_count += 1
+    else:
+        for line in sys.stdin:
+            if not line:
+                break
+            if record_count == limit:
+                break
+
+            yield(json.loads(line))
+            record_count += 1
+
+
 class RecordSource(object):
     def __init__(self, generator_func, **kwargs):
         self._generator = generator_func

@@ -2,7 +2,9 @@
 
 '''Usage:
             xfile --config <configfile> [--delimiter <delimiter>] --map <map_name>  <datafile> [--limit <max_records>]            
-            xfile --config <configfile> [--delimiter <delimiter>] --map <map_name> -s [--limit <max_records>]            
+            xfile --config <configfile> [--delimiter <delimiter>] --map <map_name> -s [--limit <max_records>]
+            xfile --config <configfile> --json --map <map_name>  <datafile> [--limit <max_records>]                        
+            xfile --config <configfile> --json --map <map_name>  -s [--limit <max_records>]                        
             xfile --config <configfile> --list (sources | maps | globals)          
             xfile -i
 
@@ -26,6 +28,11 @@ from snap import snap, common
 from mercury import datamap as dmap
 import yaml
 import logging
+
+
+class Mode(object):
+    CSV = 'csv'
+    JSON = 'json'
 
 
 class TransformProcessor(dmap.DataProcessor):
@@ -80,8 +87,13 @@ def resolve_initfile_args(arg_dict):
 
 
 def main(args):
-    logging.basicConfig(filename='exfile.log', level=logging.DEBUG)
+    logging.basicConfig(filename='xfile.log', level=logging.DEBUG)
     
+    if args.get('--json'):
+        intake_mode = Mode.JSON
+    else:
+        intake_mode = Mode.CSV
+
     transform_mode = False
     list_mode = False
     interactive_mode = False
@@ -118,16 +130,25 @@ def main(args):
         xformer = build_transformer(transform_config_file, transform_map)
 
         if stream_input_mode: # read input from stdin
-            rec_source = dmap.RecordSource(dmap.csvstream_record_generator,                                           
-                                           delimiter=field_delimiter,
-                                           limit=limit)
-            
-        else: # read input from file
+            if intake_mode == Mode.CSV:  # input is in CSV format
+                rec_source = dmap.RecordSource(dmap.csvstream_record_generator,                                           
+                                               delimiter=field_delimiter,
+                                               limit=limit)
+            else: # read json records from stdin
+                rec_source = dmap.RecordSource(dmap.json_record_generator,
+                                               limit=limit)
+
+        else: 
             datafile = args.get('<datafile>')                    
-            rec_source = dmap.RecordSource(dmap.csvfile_record_generator,
-                                           filename=datafile,
-                                           delimiter=field_delimiter,
-                                           limit=limit)
+            if intake_mode == Mode.CSV:  # read csv records from file            
+                rec_source = dmap.RecordSource(dmap.csvfile_record_generator,
+                                               filename=datafile,
+                                               delimiter=field_delimiter,
+                                               limit=limit)
+            else: # read JSON records from file
+                rec_source = dmap.RecordSource(dmap.json_record_generator,
+                                               filename=datafile,
+                                               limit=limit)
 
         for input_record in rec_source.records():     
             output_record = xformer.transform(input_record)

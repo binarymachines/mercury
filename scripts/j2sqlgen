@@ -59,23 +59,19 @@ class ColumnSpec(object):
         self.nullable = is_nullable
         self.length = kwargs.get('length', '') # can be null; usually only applies to string types
         self.is_primary_key = is_pk
-        self.default_value = kwargs.get('default', '')
+        self.default_value = kwargs.get('default')
             
     def sql(self):
         null_clause = ''
         if not self.nullable:
             null_clause = 'NOT NULL'
-        if self.default_value is None: 
-            default_clause = ''
-        else:
-            default_clause = 'DEFAULT %s' % self.default_value
-    
+        
         if self.length:
             length_clause = '(%s)' % self.length
         else:
             length_clause = ''
 
-        if not self.default_value:
+        if self.default_value is None:
             field_line = '{name} {datatype}{length} {null}'.format(name=self.name,
                                                                     datatype=self.datatype,
                                                                     length=length_clause,
