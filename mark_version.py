@@ -4,7 +4,7 @@ import os
 import sh
 from sh import git
 
-VERSION_NUM = '0.8.0'
+VERSION_NUM = '0.8.3'
 
 VERSION_MODULE_TEMPLATE = '''#!/usr/bin/env python
 
