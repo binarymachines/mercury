@@ -16,9 +16,36 @@ from mercury import datamap as dmap
 import yaml
 
 
+
+class ChannelWriteLogicNotFound(Exception):
+    def __init__(self, *function_names):
+        Exception.__init__(self, 'DataStore is missing the channel-write functions: %s' % (', '.join(function_names)))
+
+
+class NoSuchDatastore(Exception):
+    def __init__(self, datastore_name):
+        Exception.__init__(self, 'No datastore registered as "%s" in config file.' 
+                           % datastore_name)
+
+
 class DataStore(object):
-    def __init__(self, service_object_registry, **kwargs):
+    def __init__(self, service_object_registry, *channels, **kwargs):
         self.service_object_registry = service_object_registry
+        self.channel_write_functions = {}
+        self.channel_mode = False
+        missing_channel_writers = []
+        self._selector_func = kwargs.get('channel_select_function')
+        if self._selector_func:
+            self.channel_mode = True
+            for channel_name in channels:
+                func_name = 'write_%s' % channel_name
+                if hasattr(self, func_name):
+                    self.channel_write_functions[channel_name] = getattr(self, func_name)
+                else:
+                    missing_channel_writers.append(func_name)
+
+            if len(missing_channel_writers):
+                raise ChannelWriteLogicNotFound(*missing_channel_writers)
 
 
     def write(self, recordset, **kwargs):
@@ -26,6 +53,19 @@ class DataStore(object):
         Implement in subclass.
         '''
         pass
+
+
+class DataStoreRegistry(object):
+    def __init__(self, datastore_dictionary):
+        self.data = datastore_dictionary
+
+    def lookup(self, datastore_name):
+        if not self.data.get(datastore_name):
+            raise NoSuchDatastore(datastore_name)
+        return self.data[datastore_name]
+
+    def has_datastore(self, datastore_name):
+        return True if self.data.get(datastore_name) else False
 
 
 class RecordBuffer(object):

@@ -26,139 +26,74 @@ from docopt import docopt as docopt_func
 from docopt import DocoptExit
 from snap import snap, common
 from mercury import datamap as dmap
+from mercury.dataload import DataStore, DataStoreRegistry
 import yaml
 
 
-class NoSuchDatastore(Exception):
-    def __init__(self, datastore_name):
-        Exception.__init__(self, 'No datastore registered as "%s" in config file.' 
-                           % datastore_name)
-
-
-class DataStore(object):
-    def __init__(self, service_object_registry, **kwargs):
-        self.service_object_registry = service_object_registry
-
-
-    def write(self, recordset, **kwargs):
-        '''write each record in <recordset> to the underlying storage medium.
-        Implement in subclass.
-        '''
-        pass
-
-
-class RecordBuffer(object):
-    def __init__(self, datastore, **kwargs):        
-        self.data = []
-        self.checkpoint_mgr = None        
-        self.datastore = datastore
-
-
-    def writethrough(self, **kwargs):
-        '''write the contents of the record buffer out to the underlying datastore.
-        Implement in subclass.
-        '''
-        self.datastore.write(self.data, **kwargs)
-
-
-    def register_checkpoint(self, checkpoint_instance):
-        self.checkpoint_mgr = checkpoint_instance
-
-
-    def flush(self, **kwargs):        
-        self.writethrough(**kwargs)
-        self.data = []
-
-
-    def write(self, record, **kwargs):
-        try:
-            self.data.append(record) 
-            if self.checkpoint_mgr:
-                self.checkpoint_mgr.register_write(**kwargs)          
-        except Exception as err: 
-            raise err
-
-
-class checkpoint(ContextDecorator):
-    def __init__(self, record_buffer, **kwargs):
-        checkpoint_interval = int(kwargs.get('interval') or 1)
-
-        self.interval = checkpoint_interval
-        self._outstanding_writes = 0
-        self._total_writes = 0
-        self.record_buffer = record_buffer
-        self.record_buffer.register_checkpoint(self)
-
-
-    @property
-    def total_writes(self):
-        return self._total_writes
-
-    @property
-    def writes_since_last_reset(self):
-        return self._outstanding_writes
-
-
-    def increment_write_count(self):
-        self._outstanding_writes += 1
-        self._total_writes += 1
-
-
-    def reset(self):
-        self.outstanding_writes = 0
-
-
-    def register_write(self, **kwargs):
-        self.increment_write_count()
-        if self.writes_since_last_reset == self.interval:
-            self.record_buffer.flush(**kwargs)
-            self.reset()
-
-
-    def __enter__(self):
-        return self
-
-
-    def __exit__(self, *exc):
-        self.record_buffer.writethrough()
-        return False
-
-
-def initialize_datastores(transform_config, service_object_registry):
+def initialize_datastores(yaml_config, service_object_registry):
     datastores = {}
-    ds_module_name = transform_config['globals']['datastore_module']
+    ds_module_name = yaml_config['globals']['datastore_module']
 
-    if not len(transform_config['datastores']):
+    if not len(yaml_config['datastores']):
         return datastores        
 
-    for datastore_name in transform_config['datastores']:
-        datastore_class_name = transform_config['datastores'][datastore_name]['class']
+    for datastore_name in yaml_config['datastores']:
+        datastore_class_name = yaml_config['datastores'][datastore_name]['class']
         klass = common.load_class(datastore_class_name, ds_module_name)
     
+        # Channels allow us to handle multiple record types within a single DataStore class.
+        # In the YAML config, we channelize a DataStore by adding  
+        #
+        # channel_selector_function: <function_name>
+        # channels:
+        #   - channel1
+        #   - channel2
+        #   - ...
+        #   - channelN
+        #
+        # to the configuration for that DataStore (on the same level as the "class" and "init_params" keys).
+        # The user must implement <function_name> as a standalone function inside the datastore_module
+        # designated in the global settings.
+        #
+        # The channel_selector function takes a dictionary (representing the record being processed) as input,
+        # and a string (representing the detected channel) as output. A DataStore that is operating in 
+        # channel mode will pass each inbound record to the channel selector, then pass that record to
+        # a method named write_<X> (where X is the channel name).   
+        # 
+        # If the channel selector function returns a channel name not listed in the initfile, ngst will 
+        # raise an exception. ngst will alsso raise an exception if the DataStore class does not contain
+        # all the methods implied by its registered channels.
+        #
         init_params = {}
 
-        param_config_section = transform_config['datastores'][datastore_name]['init_params']
-        if param_config_section:
-        #for param in transform_config['datastores'][datastore_name].get('init_params', []):
+        param_config_section = yaml_config['datastores'][datastore_name]['init_params']
+        if param_config_section:        
             for param in param_config_section:
                 init_params[param['name']] = param['value']
         
-        datastore_instance = klass(service_object_registry, **init_params)
+        channel_mode = False
+        channel_list = []
+        channel_selector_function_name = yaml_config['datastores'][datastore_name].get('channel_selector_function')
+
+        if channel_selector_function_name:
+            channel_mode = True
+
+            if not yaml_config['datastores'][datastore_name].get('channels'):
+                raise Exception('Datastores in channel mode must specify a channel list.')
+
+            for channel in yaml_config['datastores'][datastore_name]['channels']:
+                channel_list.append(channel)
+        
+            init_params['channel_select_function'] = channel_selector_function_name
+            
+        datastore_instance = klass(service_object_registry, *channel_list, **init_params)
+        if channel_mode and not hasattr(datastore_instance, channel_selector_function_name):
+            raise Exception('DataStore subclass %s is missing channel selection function "%s."' % 
+                            (klass.__name__, channel_selector_function_name))
+
         datastores[datastore_name] = datastore_instance
+
     return datastores
-
-
-class DatastoreRegistry(object):
-    def __init__(self, datastore_dictionary):
-        self.data = datastore_dictionary
-
-    def lookup(self, datastore_name):
-        if not self.data.get(datastore_name):
-            raise NoSuchDatastore(datastore_name)
-        return self.data[datastore_name]
-
-    def has_datastore(self, datastore_name):
-        return True if self.data.get(datastore_name) else False
 
 
 IngestTarget = namedtuple('IngestTarget', 'datastore_name checkpoint_interval')
@@ -193,12 +128,11 @@ def initialize_record_buffer(ingest_target, datastore_registry):
     return buffer
 
 
-def main(args):
-    #print(common.jsonpretty(args))
+def main(args):    
     config_filename = args['<configfile>']
     yaml_config = common.read_config_file(config_filename)
     service_object_registry = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
-    datastore_registry = DatastoreRegistry(initialize_datastores(yaml_config, service_object_registry))
+    datastore_registry = DataStoreRegistry(initialize_datastores(yaml_config, service_object_registry))
 
     preview_mode = False
     if args['--preview']:
