@@ -77,7 +77,6 @@ class RecordBuffer(object):
 
     def writethrough(self, **kwargs):
         '''write the contents of the record buffer out to the underlying datastore.
-        Implement in subclass.
         '''
         self.datastore.write(self.data, **kwargs)
 

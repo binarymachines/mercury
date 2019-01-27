@@ -5,6 +5,7 @@
 import codecs
 import os
 import re
+from mark_version import VERSION_NUM
 
 
 from setuptools import setup, find_packages
@@ -15,7 +16,7 @@ except ImportError: # for pip <= 9.0.3
 
 
 NAME = 'mercury'
-VERSION = '0.8.3'
+VERSION = VERSION_NUM'
 PACKAGES = find_packages(where='src')
 DEPENDENCIES=['snap-micro',
               'docopt',

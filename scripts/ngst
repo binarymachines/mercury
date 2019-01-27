@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 '''Usage:
-            ngst --config <configfile> [-p] --target <ingest_target> [--datafile <datafile>] [--limit=<max_records>]           
-            ngst --config <configfile> --list (targets | datastores | globals)
+        ngst --config <configfile> [-p] --target <ingest_target> [--datafile <datafile>] [--limit=<max_records>]
+        ngst --config <configfile> --list (targets | datastores | globals)
 
    Options:            
-            -i --interactive   Start up in interactive mode
-            -p --preview       Display records to be ingested, but do not ingest
+        -i --interactive   Start up in interactive mode
+        -p --preview       Display records to be ingested, but do not ingest
 '''
 
 #

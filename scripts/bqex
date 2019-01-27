@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 '''
-     Usage:  
-        bqex [-p] <project> <dataset> --table <table> --bucket <google_bucket> [--delimiter=<delimiter>] [--directory=<directory>]        
-        bqex [-p] <project> <dataset> --table-list-file <tables> --bucket <google_bucket> [--delimiter=<delimiter>] [--directory=<directory>]
-             
-     Options: 
-        -p,--preview     : show (but do not execute) export command
+Usage:  
+    bqex [-p] <project> <dataset> --table <table> --bucket <google_bucket> --format=<fmt> [--delimiter=<delimiter>] [--directory=<directory>]   
+    bqex [-p] <project> <dataset> --table-list-file <tables> --bucket <google_bucket> --format=<fmt> [--delimiter=<delimiter>] [--directory=<directory>]    
+         
+Options: 
+    -p,--preview     : show (but do not execute) export command
 '''
 
 import os, sys
@@ -17,15 +17,29 @@ import sh
 from sh import bq  # Google Cloud CLI must already be installed
 
 
-def extract_data(source_table_designator, target_designator, delimiter):
+class EXPORT_FORMAT(object):
+    CSV = 'csv'
+    JSON = 'json'
+
+
+def extract_data(source_table_designator, target_designator, export_format, delimiter):
     try:
-        result = bq.extract('--field_delimiter',
-                            delimiter, 
-                            '--format=csv',
-                            source_table_designator,
-                            target_designator)
-        print('\n### export of "%s" to "%s" complete.\n' % 
-              (source_table_designator, target_designator), file=sys.stderr)
+        if export_format == EXPORT_FORMAT.CSV:
+            result = bq.extract('--field_delimiter',
+                                delimiter, 
+                                '--destination_format',
+                                'CSV',
+                                source_table_designator,
+                                target_designator)
+            print('\n### export of "%s" to "%s" complete.\n' % 
+                (source_table_designator, target_designator), file=sys.stderr)
+        else: # export JSON records
+            result = bq.extract('--destination_format',
+                                'NEWLINE_DELIMITED_JSON',
+                                source_table_designator,
+                                target_designator)
+            print('\n### export of "%s" to "%s" complete.\n' % 
+                (source_table_designator, target_designator), file=sys.stderr)
 
     except Exception as err:
         print('!!! error exporting table data.', file=sys.stderr)
@@ -33,6 +47,13 @@ def extract_data(source_table_designator, target_designator, delimiter):
 
 
 def main(args):
+    export_format = args['--format']
+    if export_format == EXPORT_FORMAT.CSV:
+        if args.get('--delimiter') is None:
+            print('### csv chosen as the export format, but no delimiter specified. Defaulting to comma.', file=sys.stderr)
+    elif export_format != EXPORT_FORMAT.JSON:
+        print('!!! supported export formats are "csv" and "json".')
+        return
     
     tables = []
     if args.get('--table'):
@@ -42,11 +63,14 @@ def main(args):
         with open(table_list_file) as f:
             for line in f:
                 tables.append(line.lstrip().rstrip())
-        
+
     project_name = args['<project>']
     dataset = args['<dataset>']    
     bucket = args['<google_bucket>']
-    delimiter = args.get('--delimiter', ',')
+    
+    delimiter = ','
+    if args.get('--delimiter') is not None:
+        delimiter = args['--delimiter']
 
     preview_mode = False
     if args.get('--preview'):
@@ -62,18 +86,25 @@ def main(args):
         source_table_designator = '{project}:{dataset}.{table}'.format(project=project_name,
                                                                        dataset=dataset,
                                                                        table=table_name)
-        filename = '%s_*.csv' % table_name
+        filename = '%s_*.%s' % (table_name, export_format)
         path_string = os.path.join(bucket, bucket_directory, filename)
         target_designator = 'gs://%s' % path_string
         
-        if preview_mode:            
-            print(bq.extract.bake('--field_delimiter',
-                                    '\'%s\'' % delimiter, 
-                                    '--format=csv',
-                                    source_table_designator,
-                                    target_designator))                        
+        if preview_mode:
+            if export_format == EXPORT_FORMAT.CSV:
+                print(bq.extract.bake('--field_delimiter',
+                                        '\'%s\'' % delimiter, 
+                                        '--destination_format',
+                                        'CSV',
+                                        source_table_designator,
+                                        target_designator))
+            else:
+                print(bq.extract.bake('--destination_format',
+                                      'NEWLINE_DELIMITED_JSON',
+                                      source_table_designator,
+                                      target_designator))                    
         else:
-            extract_data(source_table_designator, target_designator, delimiter)
+            extract_data(source_table_designator, target_designator, export_format, delimiter)
     
     print('\n### exiting.', file=sys.stderr)
 
