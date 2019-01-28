@@ -26,7 +26,7 @@ from docopt import docopt as docopt_func
 from docopt import DocoptExit
 from snap import snap, common
 from mercury import datamap as dmap
-from mercury.dataload import DataStore, DataStoreRegistry
+from mercury.dataload import DataStore, DataStoreRegistry, RecordBuffer, checkpoint
 import yaml
 
 

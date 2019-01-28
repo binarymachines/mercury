@@ -12,7 +12,7 @@ Options:
 
 import os, sys
 import json
-import multiprocessing
+import multiprocessing as mp
 from snap import common
 import docopt
 import sh
@@ -118,22 +118,21 @@ def main(args):
         print('### operating in xfile_bypass mode.', file=sys.stderr)
 
     ngst_config = args.get('--ncfg')
-    ngst_target = args,get('--ntarget')
+    ngst_target = args.get('--ntarget')
     delimiter = args.get('--d', ',')
 
     if parallel_mode:
         for file_uri in list_bucket_files_for_table(tablename, bucket, directory, data_format):
             if xfile_bypass_mode:
-                p = Process(target=stream_file_contents_direct_to_ngst,
-                            args=(file_uri,
-                                  delimiter,                                  
+                p = mp.Process(target=stream_file_contents_direct_to_ngst,
+                            args=(file_uri,                                                                   
                                   ngst_config,
                                   ngst_target,
                                   Mode.PARALLEL))
                 p.start()
                 p.join()
             else:
-                p = Process(target=relay_file_contents_to_ngst,
+                p = mp.Process(target=relay_file_contents_to_ngst,
                             args=(file_uri,        
                                   delimiter,
                                   xfile_config,
@@ -145,7 +144,7 @@ def main(args):
                 p.join()
 
     else:
-        for file_uri in list_bucket_files_for_table(tablename, bucket, directory):
+        for file_uri in list_bucket_files_for_table(tablename, bucket, directory, data_format):
             if xfile_bypass_mode:          
                 stream_file_contents_direct_to_ngst(file_uri,                                              
                                                     ngst_config,
