@@ -124,40 +124,55 @@ def main(args):
     if parallel_mode:
         for file_uri in list_bucket_files_for_table(tablename, bucket, directory, data_format):
             if xfile_bypass_mode:
-                p = mp.Process(target=stream_file_contents_direct_to_ngst,
-                            args=(file_uri,                                                                   
-                                  ngst_config,
-                                  ngst_target,
-                                  Mode.PARALLEL))
-                p.start()
-                p.join()
+                try:
+                    p = mp.Process(target=stream_file_contents_direct_to_ngst,
+                                args=(file_uri,                                                                   
+                                    ngst_config,
+                                    ngst_target,
+                                    Mode.PARALLEL))
+                    p.start()
+                    p.join()
+                except sh.ErrorReturnCode as e:
+                    print(e.stderr)
+                except Exception as e:
+                    print(e)
             else:
-                p = mp.Process(target=relay_file_contents_to_ngst,
-                            args=(file_uri,        
-                                  delimiter,
-                                  xfile_config,
-                                  xfile_map,
-                                  ngst_config,
-                                  ngst_target,
-                                  Mode.PARALLEL))
-                p.start()
-                p.join()
+                try:
+                    p = mp.Process(target=relay_file_contents_to_ngst,
+                                args=(file_uri,        
+                                    delimiter,
+                                    xfile_config,
+                                    xfile_map,
+                                    ngst_config,
+                                    ngst_target,
+                                    Mode.PARALLEL))
+                    p.start()
+                    p.join()
+                except sh.ErrorReturnCode as e:
+                    print(e.stderr)
+                except Exception as e:
+                    print(e)
 
     else:
         for file_uri in list_bucket_files_for_table(tablename, bucket, directory, data_format):
-            if xfile_bypass_mode:          
-                stream_file_contents_direct_to_ngst(file_uri,                                              
-                                                    ngst_config,
-                                                    ngst_target,
-                                                    Mode.SERIAL)
-            else:
-                relay_file_contents_to_ngst(file_uri,
-                                            delimiter,
-                                            xfile_config,                                            
-                                            xfile_map,
-                                            ngst_config,
-                                            ngst_target,
-                                            Mode.SERIAL)
+            try:
+                if xfile_bypass_mode:          
+                    stream_file_contents_direct_to_ngst(file_uri,                                              
+                                                        ngst_config,
+                                                        ngst_target,
+                                                        Mode.SERIAL)
+                else:
+                    relay_file_contents_to_ngst(file_uri,
+                                                delimiter,
+                                                xfile_config,                                            
+                                                xfile_map,
+                                                ngst_config,
+                                                ngst_target,
+                                                Mode.SERIAL)
+            except sh.ErrorReturnCode as e:
+                print(e.stderr)                
+            except Exception as e:
+                print(e)
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)
