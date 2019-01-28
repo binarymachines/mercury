@@ -2,8 +2,8 @@
 
 '''
 Usage:  
-    bqex [-p] <project> <dataset> --table <table> --bucket <google_bucket> --format=<fmt> [--delimiter=<delimiter>] [--directory=<directory>]   
-    bqex [-p] <project> <dataset> --table-list-file <tables> --bucket <google_bucket> --format=<fmt> [--delimiter=<delimiter>] [--directory=<directory>]    
+    bqexport [-p] <project> <dataset> --table <table> --bucket <google_bucket> --format=<fmt> [--delimiter=<delimiter>] [--directory=<directory>]   
+    bqexport [-p] <project> <dataset> --table-list-file <tables> --bucket <google_bucket> --format=<fmt> [--delimiter=<delimiter>] [--directory=<directory>]    
          
 Options: 
     -p,--preview     : show (but do not execute) export command

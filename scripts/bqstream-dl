@@ -2,9 +2,9 @@
 
 '''
 Usage:  
-    bqstream-x --table <table> --bucket <bucket> --format=<fmt> [--dir=<directory>] --list
-    bqstream-x [-p] --table <table> --bucket <bucket> --format=<fmt> [--dir=<directory>] [--d=<delimiter>] --xcfg=<xfile_cfg> --xmap=<xfile_map> --ncfg=<ngst_cfg> --ntarget=<ngst_target>
-    bqstream-x [-p] --table <table> --bucket <bucket> --format=<fmt> [--dir=<directory>] --ncfg=<ngst_cfg> --ntarget=<ngst_target>
+    bqstream-dl --table <table> --bucket <bucket> --format=<fmt> [--dir=<directory>] --list
+    bqstream-dl [-p] --table <table> --bucket <bucket> --format=<fmt> [--dir=<directory>] [--d=<delimiter>] --xcfg=<xfile_cfg> --xmap=<xfile_map> --ncfg=<ngst_cfg> --ntarget=<ngst_target>
+    bqstream-dl [-p] --table <table> --bucket <bucket> --format=<fmt> [--dir=<directory>] --ncfg=<ngst_cfg> --ntarget=<ngst_target>
 
 Options: 
     -p,--parallel     : stream bucket contents in parallel        
@@ -55,7 +55,6 @@ def stream_file_contents_direct_to_ngst(file_uri, ngst_configfile, ngst_target, 
             print(line, file=sys.stderr)
         else:
             print('[%s:%s (child_proc_%s)]: %s' % (module, parent, pid, line), file=sys.stderr)
-
 
 
 def relay_file_contents_to_ngst(file_uri, delimiter, xfile_configfile, xfile_map, ngst_configfile, ngst_target, mode):
