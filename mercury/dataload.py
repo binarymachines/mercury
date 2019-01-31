@@ -114,6 +114,7 @@ class checkpoint(ContextDecorator):
         self._total_writes = 0
         self.record_buffer = record_buffer
         self.record_buffer.register_checkpoint(self)
+        self.override_channel = kwargs.get('channel')
 
 
     @property
@@ -136,6 +137,7 @@ class checkpoint(ContextDecorator):
 
     def register_write(self, **kwargs):
         self.increment_write_count()
+        kwargs.update(channel=self.override_channel)
         if self.writes_since_last_reset == self.interval:
             self.record_buffer.flush(**kwargs)
             self.reset()
@@ -146,7 +148,7 @@ class checkpoint(ContextDecorator):
 
 
     def __exit__(self, *exc):
-        self.record_buffer.writethrough()
+        self.record_buffer.writethrough(channel=self.override_channel)
         return False
 
 
