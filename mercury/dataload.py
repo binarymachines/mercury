@@ -19,7 +19,7 @@ import yaml
 
 class ChannelWriteLogicNotFound(Exception):
     def __init__(self, *function_names):
-        Exception.__init__(self, 'DataStore is missing the channel-write functions: %s' % (', '.join(function_names)))
+        Exception.__init__(self, 'DataStore subclass is missing the channel-write functions: %s' % (', '.join(function_names)))
 
 
 class NoSuchDatastore(Exception):
@@ -47,6 +47,12 @@ class DataStore(object):
             if len(missing_channel_writers):
                 raise ChannelWriteLogicNotFound(*missing_channel_writers)
 
+    @property
+    def channels(self):
+        return self.channel_write_functions.keys()
+
+    def has_channel(self, channel_id):
+        return channel_id in self.channel_write_functions
 
     def write(self, recordset, **kwargs):
         '''write each record in <recordset> to the underlying storage medium.

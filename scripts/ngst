@@ -147,7 +147,8 @@ def main(args):
 
     available_ingest_targets = load_ingest_targets(yaml_config, datastore_registry)
     write_params = {}
-    if args.get('--channel') is not None:
+    channel_id = None
+    if args.get('--channel'):
         channel_id = args['--channel']
         print('### explicit write channel %s designated. Bypassing internal channel detect logic.' 
              % channel_id)
@@ -157,6 +158,13 @@ def main(args):
         stream_input_mode = True
         ingest_target_name = args['<ingest_target>']
         ingest_target = lookup_ingest_target_by_name(ingest_target_name, available_ingest_targets)
+
+        target_datastore = datastore_registry.lookup(ingest_target.datastore_name)
+        if target_datastore.channel_mode and channel_id:            
+            if not target_datastore.has_channel(channel_id):
+                raise Exception('No channel "%s" registered in DataStore subclass %s.' 
+                                % (channel_id, target_datastore.__class__.__name__))
+
         buffer = initialize_record_buffer(ingest_target, datastore_registry)
 
         record_count = 0
@@ -179,6 +187,13 @@ def main(args):
         input_file = args['<datafile>']        
         ingest_target_name = args['<ingest_target>']
         ingest_target = lookup_ingest_target_by_name(ingest_target_name, available_ingest_targets)
+
+        target_datastore = datastore_registry.lookup(ingest_target.datastore_name)
+        if target_datastore.channel_mode and channel_id:            
+            if not target_datastore.has_channel(channel_id):
+                raise Exception('No channel "%s" in DataStore subclass %s.' 
+                                % (channel_id, target_datastore.__class__.__name__))
+
         buffer = initialize_record_buffer(ingest_target, datastore_registry)
 
         record_count = 0
