@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 '''Usage:
-        ngst --config <configfile> [-p] --target <ingest_target> [--datafile <datafile>] [--limit=<max_records>]
-        ngst --config <configfile> --list (targets | datastores | globals)
+        ngst --config <configfile> [-p] --target <ingest_target> [--datafile <datafile>] [--channel=<channel>] [--limit=<max_records>]
+        ngst --config <configfile> --list (targets | datastores | channels | globals)
 
    Options:            
         -i --interactive   Start up in interactive mode
@@ -146,6 +146,12 @@ def main(args):
     file_input_mode = False
 
     available_ingest_targets = load_ingest_targets(yaml_config, datastore_registry)
+    write_params = {}
+    if args.get('--channel') is not None:
+        channel_id = args['--channel']
+        print('### explicit write channel %s designated. Bypassing internal channel detect logic.' 
+             % channel_id)
+        write_params['channel'] = channel_id
 
     if args['--target'] == True and args['<datafile>'] is None:
         stream_input_mode = True
@@ -163,7 +169,7 @@ def main(args):
                 if not len(line):
                     break
                 if not preview_mode:
-                    buffer.write(line)
+                    buffer.write(line, **write_params)
                 else:
                     print(line)
                 record_count += 1
@@ -182,12 +188,12 @@ def main(args):
                     if record_count == limit:
                         break
                     if not preview_mode:
-                        buffer.write(line)
+                        buffer.write(line, **write_params)
                     else:
                         print(line)
                     record_count += 1
 
-    elif args['--list'] == True:        
+    elif args['--list'] == True:
         if args['targets']:
             for target in yaml_config['ingest_targets']:
                 print('::: Ingest target "%s": ' % target)
@@ -197,6 +203,12 @@ def main(args):
             for dstore in yaml_config['datastores']:
                 print('::: Datastore alias "%s": ' % dstore)
                 print(common.jsonpretty(yaml_config['datastores'][dstore]))
+
+        if args['channels']:
+            for dstore in yaml_config['datastores']:
+                if yaml_config['datastores'][dstore].get('channels'):
+                    print('::: Channels for datastore alias "%s": ' % dstore)
+                    print(common.jsonpretty(yaml_config['datastores'][dstore]['channels']))
 
         if args['globals']:
             print('::: Global settings:')
