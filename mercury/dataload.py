@@ -33,26 +33,36 @@ class DataStore(object):
         self.service_object_registry = service_object_registry
         self.channel_write_functions = {}
         self.channel_mode = False
-        missing_channel_writers = []
+        self.write_channels = []
+        for c in channels:
+            self.write_channels.append(c)
+        
         self._selector_func = kwargs.get('channel_select_function')
         if self._selector_func:
-            self.channel_mode = True
+            self.channel_mode = True            
             for channel_name in channels:
                 func_name = 'write_%s' % channel_name
                 if hasattr(self, func_name):
                     self.channel_write_functions[channel_name] = getattr(self, func_name)
-                else:
-                    missing_channel_writers.append(func_name)
-
-            if len(missing_channel_writers):
-                raise ChannelWriteLogicNotFound(*missing_channel_writers)
+                
 
     @property
     def channels(self):
-        return self.channel_write_functions.keys()
+        return self.write_channels
+
+
+    def write_default_channel(self, recordset, **kwargs):
+        channel = kwargs.get('channel')
+        print('!!! Invoking default channel write method for channel ID "%s". Override in DataStore subclass.' % channel, file=sys.stderr)
+
 
     def has_channel(self, channel_id):
-        return channel_id in self.channel_write_functions
+        return channel_id in self.write_channels
+
+
+    def get_channel_write_function(self, channel):
+        return self.channel_write_functions.get(channel, self.write_default_channel)
+
 
     def write(self, recordset, **kwargs):
         '''write each record in <recordset> to the underlying storage medium.

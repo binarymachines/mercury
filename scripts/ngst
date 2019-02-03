@@ -86,11 +86,7 @@ def initialize_datastores(yaml_config, service_object_registry):
         
             init_params['channel_select_function'] = channel_selector_function_name
             
-        datastore_instance = klass(service_object_registry, *channel_list, **init_params)
-        if channel_mode and not hasattr(datastore_instance, channel_selector_function_name):
-            raise Exception('DataStore subclass %s is missing channel selection function "%s."' % 
-                            (klass.__name__, channel_selector_function_name))
-
+        datastore_instance = klass(service_object_registry, *channel_list, **init_params)        
         datastores[datastore_name] = datastore_instance
 
     return datastores
