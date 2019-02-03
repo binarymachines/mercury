@@ -51,7 +51,8 @@ class DuplicateColumn(Exception):
 
 
 class ColumnSpec(object):
-    def __init__(self, column_name, column_type, is_nullable=True, is_pk=False, **kwargs):
+    def __init__(self, table_name, column_name, column_type, is_nullable=True, is_pk=False, **kwargs):
+        self.tablename = table_name
         self.name = column_name
         self.datatype = column_type
         self.nullable = is_nullable
@@ -59,7 +60,7 @@ class ColumnSpec(object):
         self.is_primary_key = is_pk
         self.default_value = kwargs.get('default')
             
-    def sql(self):
+    def sql(self, table_creation_context):
         null_clause = ''
         if not self.nullable:
             null_clause = 'NOT NULL'
@@ -69,19 +70,28 @@ class ColumnSpec(object):
         else:
             length_clause = ''
 
+        src_colname = self.name
+        src_coltype = self.datatype
         if self.default_value is None:
-            field_line = '{name} {datatype}{length} {null}'.format(name=self.name,
-                                                                    datatype=self.datatype,
+            field_line = '{name} {datatype}{length} {null}'.format(name=table_creation_context.get_target_column_name(self.tablename,
+                                                                                                                      self.name),
+                                                                    datatype=table_creation_context.get_target_column_type(self.tablename,
+                                                                                                                           self.name,
+                                                                                                                           self.datatype),
                                                                     length=length_clause,
                                                                     null=null_clause)
         else:
             #print('generating field line for %s with default clause...' % self.name)
-            field_line = '{name} {datatype}{length} {null} DEFAULT {default}'.format(name=self.name,
-                                                                    datatype=self.datatype,
+            field_line = '{name} {datatype}{length} {null} DEFAULT {default}'.format(name=table_creation_context.get_target_column_name(self.tablename,
+                                                                                                                                        self.name),
+                                                                    datatype=table_creation_context.get_target_column_type(self.tablename,
+                                                                                                                           self.datatype),
                                                                     length=length_clause,
                                                                     null=null_clause,
-                                                                    default=self.default_value)                                                                                                            
-        return field_line.lstrip().rstrip()                                                                   
+                                                                    default=self.default_value)
+        if self.is_primary_key:
+            field_line = field_line + ' PRIMARY KEY'                                                                                                            
+        return field_line.lstrip().rstrip()                                                    
 
 
 class TableSpec(object):
@@ -99,7 +109,8 @@ class TableSpec(object):
 
 
     def generate_pk_column(self, table_creation_context):
-        return ColumnSpec(table_creation_context.pk_name,
+        return ColumnSpec(self.name,
+                          table_creation_context.pk_name,
                           table_creation_context.pk_type,
                           False,
                           True,
@@ -114,16 +125,16 @@ class TableSpec(object):
         self.columns.append(columnspec)
 
 
-    def add_column(self, column_name, column_type, creation_context, **kwargs):
-        column_type = creation_context.get_target_column_type(self.name, column_name, column_type)
-        column_name = creation_context.get_target_column_name(self.name, column_name)
+    def add_column(self, source_column_name, source_column_type, creation_context, **kwargs):
+        target_column_type = creation_context.get_target_column_type(self.name, source_column_name, source_column_type)
+        target_column_name = creation_context.get_target_column_name(self.name, source_column_name)
 
-        if self.get_column(column_name):
-            raise DuplicateColumn(column_name)
+        if self.get_column(target_column_name):
+            raise DuplicateColumn(target_column_name)
 
         nullable = kwargs.get('is_nullable', True)
         is_pk = False        
-        self.columns.append(ColumnSpec(column_name, column_type, nullable, is_pk, **kwargs))
+        self.columns.append(ColumnSpec(self.name, target_column_name, target_column_type, nullable, is_pk, **kwargs))
 
 
     def get_column(self, column_name):
@@ -158,6 +169,13 @@ class TableCreationContext(object):
             self.pk_name = self.defaults['pk_name']
 
 
+    def get_mapped_table_name(self, table_name):
+        if not self.overrides.get(table_name):
+            return table_name
+
+        return self.overrides[table_name].get('rename_to', table_name)     
+
+
     def should_autocreate_pk(self, table_name): 
         setting = self.defaults['autocreate_pk_if_missing']
         if not self.overrides:
@@ -185,11 +203,16 @@ class TableCreationContext(object):
     def get_target_column_name(self, table_name, column_name):
         name = column_name
         if not self.overrides:
+            print('no overrides specified.')
             return name
 
-        if self.overrides.get(table_name):
-            if self.overrides[table_name].get('column_name_map'):
-                name = self.overrides[table_name]['column_name_map'].get(column_name, column_name)
+        if not self.overrides.get(table_name):
+            print('no overrides specified for table %s.' % table_name)
+            return name
+
+        if self.overrides[table_name].get('column_name_map'):
+            print('column name map specified for table %s.' % table_name)
+            name = self.overrides[table_name]['column_name_map'].get(column_name, column_name)
 
         return name
 
@@ -211,38 +234,45 @@ class TableCreationContext(object):
 
 
 def create_tablespec_from_json_config(tablename, json_config, default_schema, creation_context):
-    tspec = TableSpec(tablename, json_config.get('schema_name', default_schema))
-    for column_config in json_config['columns']:
-        column_name = column_config['column_name']
+    source_tablename = tablename
+    target_tablename = creation_context.get_mapped_table_name(source_tablename)
 
-        column_type = creation_context.get_target_column_type(tablename,
-                                                              column_name,
+    tspec = TableSpec(source_tablename, json_config.get('schema_name', default_schema))
+    for column_config in json_config['columns']:
+        source_column_name = column_config['column_name']
+        #target_column_name = creation_context.get_target_column_name(source_column_name)
+        source_column_type = column_config['column_type']
+        #column_name = column_config['column_name']
+        '''
+        column_type = creation_context.get_target_column_type(source_tablename,
+                                                              source_column_name,
                                                               column_config['column_type'])
+        '''
         settings = {}
 
-        if is_string_type(column_config['column_type']):            
-            settings['length'] = creation_context.get_varchar_length(tablename, column_name)
+        if is_string_type(column_config['column_type']):
+            settings['length'] = creation_context.get_varchar_length(source_tablename, source_column_name)
 
-        tspec.add_column(column_name, 
-                         column_type,
+        tspec.add_column(source_column_name,
+                         source_column_type,
                          creation_context,
                          **settings)
 
-    if not tspec.has_pk() and creation_context.should_autocreate_pk(tablename):
+    if not tspec.has_pk() and creation_context.should_autocreate_pk(source_tablename):
         primary_key_col = tspec.generate_pk_column(creation_context)
         tspec.insert_pk(primary_key_col)
 
     return tspec
 
 
-def generate_sql(tablespec):
+def generate_sql(tablespec, table_creation_context):
     
     field_lines = []
     for column in tablespec.columns:
-        field_lines.append(column.sql())
+        field_lines.append(column.sql(table_creation_context))
         
     return TABLE_DDL_TEMPLATE.format(schema=tablespec.schema,
-                                     tablename=tablespec.name,
+                                     tablename=table_creation_context.get_mapped_table_name(tablespec.name),
                                      table_body=',\n'.join(field_lines))
 
     
@@ -285,7 +315,7 @@ def main(args):
                                                       project_schema,
                                                       table_creation_context)
 
-        print(generate_sql(tablespec))
+        print(generate_sql(tablespec, table_creation_context))
         return       
 
 if __name__ == '__main__':
