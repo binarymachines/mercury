@@ -1,0 +1,191 @@
+#!/usr/bin/env python
+
+'''
+     Usage:  
+        bqexport-view [-p] <project> <dataset> --view <view> --bucket <google_bucket> --format=<fmt> [--rename_to=<name>] [--delimiter=<delimiter>] [--directory=<directory>]        
+        bqexport-view [-p] <project> <dataset> --view_list_file <views> --bucket <google_bucket> --format=<fmt> [--delimiter=<delimiter>] [--directory=<directory>]
+             
+     Options: 
+        -p,--preview     : show (but do not execute) export command
+'''
+
+import os, sys
+import json
+import uuid
+from snap import common
+import docopt
+import sh
+from sh import bq  # Google Cloud CLI must already be installed
+
+
+class EXPORT_FORMAT(object):
+    CSV = 'csv'
+    JSON = 'json'
+
+
+QUERY_TEMPLATE = '''select * from {project}:{dataset}.{view_name}'''
+
+
+def generate_temp_table_name(view_name):
+    view_id = uuid.uuid4()
+    id = 'mview_{view}_{id}'.format(view=view_name, id=view_id)
+    return id.replace('-', '_')
+
+
+def compose_source_table_designator(project_name, dataset_name, table_name):
+
+    return '{project}:{dataset}.{table}'.format(project=project_name,
+                                                dataset=dataset_name,
+                                                table=table_name)
+
+
+def compose_source_view_designator(dataset_name, view_name):
+    return '{dataset}.{view}'.format(dataset=dataset_name,
+                                     view=view_name)
+
+
+def compose_target_table_designator(project_name,
+                                    dataset_name,
+                                    table_name):
+
+    return '{project}:{dataset}.{table}'.format(project=project_name,
+                                                dataset=dataset_name,
+                                                table=table_name)
+
+
+def compose_bucketfile_designator(bucket_name, filename, data_format, directory=None):
+    bucket_root = bucket_name
+    if not bucket_name.startswith('gs://'):
+        bucket_root = 'gs://' + bucket_name
+
+    if directory:
+        bucket_path = os.path.join(bucket_root, directory, filename)
+    else:
+        bucket_path = os.path.join(bucket_root, filename)
+
+    return bucket_path + '_*.%s' % data_format
+
+
+def export_view_to_temp_table(source_view_designator, temp_table_designator, legacy_sql=False):
+    print('### exporting view %s' % source_view_designator)
+    print('### to target temp table %s...' % temp_table_designator)
+    if legacy_sql:
+        legacy_arg = '--use_legacy_sql=true'
+    else:
+        legacy_arg = '--use_legacy_sql=false'
+
+    query = "SELECT * FROM %s" % source_view_designator
+    try:
+        result = bq.query('--destination_table',
+                          temp_table_designator,
+                          legacy_arg,
+                          query)
+        return True
+    except Exception as err:
+        print('!!! error exporting view data to temp table.', file=sys.stderr)
+        print(err, file=sys.stderr)
+        return False
+
+
+def extract_data(source_table_designator, target_designator, export_format, delimiter):
+    print('### extracting data from temp table %s to %s...' % (source_table_designator, target_designator))
+    try:
+        if export_format == EXPORT_FORMAT.CSV:
+            result = bq.extract('--field_delimiter',
+                                delimiter, 
+                                '--destination_format',
+                                'CSV',
+                                source_table_designator,
+                                target_designator)
+            print('\n### export of "%s" to "%s" complete.\n' % 
+                (source_table_designator, target_designator), file=sys.stderr)
+        else: # export JSON records
+            result = bq.extract('--destination_format',
+                                'NEWLINE_DELIMITED_JSON',
+                                source_table_designator,
+                                target_designator)
+            print('\n### export of "%s" to "%s" complete.\n' % 
+                (source_table_designator, target_designator), file=sys.stderr)
+
+    except Exception as err:
+        print('!!! error exporting table data.', file=sys.stderr)
+        print(err, file=sys.stderr)
+
+
+def drop_temp_table(dataset, table_name):
+    print('### issuing DROP TABLE command for temp table %s...' % table_name)
+    designator = '%s.%s' % (dataset, table_name)
+    bq.rm('-f', '-t', designator)
+
+
+def main(args):
+    export_format = args['--format']
+    if export_format == EXPORT_FORMAT.CSV:
+        if args.get('--delimiter') is None:
+            print('### csv chosen as the export format, but no delimiter specified. Defaulting to comma.', file=sys.stderr)
+    elif export_format != EXPORT_FORMAT.JSON:
+        print('!!! supported export formats are "csv" and "json".')
+        return
+    
+    views = []
+    if args.get('--view'):
+        views.append(args['<view>'])
+    elif args.get('--view-list-file'):
+        view_list_file = args['<views>']
+        with open(view_list_file) as f:
+            for line in f:
+                views.append(line.lstrip().rstrip())
+
+    project_name = args['<project>']
+    dataset = args['<dataset>']    
+    bucket = args['<google_bucket>']
+    
+    delimiter = ','
+    if args.get('--delimiter') is not None:
+        delimiter = args['--delimiter']
+
+    preview_mode = False
+    if args.get('--preview'):
+        preview_mode = True
+        print('\n### running bqex in preview mode.\n', file=sys.stderr)
+    
+    if args.get('--directory') is not None: 
+        bucket_directory = args['--directory']
+    else:
+        bucket_directory = ''
+
+    view_table_map = {}
+    for view in views:
+        # export view to temp table
+        temp_tablename = generate_temp_table_name(view)
+        view_table_map[view] = temp_tablename
+
+        src_view = compose_source_view_designator(dataset, view)
+        target_table = compose_target_table_designator(project_name,
+                                                       dataset,
+                                                       temp_tablename)
+        if not export_view_to_temp_table(src_view, target_table):
+            return
+        
+    for view, temp_table_name in view_table_map.items():
+        export_name = view
+        if args.get('--rename_to'):
+            export_name = args['--rename_to']
+
+        target_designator = compose_bucketfile_designator(bucket,
+                                                          export_name,
+                                                          export_format,
+                                                          bucket_directory)
+
+        source_table_designator = compose_source_table_designator(project_name, dataset, temp_table_name)
+        extract_data(source_table_designator,
+                     target_designator,
+                     export_format,
+                     delimiter)
+
+        drop_temp_table(dataset, temp_table_name)
+
+    
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)
