@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-VERSION_STRING = "0.9.2[49e047e]"
+VERSION_STRING = "0.9.21[b8a3091]"
 
 
 def show():

@@ -56,6 +56,7 @@ setup(
              'scripts/ngst',
              'scripts/j2sqlgen',
              'scripts/bqexport',
+             'scripts/bqexport-view',
              'scripts/bqstream-dl'],
     packages=find_packages(),
     install_requires=DEPENDENCIES,
