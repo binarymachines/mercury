@@ -81,7 +81,6 @@ class ColumnSpec(object):
                                                                     length=length_clause,
                                                                     null=null_clause)
         else:
-            #print('generating field line for %s with default clause...' % self.name)
             field_line = '{name} {datatype}{length} {null} DEFAULT {default}'.format(name=table_creation_context.get_target_column_name(self.tablename,
                                                                                                                                         self.name),
                                                                     datatype=table_creation_context.get_target_column_type(self.tablename,
@@ -203,15 +202,10 @@ class TableCreationContext(object):
     def get_target_column_name(self, table_name, column_name):
         name = column_name
         if not self.overrides:
-            print('no overrides specified.')
             return name
-
         if not self.overrides.get(table_name):
-            print('no overrides specified for table %s.' % table_name)
             return name
-
         if self.overrides[table_name].get('column_name_map'):
-            print('column name map specified for table %s.' % table_name)
             name = self.overrides[table_name]['column_name_map'].get(column_name, column_name)
 
         return name
