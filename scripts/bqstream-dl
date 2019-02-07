@@ -25,6 +25,7 @@ from sh import ngst
 class DATA_FORMAT(object):
     CSV = 'csv'
     JSON = 'json'
+    PARQUET = 'parquet'
 
 
 class Mode():
@@ -62,6 +63,7 @@ def stream_file_contents_direct_to_ngst(file_uri,
 
 
 def relay_file_contents_to_ngst(file_uri,
+                                data_format,
                                 delimiter,
                                 xfile_configfile,
                                 xfile_map,
@@ -73,7 +75,13 @@ def relay_file_contents_to_ngst(file_uri,
     parent = os.getppid()
     pid = os.getpid()
 
-    xfile_cmd = xfile.bake('--config', xfile_configfile, '--delimiter', delimiter, '--map', xfile_map, '-s')    
+    if delimiter:
+        xfile_cmd = xfile.bake('--config', xfile_configfile, '--delimiter', delimiter, '--map', xfile_map, '-s')
+    elif data_format == DATA_FORMAT.JSON:
+        xfile_cmd = xfile.bake('--config', xfile_configfile, '--json', '--map', xfile_map, '-s')
+    else:
+        raise Exception('only csv and json formats are currently supported.')
+
     ngst_cmd = ngst.bake('--config', ngst_configfile, '--target', ngst_target)
 
     for line in ngst_cmd(xfile_cmd(gsutil('cp', file_uri, '-', _piped=True), _piped=True), _iter=True):
@@ -101,7 +109,7 @@ def main(args):
     data_format = args['--format']
     if data_format == DATA_FORMAT.CSV:
         if args.get('--xcfg') is not None and args.get('--d') is None:
-            print('### csv chosen as the data format, but no delimiter specified. Defaulting to comma.', file=sys.stderr)
+            print('### csv chosen as the data format, but no delimiter specified.', file=sys.stderr)
     elif data_format != DATA_FORMAT.JSON:
         print('!!! supported data formats are "csv" and "json".', file=sys.stderr)
         return
@@ -130,7 +138,7 @@ def main(args):
 
     ngst_config = args.get('--ncfg')
     ngst_target = args.get('--ntarget')
-    delimiter = args.get('--d', ',')
+    delimiter = args.get('--d')  # if no delimiter is supplied, we will assume JSON data
 
     if parallel_mode:
         for file_uri in list_bucket_files_for_table(tablename, bucket, directory, data_format):
@@ -152,7 +160,8 @@ def main(args):
                     print(e)
             else:
                 try:                    
-                    stream_args = (file_uri,        
+                    stream_args = (file_uri,
+                                   data_format,        
                                    delimiter,
                                    xfile_config,
                                    xfile_map,
@@ -183,6 +192,7 @@ def main(args):
                                                         channel_id)
                 else:
                     relay_file_contents_to_ngst(file_uri,
+                                                data_format,
                                                 delimiter,
                                                 xfile_config,                                            
                                                 xfile_map,
