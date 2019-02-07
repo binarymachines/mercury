@@ -54,6 +54,28 @@ class InvalidSupplierRecord(Exception):
         Exception.__init__(self, 'Incoming record is missing a value for its identifier field "%s"; cannot supply data.' % record_id_field_name)
 
 
+rx_var_placeholder = re.compile(r'\~[a-zA-Z\-_]+')
+lambda_template = 'lambda {vars}: {exp}'
+
+
+ExpansionTuple = namedtuple('ExpansionTuple', 'placeholder varname')
+
+def expand_lambda_template(raw_expression):    
+    #raise Exception('invalid format for predicate placeholder variable. Please check your command line.')    
+    lambda_vars = OrderedDict()
+    for match in rx_var_placeholder.finditer(raw_expression):        
+        placeholder = match.group()        
+        lambda_vars[placeholder]=placeholder[1:]        
+
+    expr = raw_expression    
+    for key, value in lambda_vars.items():
+        expr = expr.replace(key, value)
+
+    vars = [lambda_vars[k] for k in lambda_vars.keys()]
+    vars_string = ','.join(vars)
+    return lambda_template.format(vars=vars_string, exp=expr)
+
+
 
 class TextFieldConverter(object):
     def __init__(self, **kwargs):
@@ -107,7 +129,6 @@ class StringToIntConverter(TextFieldConverter):
         return int(src_string)
 
 
-
 class StringToFloatConverter(TextFieldConverter):
     def __init__(self, **kwargs):
         TextFieldConverter.__init__(self, **kwargs)
@@ -116,8 +137,7 @@ class StringToFloatConverter(TextFieldConverter):
     def _convert(self, src_string):
         return float(src_string)
 
-    
-    
+
 class RecordFormatConverter(object):
     def __init__(self, conversion_table={}, **kwargs):       
         self._conversion_tbl = conversion_table
@@ -191,6 +211,17 @@ class ConstValueResolver(object):
 
     def resolve(self, source_record):
         return self._value
+
+
+class LambdaResolver(object):
+    def __init__(self, expr, field_name):
+        self._expr = expr
+        self._field_name = field_name
+
+    def resolve(self, source_record):
+        lstring = expand_lambda_template(self._expr)
+        transform_func = eval(lstring)
+        return transform_func(source_record[self._field_name])
 
 
 class FieldValueMap(object):
@@ -408,6 +439,12 @@ class RecordTransformer(object):
         self.field_map[target_field_name] = ConstValueResolver(value)
 
 
+    def map_source_to_lambda(self, source_field_name, target_field_name, lambda_string):
+        if not target_field_name in self.target_record_fields:
+            raise NoSuchTargetField(target_field_name)
+        self.field_map[target_field_name] = LambdaResolver(lambda_string, source_field_name)
+
+
     def register_datasource(self, target_field_name, datasource):
         if not target_field_name in self.target_record_fields:
             raise Exception('No target field "%s" has been added to the transformer.' % target_field_name)
@@ -558,7 +595,17 @@ class RecordTransformerBuilder(object):
                                                                                datasource, 
                                                                                field_config['source'])
                 elif field_config['source'] == 'value':
+                    if 'value' not in field_config:
+                        raise Exception('a mapped field with source = value must set the "value" field.')
                     transformer.map_const_to_target_field(fieldname, field_config['value'])
+
+                elif field_config['source'] == 'lambda':
+                    source_fieldname = field_config.get('key', fieldname)
+                    lambda_string = field_config.get('expression')
+                    if not lambda_string:
+                        raise Exception('a mapped field with source = lambda must set the "expression" field.')                    
+                    transformer.map_source_to_lambda(source_fieldname, lambda_string)
+
                 else:
                     raise Exception('unrecognized source type "%s." Allowed types are record, lookup, and value.' % field_config['source'])                
 

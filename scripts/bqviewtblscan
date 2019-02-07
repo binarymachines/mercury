@@ -1,0 +1,127 @@
+#!/usr/bin/env python
+
+'''
+Usage:  
+    viewtblscan --source <schemafile> --name <table_name> [--quote=<quote_char>] [--ss=<schema> --ts=<schema>] [--tprefix=<prefix,tablename>]
+    viewtblscan --source <schemafile> --exportall --dir <export_dir> [--quote=<quote_char>] [--ss=<schema> --ts=<schema>] [--tprefix=<prefix,tablename>]
+    viewtblscan --source <schemafile> --list
+        
+
+Options: 
+    -p,--preview     : show (but do not execute) export command
+    -f,--file
+    -o,--output      : output the SQL for the named view-table 
+'''
+
+import os, sys
+import collections
+import json
+from snap import common
+import docopt
+import sh
+#from sh import bq  # Google Cloud CLI must already be installed
+
+BACKTICK_CHAR = '`'
+
+TablePrefixSetting = collections.namedtuple('TablePrefixSetting', 'prefix table')
+
+def transform_query(source_query, input_schema, output_schema, **kwargs):
+    quote_char = kwargs.get('quote')
+    prefix_setting = kwargs.get('prefix_setting')
+
+    query = source_query.replace(input_schema, output_schema)
+    if quote_char:
+        query = query.replace(BACKTICK_CHAR, quote_char)
+    
+    if prefix_setting:
+        new_tablename = prefix_setting.prefix + prefix_setting.table
+        query = query.replace(prefix_setting.table, new_tablename)
+
+    return query
+
+
+def read_transform_params(args_dict):
+    params = {}
+    if args_dict.get('--quote'):
+        params['quote'] = args['--quote']
+
+    if args_dict.get('--tprefix'):
+        prefix_str = args['--tprefix']
+        if not ',' in prefix_str:
+            raise Exception('The parameter --tprefix must contain the desired prefix and a table name, separated by a comma.')
+        prefix = prefix_str.split(',')[0].lstrip().rstrip()
+        table_name = prefix_str.split(',')[1].lstrip().rstrip()
+        params['prefix_setting'] = TablePrefixSetting(table=table_name, prefix=prefix)
+    
+    return params
+
+
+def main(args):
+    schema_filename = args['<schemafile>']    
+    preview_mode = False
+    if args.get('--preview'):
+        preview_mode = True
+        print('\n### running viewtblscan in preview mode.\n', file=sys.stderr)
+        
+    with open(schema_filename) as f:
+        json_schema = json.loads(f.read())
+
+    registry = {}
+    for table_cfg in json_schema['tables']:
+        name = table_cfg['table_name']
+        registry[name] = table_cfg 
+
+    if args.get('--list'):
+        print('\n'.join(registry.keys()))
+        return
+
+    transform_params = read_transform_params(args)
+    if args.get('--exportall'):
+        export_dir = args.get('<export_dir>', '')
+        for tablename in registry:
+            sql_filename = '%s.sql' % tablename.rstrip('_view')
+            export_path = os.path.join(os.getcwd(), export_dir, sql_filename)
+            if not registry[tablename].get('view_query'):
+                continue
+
+            with open(export_path, 'w') as f:
+                source_query = registry[tablename]['view_query']
+                target_query = source_query
+                if args.get('--ts'):
+                    src_schema = args['--ss']
+                    target_schema = args['--ts']
+                    target_query = transform_query(source_query,
+                                                   src_schema,
+                                                    target_schema,
+                                                    **transform_params)                
+                f.write(target_query)
+    else:   
+        table_name = args['<table_name>']
+        if not registry.get(table_name):
+            print('### no table "%s" found.' % (table_name), file=sys.stderr)
+
+        else:
+            source_query = registry[table_name].get('view_query', '')
+            if not source_query:
+                print('### no view query defined for table %s.' % table_name)
+                return
+
+            target_query = source_query            
+            if source_query and args.get('--ts'):
+                src_schema = args['--ss']
+                target_schema = args['--ts']
+                target_query = transform_query(source_query,
+                                               src_schema,
+                                               target_schema,
+                                               **transform_params)
+            print(target_query)
+
+    print('\n### exiting.', file=sys.stderr)
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)
+
+
+

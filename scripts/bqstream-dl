@@ -3,8 +3,8 @@
 '''
 Usage:  
     bqstream-dl --table <table> --bucket <bucket> --format=<fmt> [--dir=<directory>] --list
-    bqstream-dl [-p] --table <table> --bucket <bucket> --format=<fmt> [--dir=<directory>] [--d=<delimiter>] --xcfg=<xfile_cfg> --xmap=<xfile_map> --ncfg=<ngst_cfg> --ntarget=<ngst_target>
-    bqstream-dl [-p] --table <table> --bucket <bucket> --format=<fmt> [--dir=<directory>] --ncfg=<ngst_cfg> --ntarget=<ngst_target>
+    bqstream-dl [-p] --table <table> --bucket <bucket> --format=<fmt> [--dir=<directory>] [--d=<delimiter>] --xcfg=<xfile_cfg> --xmap=<xfile_map> --ncfg=<ngst_cfg> --ntarget=<ngst_target> [--nchannel=<channel>]
+    bqstream-dl [-p] --table <table> --bucket <bucket> --format=<fmt> [--dir=<directory>] --ncfg=<ngst_cfg> --ntarget=<ngst_target> [--nchannel=<channel>]
 
 Options: 
     -p,--parallel     : stream bucket contents in parallel        
@@ -43,7 +43,11 @@ def get_bucket_filecount_for_table(tablename, bucket_uri, directory, data_format
     return len(list_bucket_files_for_table(tablename, bucket_uri, directory, data_format))
 
 
-def stream_file_contents_direct_to_ngst(file_uri, ngst_configfile, ngst_target, mode):
+def stream_file_contents_direct_to_ngst(file_uri,
+                                        ngst_configfile,
+                                        ngst_target,
+                                        mode,
+                                        channel=None):
     module = __name__
     parent = os.getppid()
     pid = os.getpid()
@@ -57,7 +61,14 @@ def stream_file_contents_direct_to_ngst(file_uri, ngst_configfile, ngst_target, 
             print('[%s:%s (child_proc_%s)]: %s' % (module, parent, pid, line), file=sys.stderr)
 
 
-def relay_file_contents_to_ngst(file_uri, delimiter, xfile_configfile, xfile_map, ngst_configfile, ngst_target, mode):
+def relay_file_contents_to_ngst(file_uri,
+                                delimiter,
+                                xfile_configfile,
+                                xfile_map,
+                                ngst_configfile,
+                                ngst_target,
+                                mode,
+                                channel=None):
     module = __name__
     parent = os.getppid()
     pid = os.getpid()
@@ -123,13 +134,16 @@ def main(args):
 
     if parallel_mode:
         for file_uri in list_bucket_files_for_table(tablename, bucket, directory, data_format):
+            channel_id = args.get('--nchannel')  # can be null
             if xfile_bypass_mode:
-                try:
-                    p = mp.Process(target=stream_file_contents_direct_to_ngst,
-                                args=(file_uri,                                                                   
+                try:                    
+                    stream_args = (file_uri,
                                     ngst_config,
                                     ngst_target,
-                                    Mode.PARALLEL))
+                                    Mode.PARALLEL,
+                                    channel_id)
+                    p = mp.Process(target=stream_file_contents_direct_to_ngst,
+                                   args=stream_args)
                     p.start()
                     p.join()
                 except sh.ErrorReturnCode as e:
@@ -137,15 +151,18 @@ def main(args):
                 except Exception as e:
                     print(e)
             else:
-                try:
+                try:                    
+                    stream_args = (file_uri,        
+                                   delimiter,
+                                   xfile_config,
+                                   xfile_map,
+                                   ngst_config,
+                                   ngst_target,
+                                   Mode.PARALLEL,
+                                   channel_id)
+                    
                     p = mp.Process(target=relay_file_contents_to_ngst,
-                                args=(file_uri,        
-                                    delimiter,
-                                    xfile_config,
-                                    xfile_map,
-                                    ngst_config,
-                                    ngst_target,
-                                    Mode.PARALLEL))
+                                   args=stream_args)
                     p.start()
                     p.join()
                 except sh.ErrorReturnCode as e:
@@ -155,12 +172,15 @@ def main(args):
 
     else:
         for file_uri in list_bucket_files_for_table(tablename, bucket, directory, data_format):
+            channel_id = args.get('--nchannel')
             try:
-                if xfile_bypass_mode:          
+                if xfile_bypass_mode:
+                              
                     stream_file_contents_direct_to_ngst(file_uri,                                              
                                                         ngst_config,
                                                         ngst_target,
-                                                        Mode.SERIAL)
+                                                        Mode.SERIAL,
+                                                        channel_id)
                 else:
                     relay_file_contents_to_ngst(file_uri,
                                                 delimiter,
@@ -168,7 +188,8 @@ def main(args):
                                                 xfile_map,
                                                 ngst_config,
                                                 ngst_target,
-                                                Mode.SERIAL)
+                                                Mode.SERIAL,
+                                                channel_id)
             except sh.ErrorReturnCode as e:
                 print(e.stderr)                
             except Exception as e:
