@@ -37,8 +37,10 @@ class DataStore(object):
         for c in channels:
             self.write_channels.append(c)
         
+        # NOTE: may deprecate this
         self._selector_func = kwargs.get('channel_select_function')
-        if self._selector_func:
+
+        if len(self.write_channels):
             self.channel_mode = True            
             for channel_name in channels:
                 func_name = 'write_%s' % channel_name
