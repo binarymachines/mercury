@@ -606,7 +606,7 @@ class RecordTransformerBuilder(object):
                     lambda_string = field_config.get('expression')
                     if not lambda_string:
                         raise Exception('a mapped field with source = lambda must set the "expression" field.')                    
-                    transformer.map_source_to_lambda(source_fieldname, lambda_string)
+                    transformer.map_source_to_lambda(source_fieldname, fieldname, lambda_string)
 
                 else:
                     raise Exception('unrecognized source type "%s." Allowed types are record, lookup, and value.' % field_config['source'])                
