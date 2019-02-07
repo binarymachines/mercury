@@ -53,7 +53,12 @@ def stream_file_contents_direct_to_ngst(file_uri,
     parent = os.getppid()
     pid = os.getpid()
 
-    ngst_cmd = ngst.bake('--config', ngst_configfile, '--target', ngst_target)
+    if channel:
+        ngst_cmd = ngst.bake('--config', ngst_configfile, '--target', ngst_target, '--channel=%s' % channel)
+    else:
+        ngst_cmd = ngst.bake('--config', ngst_configfile, '--target', ngst_target)
+
+
 
     for line in ngst_cmd(gsutil('cp', file_uri, '-', _piped=True), _iter=True):
         if mode == Mode.SERIAL:
@@ -82,7 +87,10 @@ def relay_file_contents_to_ngst(file_uri,
     else:
         raise Exception('only csv and json formats are currently supported.')
 
-    ngst_cmd = ngst.bake('--config', ngst_configfile, '--target', ngst_target)
+    if channel:
+        ngst_cmd = ngst.bake('--config', ngst_configfile, '--target', ngst_target, '--channel=%s' % channel)
+    else:
+        ngst_cmd = ngst.bake('--config', ngst_configfile, '--target', ngst_target)
 
     for line in ngst_cmd(xfile_cmd(gsutil('cp', file_uri, '-', _piped=True), _piped=True), _iter=True):
         if mode == Mode.SERIAL:
