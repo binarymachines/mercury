@@ -2,6 +2,7 @@
 
 
 import sys
+import re
 import csv
 import json
 from snap import snap, common
