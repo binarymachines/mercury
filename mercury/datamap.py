@@ -5,6 +5,7 @@ import sys
 import re
 import csv
 import json
+from collections import namedtuple, OrderedDict
 from snap import snap, common
 import inspect
 import copy
