@@ -593,7 +593,7 @@ class RecordTransformerBuilder(object):
             default_transform_func = getattr(datasource, default_transform_funcname)
             transformer.set_default_transform(default_transform_func)
 
-        for field_config in self._transform_config['maps'][self._map_name]['fields']:
+        for field_config in self._transform_config['maps'][self._map_name].get('fields', []):
             for fieldname, field_config in field_config.items():
 
                 transformer.add_target_field(fieldname)
