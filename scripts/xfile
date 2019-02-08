@@ -113,7 +113,7 @@ def main(args):
         interactive_mode = True
     if args.get('--limit') == True:
         limit = int(args['<max_records>'])
-        print('### limit = %s' % limit)
+        print('### limit = %s' % limit, file=sys.stderr)
     if args.get('--list') == True:
         list_mode = True
     
