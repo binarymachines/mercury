@@ -226,13 +226,6 @@ class LambdaResolver(object):
         return transform_func(source_record.get(self._field_name, ''))
 
 
-class ResolverLoader(object):
-    def __init__(self, resolver_class_name):
-        self.resolver_class = common.load_class(resolver_class_name, __module__)
-
-    def resolve(self, source_record):
-
-
 class FieldValueMap(object):
     def __init__(self):
         self._resolvers = {}
