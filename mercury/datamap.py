@@ -516,7 +516,7 @@ class RecordTransformer(object):
 
     @decorators.processing_counter
     def transform(self, source_record, **kwargs):
-        if self.default_transform_func:
+        if self.default_transform_function:
             return self.default_transform_function(source_record)
 
         target_record = {}
