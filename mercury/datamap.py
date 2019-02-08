@@ -586,8 +586,9 @@ class RecordTransformerBuilder(object):
         default_transform_funcname = self._transform_config['maps'][self._map_name].get('default_transform')
         if default_transform_funcname:
             if not hasattr(datasource, default_transform_funcname):
-                raise Exception('default transform function "%s" designated, but not found in datasource %s.' 
-                                % (default_transform_funcname, datasource_name))
+                datasource_class_name = self._transform_config['sources'][datasource_name]['class']
+                raise Exception('default transform routine "%s" designated, but not found in datasource %s.' 
+                                % (default_transform_funcname, datasource_class_name))
 
             default_transform_func = getattr(datasource, default_transform_funcname)
             transformer.set_default_transform(default_transform_func)
