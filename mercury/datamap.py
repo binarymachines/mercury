@@ -593,7 +593,18 @@ class RecordTransformerBuilder(object):
             default_transform_func = getattr(datasource, default_transform_funcname)
             transformer.set_default_transform(default_transform_func)
 
-        for field_config in self._transform_config['maps'][self._map_name].get('fields', []):
+        output_fields = []
+        if not hasattr(self._transform_config['maps'][self._map_name], 'fields'):
+            transformer.set_csv_output_header(output_fields)
+            return transformer
+
+        for field_config in self._transform_config['maps'][self._map_name]['fields']:
+            for key, value in field_config.items():
+                output_fields.append(key)
+
+        transformer.set_csv_output_header(output_fields)
+
+        for field_config in self._transform_config['maps'][self._map_name]['fields']:
             for fieldname, field_config in field_config.items():
 
                 transformer.add_target_field(fieldname)
@@ -628,11 +639,13 @@ class RecordTransformerBuilder(object):
                 else:
                     raise Exception('unrecognized source type "%s." Allowed types are record, lookup, and value.' % field_config['source'])                
 
+        '''
         output_fields = []
         for field_config in self._transform_config['maps'][self._map_name]['fields']:
             for key, value in field_config.items():
                 output_fields.append(key)
         transformer.set_csv_output_header(output_fields)
+        '''
         return transformer
 
 
