@@ -226,6 +226,13 @@ class LambdaResolver(object):
         return transform_func(source_record.get(self._field_name, ''))
 
 
+class ResolverLoader(object):
+    def __init__(self, resolver_class_name):
+        self.resolver_class = common.load_class(resolver_class_name, __module__)
+
+    def resolve(self, source_record):
+
+
 class FieldValueMap(object):
     def __init__(self):
         self._resolvers = {}
@@ -372,6 +379,7 @@ class RecordTransformer(object):
         self.event_handlers = {}
         self.error_handlers = {}
         self.count_log = jrnl.CountLog()
+        self.default_transform_function = None
         
         # this stat will show zero unless the process() method is called.
         # We do not record time stats for individual calls to the transform() method;
@@ -421,6 +429,10 @@ class RecordTransformer(object):
 
     def set_csv_output_header(self, field_names):
         self.output_header = field_names
+
+
+    def set_default_transform(self, transform_func):
+        self.default_transform_function = transform_func
 
 
     def add_target_field(self, target_field_name):
@@ -511,6 +523,9 @@ class RecordTransformer(object):
 
     @decorators.processing_counter
     def transform(self, source_record, **kwargs):
+        if self.default_transform_func:
+            return self.default_transform_function(source_record)
+
         target_record = {}
         for key, value in kwargs.items():
             target_record[key] = value
@@ -521,7 +536,6 @@ class RecordTransformer(object):
             elif self.field_map.get(target_field_name):
                 source_field_resolver = self.field_map[target_field_name]
                 target_record[target_field_name] = source_field_resolver.resolve(source_record)
-        
         return target_record
 
 
@@ -575,6 +589,15 @@ class RecordTransformerBuilder(object):
         datasource_name = self._transform_config['maps'][self._map_name]['lookup_source']
         datasource = self.load_datasource(datasource_name, self._transform_config, so_registry)
         transformer = RecordTransformer()
+
+        default_transform_funcname = self._transform_config['maps'][self._map_name].get('default_transform')
+        if default_transform_funcname:
+            if not hasattr(datasource, default_transform_funcname):
+                raise Exception('default transform function "%s" designated, but not found in datasource %s.' 
+                                % (default_transform_funcname, datasource_name))
+
+            default_transform_func = getattr(datasource, default_transform_funcname)
+            transformer.set_default_transform(default_transform_func)
 
         for field_config in self._transform_config['maps'][self._map_name]['fields']:
             for fieldname, field_config in field_config.items():

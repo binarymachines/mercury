@@ -192,7 +192,6 @@ def main(args):
             channel_id = args.get('--nchannel')
             try:
                 if xfile_bypass_mode:
-                              
                     stream_file_contents_direct_to_ngst(file_uri,                                              
                                                         ngst_config,
                                                         ngst_target,
