@@ -149,7 +149,8 @@ def main(args):
                                                filename=datafile,
                                                limit=limit)
 
-        for input_record in rec_source.records():     
+        for input_record in rec_source.records():    
+            print('### receiving record: %s' % input_record) 
             output_record = xformer.transform(input_record)
             print(json.dumps(output_record))
 

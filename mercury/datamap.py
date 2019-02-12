@@ -223,7 +223,7 @@ class LambdaResolver(object):
     def resolve(self, source_record):
         lstring = expand_lambda_template(self._expr)
         transform_func = eval(lstring)
-        return transform_func(source_record.get(self._field_name, ''))
+        return transform_func(source_record.get(self._field_name))
 
 
 class FieldValueMap(object):
