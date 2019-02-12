@@ -521,6 +521,7 @@ class RecordTransformer(object):
             return self.default_transform_function(source_record)
 
         print('### using configured transform.')
+        print('### this transformer has %d fields.' % len(self.target_record_fields))
         target_record = {}
         for key, value in kwargs.items():
             target_record[key] = value
