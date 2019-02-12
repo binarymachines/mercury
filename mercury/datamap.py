@@ -517,8 +517,10 @@ class RecordTransformer(object):
     @decorators.processing_counter
     def transform(self, source_record, **kwargs):
         if self.default_transform_function:
+            print('### default transform found.')
             return self.default_transform_function(source_record)
 
+        print('### using configured transform.')
         target_record = {}
         for key, value in kwargs.items():
             target_record[key] = value
