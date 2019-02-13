@@ -43,8 +43,7 @@ class TransformProcessor(dmap.DataProcessor):
 
 
     def _process(self, data_dict):        
-        output = self._transformer.transform(data_dict)
-        #print(common.jsonpretty(output))
+        output = self._transformer.transform(data_dict)        
         return output
 
 
@@ -149,8 +148,7 @@ def main(args):
                                                filename=datafile,
                                                limit=limit)
 
-        for input_record in rec_source.records():    
-            print('### receiving record: %s' % input_record) 
+        for input_record in rec_source.records():                
             output_record = xformer.transform(input_record)
             print(json.dumps(output_record))
 
