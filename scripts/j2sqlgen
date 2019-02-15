@@ -311,7 +311,7 @@ def main(args):
         tablespec = create_tablespec_from_json_config(table_name,
                                                       tablecfg,
                                                       project_schema,
-                                                      table_creation_context
+                                                      table_creation_context,
                                                       dbschema=db_schema)
 
         print(generate_sql(tablespec, table_creation_context))
