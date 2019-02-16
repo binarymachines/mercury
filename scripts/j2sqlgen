@@ -232,19 +232,16 @@ def create_tablespec_from_json_config(tablename, json_config, default_schema, cr
     target_tablename = creation_context.get_mapped_table_name(source_tablename)
     dbschema = kwargs.get('dbschema', default_schema)
 
-    tspec = TableSpec(source_tablename, json_config.get('schema_name', dbschema))
-    for column_config in json_config['columns']:
-        source_column_name = column_config['column_name']
-        #target_column_name = creation_context.get_target_column_name(source_column_name)
-        source_column_type = column_config['column_type']
-        #column_name = column_config['column_name']
-        '''
-        column_type = creation_context.get_target_column_type(source_tablename,
-                                                              source_column_name,
-                                                              column_config['column_type'])
-        '''
-        settings = {}
+    #f dbschema:
+    tspec = TableSpec(source_tablename, dbschema)
+    #else:
+    #    tspec = TableSpec(source_tablename, json_config.get('schema_name', 'public'))
 
+    for column_config in json_config['columns']:
+        source_column_name = column_config['column_name']        
+        source_column_type = column_config['column_type']
+
+        settings = {}
         if is_string_type(column_config['column_type']):
             settings['length'] = creation_context.get_varchar_length(source_tablename, source_column_name)
 
@@ -297,7 +294,7 @@ def main(args):
         print('\n'.join(tablenames))
         return
 
-    db_schema = 'public'
+    db_schema = None
     if args.get('--schema'):
         db_schema = args['<db_schema>']
     table_creation_context = TableCreationContext(yaml_config)    
