@@ -2,8 +2,8 @@
 
 '''
      Usage:  
-        j2sqlgen --config <configfile> --source <schemafile> [--schema <db_schema>] --table <tablename>
-        j2sqlgen --config <configfile> --source <schemafile> [--schema <db_schema>] --tables <comma_delim_tbl_list>
+        j2sqlgen --config <configfile> --source <schemafile> [(--schema <db_schema>)] --table <tablename>
+        j2sqlgen --config <configfile> --source <schemafile> [(--schema <db_schema>)] --tables <comma_delim_tbl_list>
         j2sqlgen --config <configfile> --source <schemafile> --list_tables
 
 '''
