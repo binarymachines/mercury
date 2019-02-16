@@ -1,0 +1,81 @@
+#!/usr/bin/env python
+
+'''
+Usage:  
+    viewtblcreate --target_schema <target_schema> --tablename <table> --sqlfile=<sql_file> [--nlstrip] [--params=<n:v>...]
+    viewtblcreate --target_schema <target_schema> --tablename <table> [--nlstrip] [--params=<n:v>...]
+
+'''
+
+import os, sys
+import collections
+import json
+from snap import common
+import docopt
+import jinja2
+
+PARAM_DELIMITER = ':'
+PARAM_TOKEN_DELIMITER = ','
+
+CREATE_TABLE_TEMPLATE = '''
+CREATE TABLE {{target_schema}}.{{table}}
+AS ({{query}})
+'''
+
+def read_params_from_args(arg_dict):
+    params = {}
+    if not arg_dict.get('--params'):
+        return params
+
+    param_string = args['--params'][0]
+    param_tokens = [pstring.lstrip().rstrip() for pstring in param_string.split(PARAM_TOKEN_DELIMITER)]
+    for token in param_tokens:
+        if PARAM_DELIMITER not in token:
+            raise Exception('the optional --params string must be in the form of name1:value1,...nameN:valueN')
+        name = token.split(PARAM_DELIMITER)[0].lstrip().rstrip()
+        value = token.split(PARAM_DELIMITER)[1].lstrip().rstrip()
+        params[name] = value
+        
+    return params
+
+
+def render_query_template(template_filename, target_schema, tablename, **kwargs):
+    j2env = jinja2.Environment()
+    template_mgr = common.JinjaTemplateManager(j2env)        
+
+    template_string = None
+    with open(template_filename) as f:
+        template_string = f.read()
+
+    inner_template = j2env.from_string(template_string)
+    inner_query = inner_template.render(kwargs)
+
+    outer_template = j2env.from_string(CREATE_TABLE_TEMPLATE)
+    return outer_template.render(table=tablename, query=inner_query, target_schema=target_schema)
+
+
+def main(args):
+    template_params = read_params_from_args(args)
+    tablename = args['<table>']
+    target_schema = args['<target_schema>']
+    #configfile = args['<configfile>']
+    #yaml_config = common.read_config_file(configfile)
+    #services = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
+
+    #print(common.jsonpretty(args))
+    #print(common.jsonpretty(template_params))
+
+    if args.get('--sqlfile'):
+        sql_file = args['--sqlfile']
+        output_query = render_query_template(sql_file, target_schema, tablename, **template_params)
+
+        if args.get('--nlstrip'):
+            print(output_query.replace('\n', ' '))
+        else:
+            print(output_query) 
+    
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)
+
