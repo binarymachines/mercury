@@ -6,7 +6,6 @@ class UnregisteredTestContextException(Exception):
         Exception.__init__(self, 'No TestContext has been registered under the scenario name "%s".' % scenario_name)
 
 
-
 class TestContext(object):
     def __init__(self, name, **kwargs):
         self._name = name
@@ -14,7 +13,6 @@ class TestContext(object):
         #for name, value in kwargs.iteritems():
         #    self.__dict__.update((name, value))
 
-    
 
 class TestEnvironment(object):
     def __init__(self, **kwargs):

@@ -1,0 +1,32 @@
+
+# 
+# YAML init file for SNAP microservice framework
+#
+#
+
+
+globals:
+        project_home:                $G_HOME
+        service_module:              grailed_services 
+        datastore_module:            grailed_datastores
+
+
+service_objects:
+
+
+datastores:
+    file:
+      channel_selector_function: detect_channel
+      channels:
+        - a
+        - b
+      class: FileStore
+      init_params:
+        - name: filename
+          value: output.json
+    
+
+ingest_targets:
+    textfile:
+        datastore: file
+        checkpoint_interval: 10
