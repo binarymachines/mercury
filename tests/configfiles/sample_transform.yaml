@@ -1,0 +1,72 @@
+globals:
+  project_home: $MERCURY_HOME
+  datasource_module: datasources
+  service_module: test_services
+
+
+service_objects:
+
+      
+sources:
+  test_src:
+    class: SampleDatasource
+
+  nonexistent_src: 
+    class: NoDataSource
+
+maps:
+  test_map:
+        lookup_source: test_src
+        settings:
+            - name: use_default_identity_transform
+              value: True
+
+        fields:            
+            - COLOR:
+            - SKU:
+            - ID:
+            - COUNT:
+            - PRICE:
+            - widget_name:
+                source: record
+                key: NAME | ALIAS
+            - widget_composite_id:
+                source: lookup
+
+            
+  bad_map:
+        lookup_source: test_src
+        settings:
+            - name: use_default_identity_transform
+              value: True
+
+        fields:
+            - NAME:
+            - COLOR:
+            - SKU:
+            - ID:
+            - COUNT:
+            - PRICE:
+            - widget_name:
+                source: record
+                key: NAME | ALIAS
+            - foo:
+                source: lookup
+
+  missing_datasource_map:
+        lookup_source: nonexistent_src
+        settings:
+            - name: use_default_identity_transform
+              value: True
+
+        fields:
+            - NAME:
+            - COLOR:
+            - SKU:
+            - ID:
+            - COUNT:
+            - PRICE:
+            - widget_name:
+                source: record
+                key: NAME | ALIAS
+            

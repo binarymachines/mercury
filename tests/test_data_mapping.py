@@ -15,7 +15,7 @@ from teamcity.unittestpy import TeamcityTestRunner
 
 
 LOG_ID = 'test_data_mapping'
-TRANSFORM_YAML_FILE = 'data/sample_transform.yaml'
+TRANSFORM_YAML_FILE = 'tests/configfiles/sample_transform.yaml'
 SCHEMA_FILE = 'data/sample_schema.yaml'
 
 # this name must exist in the transform yaml file as a direct child of the 'sources' tag
@@ -39,8 +39,7 @@ class RecordTransform(unittest.TestCase):
         self.nonexistent_datasource_name = 'NoDatasource'
 
         self.builder = dmap.RecordTransformerBuilder(self.yaml_initfile_path,
-                                                     map_name=VALID_MAP_NAME,
-                                                     datasource=self.good_datasource_name)
+                                                     map_name=VALID_MAP_NAME)
         self.transformer = self.builder.build()
 
 
@@ -50,7 +49,12 @@ class RecordTransform(unittest.TestCase):
 
 
     def test_record_transform_creates_record_with_designated_fields(self):
-        designated_fields = self.builder.config['maps'][VALID_MAP_NAME]['fields'].keys()
+        fields = self.builder.config['maps'][VALID_MAP_NAME]['fields']
+        designated_fields = []
+        for f in fields:
+            for key, value in f.items():
+                designated_fields.append(key)
+    
         source_record = {'NAME': 'foo',
                          'COLOR': 'blue',
                          'SKU': 'foo_sku_242',
@@ -59,7 +63,9 @@ class RecordTransform(unittest.TestCase):
                          'PRICE': 5.40 }
         target_record = self.transformer.transform(source_record)
         self.log.debug(target_record)
-        self.assertSetEqual(set(designated_fields), self.transformer.target_record_fields)
+                
+        for dfield in designated_fields:
+            self.assertIn(dfield, self.transformer.target_record_fields)
 
 
     def test_record_transform_invokes_correct_lookup_method_on_datasource(self):
@@ -77,7 +83,7 @@ class RecordTransform(unittest.TestCase):
                          'SKU': '123.456.789',
                          'ID': 22}
 
-        with self.assertRaises(dmap.NoSuchLookupMethodException) as context:
+        with self.assertRaises(dmap.NoSuchLookupMethod) as context:
             tfmr = dmap.RecordTransformerBuilder(self.yaml_initfile_path,
                                                  map_name=INVALID_MAP_NAME).build()
 
@@ -94,12 +100,12 @@ class RecordTransform(unittest.TestCase):
                          'ID': 22}
 
         target_record = self.transformer.transform(source_record)
-        self.assertEquals(target_record.get('widget_name'), source_record['ALIAS'])
+        self.assertEqual(target_record.get('widget_name'), source_record['ALIAS'])
 
 
     def test_record_transformer_builder_throws_exception_on_missing_datasource(self):
 
-        with self.assertRaises(dmap.NonexistentDatasourceException) as context:
+        with self.assertRaises(dmap.NonexistentDatasource) as context:
             tfmr = dmap.RecordTransformerBuilder(self.yaml_initfile_path,
                                                  map_name='missing_datasource_map').build()
 

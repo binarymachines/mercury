@@ -199,7 +199,7 @@ class RecordFieldNameMapper(object):
 
 class FieldValueResolver(object):
     def __init__(self, field_name_string):
-        self._field_names = field_name_string.split('|')
+        self._field_names = [fname.lstrip().rstrip() for fname in field_name_string.split('|')]
 
     def resolve(self, source_record):
         for name in self._field_names:
@@ -507,8 +507,9 @@ class RecordTransformer(object):
         else:
             lookup_function_name = 'lookup_%s' % target_field_name
 
-        if not hasattr(datasource, lookup_function_name):            
-            raise Exception('The datasource %s has no lookup function "%s(...)". Please check your config file.' % (datasource.__class__.__name__, lookup_function_name))
+        if not hasattr(datasource, lookup_function_name):  
+            raise NoSuchLookupMethod(datasource.__class__.__name__, lookup_function_name)          
+            #raise Exception('The datasource %s has no lookup function "%s(...)". Please check your config file.' % (datasource.__class__.__name__, lookup_function_name))
 
         lookup_function = getattr(datasource, lookup_function_name)
         return lookup_function(target_field_name, source_record, self.value_map)
@@ -570,6 +571,19 @@ class RecordTransformerBuilder(object):
     def load_datasource(self, src_name, transform_config, service_object_registry):
         src_module_name = self._transform_config['globals']['datasource_module']
         datasource_class_name = self._transform_config['sources'][src_name]['class']
+
+        module_path_tokens = src_module_name.split('.')
+        module = None
+        if len(module_path_tokens) == 1:
+            module = __import__(module_path_tokens[0])            
+        else:
+            module = __import__(src_module_name)
+            for index in range(1, len(module_path_tokens)):        
+                module = getattr(module, module_path_tokens[index])
+
+        if not hasattr(module, datasource_class_name):
+            raise NonexistentDatasource(datasource_class_name, src_module_name)
+
         klass = common.load_class(datasource_class_name, src_module_name)                
         return klass(service_object_registry)
 
@@ -751,7 +765,7 @@ class DataSupplier(object):
 
     def supply(self, field_name, record):        
         if field_name == self._record_id_field:
-            raise InvalidSupplierRequestException(field_name)
+            raise InvalidSupplierRequest(field_name)
 
         # record_id = record.get(self._record_id_field)
         # if record_id is None or record_id == '':
@@ -773,7 +787,7 @@ class DataSupplier(object):
             return result
 
         else:
-            raise MissingSupplierMethodException(self.__class__.__name__, supply_function_name)
+            raise MissingSupplierMethod(self.__class__.__name__, supply_function_name)
 
 
 
@@ -789,7 +803,7 @@ class LookupDatasource(object):
     def lookup(self, target_field_name, source_record, field_value_map):
         lookup_method_name = 'lookup_%s' % target_field_name
         if not hasattr(self, lookup_method_name):
-            raise NoSuchLookupMethodException(self.__class__.__name, lookup_method_name)
+            raise NoSuchLookupMethod(self.__class__.__name, lookup_method_name)
         lookup_method = getattr(self, lookup_method_name)
         return lookup_method(target_field_name, source_record, field_value_map)            
 

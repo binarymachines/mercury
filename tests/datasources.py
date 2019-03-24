@@ -4,13 +4,13 @@
 
 
 class BadDatasource(object):
-    def __init__(self, **kwargs):
+    def __init__(self, service_object_registry):
         pass
 
 
 
 class SampleDatasource(object):
-    def __init__(self, **kwargs):
+    def __init__(self, service_object_registry):
         self.called_composite_id_func = False
 
 
