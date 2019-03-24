@@ -32,8 +32,30 @@ maps:
                 key: NAME | ALIAS
             - widget_composite_id:
                 source: lookup
+  
 
-            
+  lambda_map:
+        lookup_source: test_src
+        settings:
+            - name: use_default_identity_transform
+              value: True
+
+        fields:            
+            - COLOR:
+            - SKU:
+            - ID:
+            - COUNT:
+            - PRICE:
+            - widget_name:
+                source: record
+                key: NAME | ALIAS
+            - widget_composite_id:
+                source: lookup
+            - in_stock:
+                source: lambda
+                expression: 'True if ~x > 0 else False'
+                key: COUNT
+
   bad_map:
         lookup_source: test_src
         settings:

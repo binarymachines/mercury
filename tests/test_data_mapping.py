@@ -59,7 +59,7 @@ class RecordTransform(unittest.TestCase):
                          'COLOR': 'blue',
                          'SKU': 'foo_sku_242',
                          'ID': 22,
-                         'COUNT': 'abc',
+                         'COUNT': 9,
                          'PRICE': 5.40 }
         target_record = self.transformer.transform(source_record)
         self.log.debug(target_record)
@@ -89,6 +89,20 @@ class RecordTransform(unittest.TestCase):
 
             target_record = tfmr.transform(source_record)
 
+
+    def test_record_transform_resolves_record_value_using_lambda(self):
+        source_record = {'ALIAS': 'foo',
+                         'COLOR': 'blue',
+                         'SKU': '123.456.789',
+                         'COUNT': 0,
+                         'ID': 22}
+
+        builder = dmap.RecordTransformerBuilder(self.yaml_initfile_path,
+                                                           map_name='lambda_map')
+
+        lambda_transformer = builder.build()
+        target_record = lambda_transformer.transform(source_record)
+        self.assertFalse(target_record['in_stock'])
 
 
     def test_record_transform_resolves_record_key_using_or_syntax(self):

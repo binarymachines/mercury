@@ -216,14 +216,14 @@ class ConstValueResolver(object):
 
 
 class LambdaResolver(object):
-    def __init__(self, expr, field_name):
+    def __init__(self, expr, source_field_name):
         self._expr = expr
-        self._field_name = field_name
+        self._source_field_name = source_field_name
 
     def resolve(self, source_record):
         lstring = expand_lambda_template(self._expr)
         transform_func = eval(lstring)
-        return transform_func(source_record.get(self._field_name))
+        return transform_func(source_record.get(self._source_field_name))
 
 
 class FieldValueMap(object):
