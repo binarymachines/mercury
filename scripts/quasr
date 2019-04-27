@@ -102,12 +102,26 @@ class QaJobRunner(object):
         return output_values
 
 
-    def _load_template(self, template_name):
-        # this is not really loading a class -- the underlying logic just pulls the named
-        # attribute of the loaded Python module using getattr(). 
-        # TODO: create a load_module_object() method, so as not to mislead
-        return common.load_class(template_name, self.config['globals']['template_module'])
-    
+    def _load_template(self, template_name):        
+        if template_name.startswith('(') and template_name.endswith(')'):
+            # a template name in parentheses means that the template itself 
+            # is in the config file
+            template_name = template_name.lstrip('(').rstrip(')')
+            if not self.config.get('templates'):
+                raise Exception('bad internal template ref: the configfile has no "templates" section.')
+            if not self.config['templates'].get(template_name):
+                raise Exception('no template registered under the alias "%s" in the "templates" config section.'
+                                % template_name)
+            return self.config['templates'][template_name]
+        else:
+            # otherwise the template is in the module referenced in the 
+            # globals section as template_module
+            
+            # this is not really loading a class -- the underlying logic just pulls the named
+            # attribute of the loaded Python module using getattr(). 
+            # TODO: create a load_module_object() method, so as not to mislead
+            return common.load_class(template_name, self.config['globals']['template_module'])
+        
 
     def _lookup_node(self, job_name):
         node = self.qa_nodes.get(job_name)
