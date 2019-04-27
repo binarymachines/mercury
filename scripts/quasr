@@ -2,19 +2,27 @@
 
 '''
 Usage:
-    quasr --config <configfile> --job <jobname>
+    quasr --config <configfile> --job <jobname> [--params=<n:v>...]
     quasr --config <configfile> --jobs
 '''
 
 # QUASR: Quality Assurance SQL Runner
 
 import os, sys
+import re
 import docopt
 from collections import namedtuple
 from snap import snap, common
 
-Slot = namedtuple('Slot', 'name datatype')
 
+PARAM_DELIMITER = ':'
+PARAM_TOKEN_DELIMITER = ','
+
+integer_rx = re.compile(r'^[0-9]+$')
+float_rx = re.compile(r'^[0-9]*.[0-9]+$')
+
+
+Slot = namedtuple('Slot', 'name datatype')
 
 class QaSqlNode(object):
     def __init__(self, query_template):
@@ -145,8 +153,22 @@ class QaJobRunner(object):
             output_builder_func = common.load_class(output_builder_func_name, self.config['globals']['qa_logic_module'])
             raw_outputs =  output_builder_func(query_executor(query, self.service_registry, **kwargs))
             return raw_outputs
-                
-        
+
+
+def read_params_from_args(arg_dict):
+    params = {}
+    if not arg_dict.get('--params'):
+        return params
+
+    param_string = args['--params'][0]
+    param_tokens = [pstring.lstrip().rstrip() for pstring in param_string.split(PARAM_TOKEN_DELIMITER)]
+    for token in param_tokens:
+        if PARAM_DELIMITER not in token:
+            raise Exception('the optional --params string must be in the form of name1:value1,...nameN:valueN')
+        name = token.split(PARAM_DELIMITER)[0].lstrip().rstrip()
+        value = token.split(PARAM_DELIMITER)[1].lstrip().rstrip()
+        params[name] = value
+    return params
 
 
 def main(args):
@@ -165,7 +187,8 @@ def main(args):
         jobname = args['<jobname>']
         print(job_runner.get_sql_template(jobname))
         print(job_runner.inputs(jobname))
-        print(job_runner.run(jobname, data_drop_schema='c3_qdm_v4'))
+        job_params = read_params_from_args(args)
+        print(job_runner.run(jobname, **job_params))
         return
 
 
