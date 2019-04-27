@@ -20,7 +20,16 @@ PARAM_TOKEN_DELIMITER = ','
 
 integer_rx = re.compile(r'^[0-9]+$')
 float_rx = re.compile(r'^[0-9]*.[0-9]+$')
+string_rx = re.compile(r'^[a-zA-Z0-9_]+$')
 
+
+TypeFormat = namedtuple('TypeFormat', 'class_object regex')
+
+type_formats = {
+    'str': TypeFormat(class_object=str, regex=string_rx),
+    'float': TypeFormat(class_object=float, regex=float_rx),
+    'int': TypeFormat(class_object=int, regex=integer_rx)
+}
 
 Slot = namedtuple('Slot', 'name datatype')
 
@@ -54,20 +63,7 @@ class QaSqlNode(object):
         kwreader = common.KeywordArgReader(*self.input_slots.keys())
         kwreader.read(**kwargs)
         self.validate_input_types(**kwargs)
-
         return self.sql_template.format(**kwargs)
-
-
-    def generate_outputs(self, record_generator, **kwargs):
-        '''return a dictionary of name/value pairs matching 
-        the registered output_slot names and types. 
-        Implement in subclass.'''
-        pass
-
-
-class QaSqlNodeBuilder(object):
-    def __init__(self):
-        pass
 
 
 class QaJobRunner(object):
@@ -133,6 +129,27 @@ class QaJobRunner(object):
         return result
 
 
+    def convert_input_params(self, job_name, **kwargs):
+        node = self._lookup_node(job_name)
+        job_params = {}
+        slots = node.input_slots
+        for param_name, param in kwargs.items():
+            input_slot = slots.get(param_name)
+            if not input_slot:
+                raise Exception('no input slot registered with name "%s".' % param_name)
+            
+            type_format = type_formats.get(input_slot.datatype)
+            if not type_format:
+                raise Exception('input datatype "%s" is not supported.' % input_slot.datatype)
+            
+            if not type_format.regex.match(param):
+                raise Exception('the format of input param "%s" (value: "%s") does not match type %s.'
+                                % (param_name, param, input_slot.datatype))
+
+            job_params[param_name] = type_format.class_object(param)
+
+        return job_params
+
     def run(self, job_name, preview_mode=False, **kwargs):
         # execute query -- must return record generator
         # call job node's generate_outputs() method and pass in generator
@@ -172,13 +189,20 @@ def read_params_from_args(arg_dict):
 
 
 def main(args):
-    print(common.jsonpretty(args))
-
     configfile = args['<configfile>']
     yaml_config = common.read_config_file(configfile)
 
-    if args['--jobs']:        
-        print('\n'.join([job for job in yaml_config['jobs']]))
+    if args['--jobs']:
+        jobs = []
+        for job in yaml_config['jobs']:
+            input_params = yaml_config['jobs'][job]['inputs']
+            output_params = yaml_config['jobs'][job]['outputs']
+            jobs.append({
+                'name': job,
+                'inputs': input_params,
+                'outputs': output_params
+            })
+        print(common.jsonpretty(jobs))
         return
 
     job_runner = QaJobRunner(yaml_config)
@@ -187,7 +211,9 @@ def main(args):
         jobname = args['<jobname>']
         print(job_runner.get_sql_template(jobname))
         print(job_runner.inputs(jobname))
-        job_params = read_params_from_args(args)
+        input_params = read_params_from_args(args)
+
+        job_params = job_runner.convert_input_params(jobname, **input_params)
         print(job_runner.run(jobname, **job_params))
         return
 
