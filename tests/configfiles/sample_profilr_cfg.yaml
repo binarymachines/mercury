@@ -1,0 +1,45 @@
+globals:
+  project_home: $EOS_HOME
+  profiler_module: eos_profilers
+  service_module: eos_services
+
+profilers:
+  fillrate:
+    class: FillRateProfiler
+
+datasets:
+  fstat:
+    profiler: fillrate
+    settings:
+    tablename: functionalstatusperformed
+    columns:
+      - AssessmentDate
+      - AssessmentName_Code
+      - AssessmentName_CodeLabel
+      - AssessmentName_VocabularyID
+      - AssessmentValue_CodeLabel
+      - AssessmentValue_Code
+      - AssessmentValueNumeric
+      - AssessmentValue_VocabularyID
+      - Source
+      - Method
+
+  diagnosisactive:
+    profiler: fillrate
+    settings:
+    tablename: diagnosisactive 
+    columns:
+      - diagnosiscode_code
+      - diagnosiscode_codelabel
+      - diagnosiscode_vocabularyid
+      - diagnosisdate
+      - diagnosistype_code
+      - diagnosistype_codelabel
+      - diagnosistype_vocabularyid
+      - method
+      - patientbestrecordid
+      - periodend
+      - periodstart
+
+    null_equivalents:
+

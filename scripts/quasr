@@ -1,0 +1,175 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    quasr --config <configfile> --job <jobname>
+    quasr --config <configfile> --jobs
+'''
+
+# QUASR: Quality Assurance SQL Runner
+
+import os, sys
+import docopt
+from collections import namedtuple
+from snap import snap, common
+
+Slot = namedtuple('Slot', 'name datatype')
+
+
+class QaSqlNode(object):
+    def __init__(self, query_template):
+        self.sql_template = query_template
+        self.input_slots = {}
+        self.output_slots = {}
+
+
+    def add_input_slot(self, name, classname):
+        self.input_slots[name] = Slot(name, classname)
+
+
+    def add_output_slot(self, name, classname):
+        self.output_slots[name] = Slot(name, classname)
+
+
+    def validate_input_types(self, **kwargs):
+        for name, value in kwargs.items():
+            input_slot = self.input_slots.get(name)
+            if not input_slot:
+                raise Exception('No input slot "%s" registered with this QA node.')
+
+            if value.__class__.__name__ != input_slot.datatype:
+                raise Exception('The input parameter "%s" does not match the registered slot type "%s".' 
+                                % (name, input_slot.datatype))
+
+
+    def generate_query(self, **kwargs):
+        kwreader = common.KeywordArgReader(*self.input_slots.keys())
+        kwreader.read(**kwargs)
+        self.validate_input_types(**kwargs)
+
+        return self.sql_template.format(**kwargs)
+
+
+    def generate_outputs(self, record_generator, **kwargs):
+        '''return a dictionary of name/value pairs matching 
+        the registered output_slot names and types. 
+        Implement in subclass.'''
+        pass
+
+
+class QaSqlNodeBuilder(object):
+    def __init__(self):
+        pass
+
+
+class QaJobRunner(object):
+    def __init__(self, yaml_config):
+        self.qa_nodes = {}
+        self.config = yaml_config
+        self.service_registry = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
+        
+        job_config_group = yaml_config['jobs']
+        for nodename in job_config_group:
+            template = self._load_template(job_config_group[nodename]['sql_template'])
+            inputs =  self._load_input_values(job_config_group[nodename]['inputs'])
+            outputs = self._load_output_values(job_config_group[nodename]['outputs'])
+            node = QaSqlNode(template)
+
+            for input in inputs:                
+                node.add_input_slot(input['name'], input['type'])
+
+            for output in outputs:                
+                node.add_output_slot(output['name'], output['type'])
+
+            self.qa_nodes[nodename] = node
+
+
+    def _load_input_values(self, dict_array):
+        input_values = []
+        for input in dict_array:
+            input_values.append({'name': input['name'], 'type': input['type']})
+        return input_values
+
+
+    def _load_output_values(self, dict_array):
+        output_values = []
+        for output in dict_array:
+             output_values.append({'name': output['name'], 'type': output['type']})
+        return output_values
+
+
+    def _load_template(self, template_name):
+        # this is not really loading a class -- the underlying logic just pulls the named
+        # attribute of the loaded Python module using getattr(). 
+        # TODO: create a load_module_object() method, so as not to mislead
+        return common.load_class(template_name, self.config['globals']['template_module'])
+    
+
+    def _lookup_node(self, job_name):
+        node = self.qa_nodes.get(job_name)
+        if not node:
+            raise Exception('no job registered under alias "%s".' % job_name)
+        return node
+
+
+    def get_sql_template(self, job_name):
+        node = self._lookup_node(job_name)        
+        return node.sql_template
+
+
+    def inputs(self, job_name):
+        node = self._lookup_node(job_name)
+        result = {}
+        for name, slot in node.input_slots.items():
+            result[name] = slot.datatype
+        return result
+
+
+    def run(self, job_name, preview_mode=False, **kwargs):
+        # execute query -- must return record generator
+        # call job node's generate_outputs() method and pass in generator
+        # if there is an analyzer attached to this job, pass it the outputs
+        # return the raw and analyzed outputs
+        node = self._lookup_node(job_name)
+        query = node.generate_query(**kwargs)
+        if preview_mode:
+            print(query)
+        else:
+            job_config_group = self.config['jobs']
+            exec_func_name = job_config_group[job_name]['executor_function']
+            output_builder_func_name = job_config_group[job_name]['builder_function']
+            # this is not a class being loaded, but a pythonic generator function
+            query_executor = common.load_class(exec_func_name,  self.config['globals']['qa_logic_module'])
+
+            # load the function which builds outputs from the query results
+            output_builder_func = common.load_class(output_builder_func_name, self.config['globals']['qa_logic_module'])
+            raw_outputs =  output_builder_func(query_executor(query, self.service_registry, **kwargs))
+            return raw_outputs
+                
+        
+
+
+def main(args):
+    print(common.jsonpretty(args))
+
+    configfile = args['<configfile>']
+    yaml_config = common.read_config_file(configfile)
+
+    if args['--jobs']:        
+        print('\n'.join([job for job in yaml_config['jobs']]))
+        return
+
+    job_runner = QaJobRunner(yaml_config)
+
+    if args['--job']:
+        jobname = args['<jobname>']
+        print(job_runner.get_sql_template(jobname))
+        print(job_runner.inputs(jobname))
+        print(job_runner.run(jobname, data_drop_schema='c3_qdm_v4'))
+        return
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)
+

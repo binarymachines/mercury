@@ -43,7 +43,6 @@ class RecordTransform(unittest.TestCase):
         self.transformer = self.builder.build()
 
 
-
     def tearDown(self):
         pass
 
