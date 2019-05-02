@@ -2,13 +2,19 @@
 
 '''
 Usage:
-    quasr --config <configfile> --job <jobname> [--params=<n:v>...]
-    quasr --config <configfile> --jobs
+    quasr [-p] --config <configfile> --job <jobname> [--params=<name:value>...]
+    quasr [-p] --config <configfile> --jobs [--file <filename>]
+    quasr --config <configfile> --list [-v]
+
+Options:
+    -p --preview      preview mode
+    -v --verbose      verbose job listing
 '''
 
 # QUASR: Quality Assurance SQL Runner
 
 import os, sys
+import json
 import re
 import docopt
 from collections import namedtuple
@@ -49,6 +55,10 @@ class QaSqlNode(object):
 
 
     def validate_input_types(self, **kwargs):
+        for name, _ in self.input_slots.items():
+            if kwargs.get(name) is None:
+                raise Exception('No data supplied for input slot "%s".' % name)
+
         for name, value in kwargs.items():
             input_slot = self.input_slots.get(name)
             if not input_slot:
@@ -58,6 +68,11 @@ class QaSqlNode(object):
                 raise Exception('The input parameter "%s" does not match the registered slot type "%s".' 
                                 % (name, input_slot.datatype))
 
+    def validate_outputs(self, **kwargs):
+        for slot_name, output_slot in self.output_slots.items():
+            if not kwargs.get(slot_name):
+                raise Exception('This QA job node contains an output slot "%s", but no such output field was generated.' % slot_name)
+            
 
     def generate_query(self, **kwargs):
         kwreader = common.KeywordArgReader(*self.input_slots.keys())
@@ -71,12 +86,19 @@ class QaJobRunner(object):
         self.qa_nodes = {}
         self.config = yaml_config
         self.service_registry = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
-        
+        self.analyzers = {}
+
         job_config_group = yaml_config['jobs']
         for nodename in job_config_group:
             template = self._load_template(job_config_group[nodename]['sql_template'])
-            inputs =  self._load_input_values(job_config_group[nodename]['inputs'])
-            outputs = self._load_output_values(job_config_group[nodename]['outputs'])
+            inputs =  self._load_input_values(job_config_group[nodename]['inputs'] or [])
+            outputs = self._load_output_values(job_config_group[nodename]['outputs'] or [])
+
+            if job_config_group[nodename].get('analyzer'):
+                logic_module_name = self.config['globals']['qa_logic_module']
+                analyzer_func = common.load_class(job_config_group[nodename].get('analyzer'),
+                                                  logic_module_name)
+                self.analyzers[nodename] = analyzer_func                                                  
             node = QaSqlNode(template)
 
             for input in inputs:                
@@ -86,6 +108,9 @@ class QaJobRunner(object):
                 node.add_output_slot(output['name'], output['type'])
 
             self.qa_nodes[nodename] = node
+
+    def _lookup_analyzer(self, jobname):
+        return self.analyzers.get(jobname)
 
 
     def _load_input_values(self, dict_array):
@@ -164,6 +189,28 @@ class QaJobRunner(object):
 
         return job_params
 
+
+    def validate_outputs(self, raw_outputs, job_name):
+        missing_fields = []
+        node = self._lookup_node(job_name)
+        for key, _ in node.output_slots.items():
+            if raw_outputs.get(key) is None:
+                missing_fields.append(key)
+        
+        if len(missing_fields):
+            raise Exception('the generated outputs for job node "%s" are missing the fields: %s' 
+                            % (job_name, missing_fields))
+
+
+    def analyze(self, raw_outputs, job_name):
+        result = []
+        analyzer_func = self._lookup_analyzer(job_name)
+        if analyzer_func:
+            for condition in analyzer_func(raw_outputs):
+                result.append({'type': condition.type, 'message': condition.message})
+        return result
+
+
     def run(self, job_name, preview_mode=False, **kwargs):
         # execute query -- must return record generator
         # call job node's generate_outputs() method and pass in generator
@@ -171,6 +218,7 @@ class QaJobRunner(object):
         # return the raw and analyzed outputs
         node = self._lookup_node(job_name)
         query = node.generate_query(**kwargs)
+        result = {}
         if preview_mode:
             print(query)
         else:
@@ -183,7 +231,12 @@ class QaJobRunner(object):
             # load the function which builds outputs from the query results
             output_builder_func = common.load_class(output_builder_func_name, self.config['globals']['qa_logic_module'])
             raw_outputs =  output_builder_func(query_executor(query, self.service_registry, **kwargs))
-            return raw_outputs
+            self.validate_outputs(raw_outputs, job_name)
+            result['job_output'] = raw_outputs
+
+            result['analysis_ouptut'] = self.analyze(raw_outputs, job_name)
+
+        return result
 
 
 def read_params_from_args(arg_dict):
@@ -202,33 +255,100 @@ def read_params_from_args(arg_dict):
     return params
 
 
-def main(args):
+def parse_param_string(input_param_string):
+    '''parse an input string of the format 
+
+    <name1>:<value1>,<name2>:<value2>,...
+
+    and return a dictionary of name-value pairs
+    '''
+
+    params = {}
+    tokens = input_param_string.split(',')
+    for tok in tokens:
+        param_tokens = tok.split(':')
+        if len(param_tokens) != 2:
+            raise Exception('Each parameter string in a job file must be of the format <name>:<value>')
+
+        name = param_tokens[0]
+        value = param_tokens[1]
+        params[name] = value
+
+    return params
+
+
+def main(args):    
     configfile = args['<configfile>']
     yaml_config = common.read_config_file(configfile)
+    preview_mode = False
 
-    if args['--jobs']:
+    if args['--preview'] == True:
+        preview_mode = True
+        print('### Running in preview mode.', file=sys.stderr)
+
+    if args['--list']:
         jobs = []
-        for job in yaml_config['jobs']:
-            input_params = yaml_config['jobs'][job]['inputs']
-            output_params = yaml_config['jobs'][job]['outputs']
-            jobs.append({
-                'name': job,
-                'inputs': input_params,
-                'outputs': output_params
-            })
-        print(common.jsonpretty(jobs))
+        if args['--verbose']:
+            for job in yaml_config['jobs']:
+                input_params = yaml_config['jobs'][job]['inputs'] or []
+                output_params = yaml_config['jobs'][job]['outputs'] or []
+                jobs.append({
+                    'name': job,
+                    'inputs': input_params,
+                    'outputs': output_params
+                })
+        else:
+            for job in yaml_config['jobs']:
+                jobs.append(job)
+
+        print(json.dumps(jobs))
         return
 
     job_runner = QaJobRunner(yaml_config)
 
     if args['--job']:
         jobname = args['<jobname>']
-        print(job_runner.get_sql_template(jobname))
-        print(job_runner.inputs(jobname))
+        #print(job_runner.get_sql_template(jobname))        
         input_params = read_params_from_args(args)
 
         job_params = job_runner.convert_input_params(jobname, **input_params)
-        print(job_runner.run(jobname, **job_params))
+        if preview_mode:
+            job_runner._lookup_node(jobname).validate_input_types(**input_params)
+            print(job_runner.get_sql_template(jobname).format(**input_params))
+        else:
+            print(json.dumps(job_runner.run(jobname, **job_params)))
+        return
+
+    elif args['--jobs']:
+        job_strings = []
+        if args['--file']:
+            jobfile_name = args['<filename>']
+            with open(jobfile_name) as f:
+                for line in f:
+                    job_strings.append(line.lstrip().rstrip())
+        else:
+            for line in sys.stdin:
+                if sys.hexversion < 0x03000000:
+                    line = line.decode('utf-8')
+                job_strings.append(line.lstrip().rstrip())
+
+            for job_string in job_strings:
+                # Each job string is in the format <job_name> <param1>:<value1>,...
+                job_tokens = job_string.split(' ')
+                if len(job_tokens) != 2:
+                    print('Each job string must be in the format <job_name> <param1>:<value1>,...')
+                    return
+
+                jobname = job_tokens[0]
+                param_string = job_tokens[1]
+                raw_params = parse_param_string(param_string)
+                input_params = job_runner.convert_input_params(jobname, **raw_params)
+
+                job_runner._lookup_node(jobname).validate_input_types(**input_params)
+                if preview_mode:
+                    print(job_runner.get_sql_template(jobname).format(**input_params))
+                else:
+                    print(json.dumps(job_runner.run(jobname, **input_params)))
         return
 
 
