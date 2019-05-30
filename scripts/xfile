@@ -1,16 +1,19 @@
 #!/usr/bin/env python
 
 '''Usage:
-            xfile --config <configfile> [--delimiter <delimiter>] --map <map_name> <datafile> [--limit <max_records>]
-            xfile --config <configfile> [--delimiter <delimiter>] --map <map_name> -s [--limit <max_records>]
+            xfile --config <configfile> --delimiter <delimiter> --map <map_name> <datafile> [--limit <max_records>]
+            xfile --config <configfile> --delimiter <delimiter> --map <map_name> -s [--limit <max_records>]
             xfile --config <configfile> --json --map <map_name> <datafile> [--limit <max_records>]
             xfile --config <configfile> --json --map <map_name> -s [--limit <max_records>]
             xfile --config <configfile> --list (sources | maps | globals)
+            xfile -p --delimiter <delimiter> <datafile> [--limit <max_records>]
+            xfile -p --json <datafile> [--limit <max_records>]
             xfile -i
 
    Options:
-            -i,--interactive   :Start up in interactive mode
-            -s,--stream        :Run in streaming mode
+            -i, --interactive   :interactive mode
+            -s, --stream        :streaming mode (read fron stdin)
+            -p, --passthrough   :passthrough mode (do not transform records)
 '''
 
 #
@@ -96,6 +99,7 @@ def main(args):
     list_mode = False
     interactive_mode = False
     stream_input_mode = False
+    passthrough_mode = False
     limit = -1
 
     field_delimiter = ','        
@@ -104,6 +108,8 @@ def main(args):
 
     print('### using delimiter "%s"' % field_delimiter, file=sys.stderr)
   
+    if args.get('--passthrough'):
+        passthrough_mode = True
     if args.get('--stream'):
         stream_input_mode = True
     if args.get('--config') == True and not args.get('--list'):
@@ -116,10 +122,25 @@ def main(args):
     if args.get('--list') == True:
         list_mode = True
     
-    if not transform_mode and not interactive_mode:
+    if not any([transform_mode, interactive_mode, passthrough_mode]):
         print('unsupported run mode. Exiting.')
         return
     
+    if passthrough_mode:        
+        if args.get('--json'):
+            rec_source = dmap.RecordSource(dmap.json_record_generator,
+                                           filename=args['<datafile>'],                                           
+                                           delimiter=field_delimiter,
+                                           limit=limit)
+        else:            
+            rec_source = dmap.RecordSource(dmap.csvfile_record_generator,
+                                           filename=args['<datafile>'],
+                                           delimiter=field_delimiter,
+                                           limit=limit)
+        for record in rec_source.records():
+            print(json.dumps(record))
+        return
+
     transform_config_file = args.get('<configfile>')
     yaml_config = common.read_config_file(transform_config_file)
 
