@@ -1,0 +1,171 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    cyclops [-p] --config <configfile> --trigger <trigger_name>
+    cyclops --config <configfile> --replay <trigger_name> <filename>
+    cyclops --config <configfile> --triggers [-v]
+
+Options:
+    -p --preview        show filesystem events, but do not execute the trigger task
+    -v --verbose        show event trigger details
+'''
+
+
+import os
+import sys
+import time
+import json
+import datetime
+import docopt
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+from snap import snap, common
+
+
+FILESYSTEM_EVENT_TYPES = ['created', 'modified', 'deleted']
+
+
+class Watcher:
+    def __init__(self, target_dir, event_handler, watch_interval_secs):
+        self.target_directory = target_dir
+        self.observer = Observer()
+        self.event_handler = event_handler
+        if watch_interval_secs < 1: 
+            raise Exception('The minimum watch interval is 1 second.')
+        self.watch_interval = watch_interval_secs
+
+    def run(self):        
+        self.observer.schedule(self.event_handler, self.target_directory, recursive=False)
+        self.observer.start()
+        try:
+            while True:
+                time.sleep(self.watch_interval)
+        except Exception as err:
+            self.observer.stop()
+            print('Error handling filesystem evemt: %s' % err)
+        self.observer.join()
+
+
+class EventDispatcher(FileSystemEventHandler):
+    def __init__(self, service_registry, **kwargs):
+        self.services = service_registry
+        self.dispatch_table = {}
+        self.preview_mode = kwargs.get('preview', False) 
+
+    def register_event_type(self, event_type, handler_function):
+        '''event_type may be one of: created, modified, ...
+        '''
+        if event_type not in FILESYSTEM_EVENT_TYPES:
+            raise Exception('Invalid event type: %s. Valid event types are: %s' % (event_type, FILESYSTEM_EVENT_TYPES))
+        self.dispatch_table[event_type] = handler_function
+
+    def event_to_data(self, event):
+        if hasattr(event, 'dest_path'):
+            destpath = event.dest_path
+        else:
+            destpath = None
+        return {
+            'event_type': event.event_type,
+            'src_path': event.src_path,
+            'dest_path': destpath,
+            'is_directory': event.is_directory,
+            'time_received': datetime.datetime.now().isoformat()
+        }
+
+    def on_any_event(self, event):
+        event_data = self.event_to_data(event)
+        print('Detected filesystem event: %s' % event_data, file=sys.stderr)
+        target_function = self.dispatch_table.get(event.event_type)
+        if not target_function:
+            return
+        if not self.preview_mode:
+            target_function(event_data, self.services)
+
+
+def load_trigger_function(trigger_config, yaml_config):
+    trigger_funcname= trigger_config['function']
+    module_name = yaml_config['globals']['trigger_function_module']
+    trigger_module = __import__(module_name)
+    if not hasattr(trigger_module, trigger_funcname):
+        raise Exception('The trigger function module "%s" has no function "%s". Please check your configuration.' 
+                        % (module_name, trigger_funcname))
+    return common.load_class(trigger_funcname, module_name)
+
+
+def build_filesystem_watcher(trigger_name, yaml_config, **kwargs):
+    preview_mode = kwargs.get('preview', False)
+    services = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
+    dispatcher = EventDispatcher(services, preview=preview_mode)
+    trigger_config = yaml_config['triggers'].get(trigger_name)
+    if not trigger_config:
+        raise Exception('No trigger registered under the name "%s". Please check your config file.'
+                        % trigger_name)
+
+    trigger_function = load_trigger_function(trigger_config, yaml_config)
+    event_type = trigger_config['event_type']
+    target_directory = trigger_config['parent_dir']
+
+    if not os.path.isdir(target_directory):
+        raise Exception('The target watch-directory %s either does not exist, or is not a directory. Please check your config file.' 
+                        % target_directory)
+
+    dispatcher.register_event_type(event_type, trigger_function)
+    watch_interval = 1  # TODO: make this a setting
+    return Watcher(target_directory, dispatcher, watch_interval)
+
+
+def main(args):
+    config_filename = args['<configfile>']
+    preview_mode = args['--preview'] or False
+    list_mode = args.get('--triggers') or False
+    replay_mode = args.get('--replay') or False
+    verbose_mode = args.get('--verbose') or False
+    yaml_config = common.read_config_file(config_filename)
+
+    if list_mode:
+        trigger_data = []
+        if yaml_config.get('triggers'):
+            for trigger_name, trigger_config  in yaml_config['triggers'].items():
+                if verbose_mode:
+                    trigger_data.append({
+                        'trigger_name': trigger_name,
+                        'settings': trigger_config
+                    })
+                else:
+                    trigger_data.append(trigger_name)
+        print(json.dumps(trigger_data))
+        return
+    
+    if replay_mode:
+        trigger_name = args['<trigger_name>']
+        if not yaml_config.get('triggers'):
+            print('no triggers specified in config file.', file=sys.stderr)
+            exit(1)
+        
+        if not yaml_config['triggers'].get(trigger_name):
+            print('no trigger "%s" registered in config file.' % trigger_name, file=sys.stderr)
+            exit(1)
+
+        trigger_config = yaml_config['triggers'][trigger_name]
+        tfunc = load_trigger_function(trigger_config, yaml_config)
+        services = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
+        input_file = args['<filename>']
+        event = {
+            'event_type': trigger_config['event_type'],
+            'src_path': args['<filename>'],
+            'dest_path': None, # TODO: we might want to set this to src_path instead
+            'is_directory': os.path.isdir(input_file),
+            'time_received': datetime.datetime.now().isoformat()
+        }
+        tfunc(event, services)
+        return
+    
+    trigger_name = args['<trigger_name>']
+    watcher = build_filesystem_watcher(trigger_name, yaml_config, preview=preview_mode)
+    watcher.run()
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

@@ -1,0 +1,114 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    pgexec [-p] --target <alias> <db> -q <query>
+    pgexec [-p] --target <alias> <db> -f <sqlfile> [--params=<n:v>...]
+    pgexec [-p] --target <alias> <db> -s
+
+Options:
+    -f --file       execute contents of SQL file
+    -q --query
+    -s --stdin      execute SQL passed to standard input
+    -p --preview    show (but do not execute) SQL command(s)
+'''
+
+import os, sys
+from pathlib import Path
+from collections import namedtuple
+import sh
+from sh import psql
+import docopt
+from snap import common
+
+
+CONFIGFILE_NAME = 'config.yaml'
+CONFIG_INSTRUCTIONS = '''
+pgexec requires a YAML configuration file named "config.yaml" either in the directory
+~/.pgx, or in the location specified by the environment variable PGX_CFG. 
+'''
+
+class ConfigDirNotFound(Exception):
+    def __init__(self):
+        pass
+
+class NoSuchAlias(Exception):
+    def __init__(self, alias):
+        super().__init__(self, 'No alias registered under the name "%s".' % alias)
+        self.alias = alias
+
+TargetConfig = namedtuple('TargetConfig', 'host port user')
+
+def load_aliases():
+    aliases = {}
+    config_dir = os.getenv('PGX_CFG') or os.path.join(str(Path.home()), '.pgx')
+    if not os.path.isdir(config_dir):
+        raise ConfigDirNotFound()
+    
+    configfile = os.path.join(config_dir, 'config.yaml')
+    yaml_config = common.read_config_file(configfile)
+    
+    for name in yaml_config['aliases']:            
+        hostname = yaml_config['aliases'][name]['host']
+        port = int(yaml_config['aliases'][name].get('port') or '5432')
+        user = yaml_config['aliases'][name]['user']
+        aliases[name] = TargetConfig(host=hostname, port=port, user=user)
+    return aliases
+
+
+def read_stdin():
+    for line in sys.stdin:
+        if sys.hexversion < 0x03000000:
+            line = line.decode('utf-8')
+        yield line.lstrip().rstrip()
+
+
+def main(args):
+    print(common.jsonpretty(args))
+    preview_mode = False
+    if args['--preview']:
+        preview_mode = True
+
+    target_alias = args['<alias>']
+    try:
+        aliases = load_aliases()        
+        if not aliases.get(target_alias):
+            raise NoSuchAlias(target_alias)
+        
+        psql_args = ['-w',
+                     '-h', aliases[target_alias].host,
+                     '-p', aliases[target_alias].port,
+                     '-U', aliases[target_alias].user,
+                     '-d', args['<db>']]
+        
+        if args['--file'] is True:
+            psql_args.extend(['-f', args['<sqlfile>']])
+
+        elif args['--query'] is True:
+            psql_args.extend(['-c', args['<query>']])
+
+        else:
+            query = ''
+            for line in read_stdin():
+                query = query + line
+            psql_args.extend(['-c', query])
+
+        psql_cmd = psql.bake(*psql_args)
+        output = psql_cmd()
+        #print(dir(output))
+        if not output.exit_code:
+            print(output.stdout.decode())
+        else:
+            print(output.stderr.decode())
+
+    except ConfigDirNotFound:
+        print(CONFIG_INSTRUCTIONS)
+        return
+    except NoSuchAlias as err:
+        print(str(err))
+        return 
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

@@ -11,7 +11,7 @@ import docopt
 
 
 TABLE_CREATE_TEMPLATE = '''
-CREATE TABLE {schema}.{table_name}
+CREATE TABLE `{schema}.{table_name}`
 AS {query}
 '''
 

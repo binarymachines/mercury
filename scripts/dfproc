@@ -1,0 +1,190 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    dfproc --config <configfile> --proc <processor> --fmt <input_format> [--delimiter <delimiter>] [--limit=<limit>]
+    dfproc --config <configfile> --proc <processor> --fmt <input_format> [--delimiter <delimiter>] --file=<datafile> [--limit=<limit>]
+    dfproc --config <configfile> --list [-v]
+
+'''
+
+import os, sys
+from collections import namedtuple
+import importlib
+import json
+from snap import snap, common
+import pandas as pd
+import docopt
+
+
+class NoSuchProcessor(Exception):
+    def __init__(self, processor_name):
+        super.__init__(self, 'No DataFrame processor registered under the alias %s.' % processor_name)
+
+def import_module(module_name, module_directory):
+    module_path = '%s.py' % os.path.join(module_directory, module_name)
+    spec = importlib.util.spec_from_file_location(module_name, module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+DataframeProcessor = namedtuple('DataframeProcessor', 'read_function transform_function write_function')
+FileInputSettings = namedtuple('FileInputSettings', 'file_handle format delimiter limit')
+
+
+class FrameRunner(object):
+    def __init__(self, yaml_config, **kwargs):
+        self.processors = self.load_dataframe_processors(yaml_config)        
+
+    def load_dataframe_processors(self, yaml_config):
+        if not yaml_config.get('processors'):
+            raise Exception('Config file is missing a top-level "processors" section.')
+        
+        if not yaml_config['globals'].get('processor_module'):
+            raise Exception('Config file is missing a "processor_module" field in [globals].')
+
+        proc_module_name = yaml_config['globals']['processor_module']
+        module_dir = common.load_config_var(yaml_config['globals']['project_home'])
+
+        processor_module = import_module(proc_module_name, module_dir)
+        processors = {}
+        for procname in yaml_config['processors']:
+            proc_config = yaml_config['processors'][procname]
+            if proc_config.get('read_function'):
+                read_func = getattr(processor_module, proc_config['read_function'])
+            else:
+                read_func = self.read_datafile
+            transform_func = getattr(processor_module, proc_config['transform_function'])
+            write_func = None
+            if proc_config.get('write_function'):
+                write_func = getattr(processor_module, proc_config['write_function']) 
+            processors[procname] = DataframeProcessor(read_function=read_func,
+                                                      transform_function=transform_func,
+                                                      write_function=write_func)
+        return processors
+
+    def read_datafile(self, file_handle, format, delimiter, limit):
+        if format == 'json':
+            input = []
+            if limit > 0:                
+                for i in range(limit):
+                    line = file_handle.readline()
+                    input.append(json.loads(line))                                
+            else:
+                print('reading all data from file.')
+                for line in file_handle:
+                    input.append(json.loads(line))
+            return pd.DataFrame(input)
+        elif format == 'csv':
+            if limit > 0: 
+                return pd.read_csv(file_handle, delimiter=delimiter, nrows=limit)
+            else:
+                return pd.read_csv(file_handle, delimiter=delimiter)
+        else:
+            raise Exception('Unrecognized format "%s". Supported data formats are "json" and "csv".' % format)
+
+    def run(self, processor_name, file_input_settings, service_registry):           
+        if not self.processors.get(processor_name):
+            raise NoSuchProcessor(processor_name)
+
+        processor = self.processors[processor_name]
+
+        
+        dataframe = self.read_datafile(file_input_settings.file_handle,
+                                        file_input_settings.format,
+                                        file_input_settings.delimiter,
+                                        file_input_settings.limit)
+        
+        newframe = processor.transform_function(dataframe, service_registry)
+        if processor.write_function:            
+            processor.write_function(newframe, service_registry)
+        
+        return newframe
+
+class FrameGenerator(object):
+    def __init__(self, service_registry, **kwargs):
+        self.services = service_registry
+
+
+    def _generate_frame(self, **kwargs):
+        '''override in subclass
+        '''
+        input = []
+        return pd.DataFrame(input), False
+
+
+    def frames(self, **kwargs):
+        while True:
+            frame, has_more_data = self._generate_frame(**kwargs)            
+            yield frame
+            if not has_more_data:            
+                break
+
+
+def read_stdin():
+    for line in sys.stdin:
+        if sys.hexversion < 0x03000000:
+            line = line.decode('utf-8')
+        yield line.lstrip().rstrip()
+        
+
+def read_datafile(file_handle, format, delimiter, limit):
+    if format == 'json':        
+        if limit > 0:
+            print('reading %d lines from file' % limit)
+            return pd.read_json(file_handle, lines=True, chunksize=limit)
+        else:
+            return pd.read_json(file_handle, lines=True)
+
+    elif format == 'csv':
+        if limit > 0:        
+            return pd.read_csv(file_handle, delimiter=delimiter)
+        else:
+            return pd.read_csv(file_handle, delimiter=delimiter, nrows=limit)
+    else:
+        raise Exception('Unrecognized format "%s". Supported data formats are "json" and "csv".' % format)
+
+
+def main(args):
+    print(common.jsonpretty(args))
+    config_filename = args['<configfile>']
+    yaml_config = common.read_config_file(config_filename)
+
+    if args['--list']:
+        for p in yaml_config['processors']:
+            print(p)
+        return
+
+    service_registry = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
+
+    streaming_input_mode = True
+    if args.get('--file') is not None:        
+        streaming_input_mode = False
+
+    limit = -1
+    if args['--limit'] is not None:
+        limit = int(args['--limit'])
+    proc_name = args['<processor>']
+    frunner = FrameRunner(yaml_config)
+    
+    format = args['<input_format>']
+    df = None
+    delimiter = args.get('<delimiter>', ',')
+    if streaming_input_mode:
+        print('running in streaming-input mode.', file=sys.stderr)
+        print('processing limit %d records.' % limit, file=sys.stderr)
+        settings = FileInputSettings(file_handle=sys.stdin, format=format, delimiter=delimiter, limit=limit)
+        frunner.run(proc_name, settings, service_registry)
+    else:        
+        print('running in file-input mode.', file=sys.stderr)
+        print('processing limit %d records.' % limit, file=sys.stderr)
+        datafile = args['--file']
+        with open(datafile) as f:
+            settings = FileInputSettings(file_handle=f, format=format, delimiter=delimiter, limit=limit)
+            frunner.run(proc_name, settings, service_registry)
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)
