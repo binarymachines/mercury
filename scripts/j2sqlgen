@@ -19,7 +19,7 @@ BIGQUERY_STRING_TYPES = ['STRING']
 TABLE_DDL_TEMPLATE = '''
 CREATE TABLE {schema}.{tablename} (
 {table_body}
-);
+) {table_suffix}
 '''
 
 TABLE_LEVEL_SETTINGS = [
@@ -58,7 +58,7 @@ class ColumnSpec(object):
         self.nullable = is_nullable
         self.length = kwargs.get('length', '') # can be null; usually only applies to string types
         self.is_primary_key = is_pk
-        self.default_value = kwargs.get('default')
+        self.default_value = kwargs.get('default')        
             
     def sql(self, table_creation_context):
         null_clause = ''
@@ -73,28 +73,33 @@ class ColumnSpec(object):
         src_colname = self.name
         src_coltype = self.datatype
         if self.default_value is None:
-            field_line = '{name} {datatype}{length} {null}'.format(name=table_creation_context.get_target_column_name(self.tablename,
-                                                                                                                      self.name),
-                                                                    datatype=table_creation_context.get_target_column_type(self.tablename,
-                                                                                                                           self.name,
-                                                                                                                           self.datatype),
-                                                                    length=length_clause,
-                                                                    null=null_clause)
+            template = '{name} {datatype}{length} {null} {column_suffix}'
+            
+            field_line = template.format(name=table_creation_context.get_target_column_name(self.tablename,
+                                                                                            self.name),
+                                         datatype=table_creation_context.get_target_column_type(self.tablename,
+                                         self.name,
+                                         self.datatype),
+                                         length=length_clause,
+                                         null=null_clause,
+                                         column_suffix=table_creation_context.get_column_suffix(self.tablename, self.name))
         else:
-            field_line = '{name} {datatype}{length} {null} DEFAULT {default}'.format(name=table_creation_context.get_target_column_name(self.tablename,
-                                                                                                                                        self.name),
-                                                                    datatype=table_creation_context.get_target_column_type(self.tablename,
-                                                                                                                           self.datatype),
-                                                                    length=length_clause,
-                                                                    null=null_clause,
-                                                                    default=self.default_value)
+            template = '{name} {datatype}{length} {null} DEFAULT {default} {column_suffix}'
+            field_line = template.format(name=table_creation_context.get_target_column_name(self.tablename,
+                                                                                            self.name),
+                                        datatype=table_creation_context.get_target_column_type(self.tablename,
+                                        self.datatype),
+                                        length=length_clause,
+                                        null=null_clause,
+                                        default=self.default_value,
+                                        column_suffix=table_creation_context.get_column_suffix(self.tablename, self.name))
         if self.is_primary_key:
             field_line = field_line + ' PRIMARY KEY'                                                                                                            
         return field_line.lstrip().rstrip()                                                    
 
 
 class TableSpec(object):
-    def __init__(self, table_name, schema_name):
+    def __init__(self, table_name, schema_name, **kwargs):
         self.name = table_name
         self.schema = schema_name
         self.columns = []
@@ -158,17 +163,39 @@ class TableCreationContext(object):
         self.pk_type = None
         self.pk_name = None
         self.pk_value = self.defaults.get('pk_value')
-        self.default_varchar_length = self.defaults['varchar_length']             
-        self.type_map = self.defaults['column_type_map']
+        self.default_varchar_length = self.defaults['varchar_length']
+        self.type_map = {}         
+        self.type_map.update(self.defaults['column_type_map'] or {})
 
-        self.overrides = yaml_config.get('tables')
-        autocreate_pk = self.defaults['autocreate_pk_if_missing']
+        self.overrides = yaml_config.get('tables', {})
+        autocreate_pk = self.defaults.get('autocreate_pk_if_missing', False)
         if autocreate_pk == True:            
             self.pk_type = self.defaults['pk_type']
             self.pk_name = self.defaults['pk_name']
 
+    def get_table_suffix(self, table_name):
+        if not self.overrides:
+            return self.defaults.get('table_suffix', '')
+        if not self.overrides.get(table_name):
+            return self.defaults.get('table_suffix', '')
+        return self.overrides[table_name].get('table_suffix', '')
+
+    def get_column_suffix(self, table_name, column_name):
+        if not self.overrides:
+            return self.defaults.get('column_suffix', '')
+        if not self.overrides.get(table_name):
+            return self.defaults.get('column_suffix')
+
+        suffix = self.overrides[table_name].get('column_suffix', '')
+
+        if self.overrides[table_name].get('column_settings') and self.overrides[table_name]['column_settings'].get(column_name):            
+            suffix = suffix or self.overrides[table_name]['column_settings'][column_name].get('column_suffix')
+
+        return suffix
 
     def get_mapped_table_name(self, table_name):
+        if not self.overrides:
+            return table_name
         if not self.overrides.get(table_name):
             return table_name
 
@@ -239,7 +266,7 @@ def create_tablespec_from_json_config(tablename, json_config, dbschema, creation
         settings = {}
         if is_string_type(column_config['column_type']):
             settings['length'] = creation_context.get_varchar_length(source_tablename, source_column_name)
-
+        
         tspec.add_column(source_column_name,
                          source_column_type,
                          creation_context,
@@ -258,9 +285,12 @@ def generate_sql(tablespec, table_creation_context):
     for column in tablespec.columns:
         field_lines.append(column.sql(table_creation_context))
         
-    return TABLE_DDL_TEMPLATE.format(schema=tablespec.schema,
+    ddl_stmt = TABLE_DDL_TEMPLATE.format(schema=tablespec.schema,
                                      tablename=table_creation_context.get_mapped_table_name(tablespec.name),
-                                     table_body=',\n'.join(field_lines))
+                                     table_body=',\n'.join(field_lines),
+                                     table_suffix=table_creation_context.get_table_suffix(table_creation_context.get_mapped_table_name(tablespec.name)))
+
+    return ddl_stmt.strip() + ';'
 
     
 def find_table_config(tablename, json_dbschema):
