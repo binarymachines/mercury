@@ -10,9 +10,10 @@ Options:
 '''
 
 import os, sys
-import docopt
+from cmd import Cmd
+from snap import cli_tools as cli
 from mercury import configtemplates as templates
-
+import docopt
 
 BANNER = '''
 ___________________________________________________________________________
@@ -26,45 +27,315 @@ ___________________________________________________________________________
 
 BANNER_CLOSE = '|__________________________________________________________________________\n'
 
+
 targets = {
   'dfproc': {
     'description': 'Create and transform Pandas dataframes',
-    'template': templates.DFPROC_TEMPLATE
+    'template': templates.DFPROC_TEMPLATE,
+    'config_object_types': [
+      {
+        'name': 'globals',
+        'singular_label': 'global',
+        'find_func': find_global_by_name,
+        'create_func': create_global,
+        'update_func': edit_global,
+        'list_func': list_globals
+      },
+      {
+        'name': 'service_objects',
+        'singular_label': 'service object',
+        'find_func': find_service_object_by_name,
+        'create_func': create_service_object,
+        'update_func': edit_service_object,
+        'list_func': list_service_objects
+      },
+      {
+        'name': 'processors',
+        'singular_label': 'dataframe processor',
+        'find_func': find_dfproc_processor_by_name,
+        'create_func': create_dfproc_processor,
+        'update_func': edit_dfproc_processor,
+        'list_func': list_dfproc_processors
+      }
+    ]
   },
   'xfile': {
     'description': 'Read and transform CSV or JSON records',
-    'template': templates.XFILE_TEMPLATE
+    'template': templates.XFILE_TEMPLATE,
+    'config_object_types': [
+      {
+        'name': 'globals',
+        'singular_label': 'global',
+        'find_func': find_global_by_name,
+        'create_func': create_global,
+        'update_func': edit_global,
+        'list_func': list_globals
+      },
+      {
+        'name': 'service_objects',
+        'singular_label': 'service object',
+        'find_func': find_service_object_by_name,
+        'create_func': create_service_object,
+        'update_func': edit_service_object,
+        'list_func': list_service_objects        
+      },
+      {
+        'name': 'sources', 
+        'singular_label': 'datasource',
+        'find_func': find_datasource_by_name,
+        'create_func': create_xfile_datasource,
+        'update_func': edit_xfile_datasource,
+        'list_func': list_xfile_datasources
+      },
+      {
+        'name': 'maps',
+        'singular_label': 'map',
+        'find_func': find_xfile_map_by_name,
+        'create_func': create_xfile_map,
+        'update_func': edit_xfile_map,
+        'list_func': list_xfile_maps
+      } 
+    ]
   },
   'ngst': {
     'description': 'Send CSV or JSON records to a designated target',
-    'template': templates.NGST_TEMPLATE
+    'template': templates.NGST_TEMPLATE,
+    'config_object_types': [
+      {
+        'name': 'globals',
+        'singular_label': 'global',
+        'find_func': find_global_by_name,
+        'create_func': create_global,
+        'update_func': edit_global,
+        'list_func': list_globals
+      },
+      {
+        'name': 'service_objects',
+        'singular_label': 'service object',
+        'find_func': find_service_object_by_name,
+        'create_func': create_service_object,
+        'update_func': edit_service_object,
+        'list_func': list_service_objects        
+      },
+      {
+        'name': 'datastores',
+        'singular_label': 'ngst datastore',
+        'find_func': find_ngst_datastore_by_name,
+        'create_func': create_ngst_datastore,
+        'update_func': edit_ngst_datastore,
+        'list_func': list_ngst_datastore
+      },
+      {
+        'name': 'ingest_targets',
+        'singular_label': 'ingest target',
+        'find_func': find_ngst_target_by_name,
+        'create_func': create_ngst_target,
+        'update_func': edit_ngst_target,
+        'list_func': list_ngst_targets
+      }
+    ]
   },
   'cyclops': {
     'description': 'Run custom code in response to filesystem events',
-    'template': templates.CYCLOPS_TEMPLATE
+    'template': templates.CYCLOPS_TEMPLATE,
+    'config_object_types': [
+      {
+        'name': 'globals',
+        'singular_label': 'global',
+        'find_func': find_global_by_name,
+        'create_func': create_global,
+        'update_func': edit_global,
+        'list_func': list_globals
+      },
+      {
+        'name': 'service_objects',
+        'singular_label': 'service object',
+        'find_func': find_service_object_by_name,
+        'create_func': create_service_object,
+        'update_func': edit_service_object,
+        'list_func': list_service_objects        
+      },
+      {
+        'name': 'triggers',
+        'singular_label': 'filesystem event trigger',
+        'find_func': find_trigger_by_name,
+        'create_func': create_cyclops_trigger,
+        'update_func': update_cyclops_trigger,
+        'list_func': list_cyclops_triggers
+      }
+    ]
   },
   'j2sqlgen': {
     'description': 'Generate CREATE TABLE sql statements from JSON metadata',
-    'template': templates.J2SQLGEN_TEMPLATE
+    'template': templates.J2SQLGEN_TEMPLATE,
+    'config_object_types': [
+      {
+        'name': 'globals',
+        'singular_label': 'global',
+        'find_func': find_global_by_name,
+        'create_func': create_global,
+        'update_func': edit_global,
+        'list_func': list_globals
+      },
+      {
+        'name': 'defaults',
+        'singular_label': 'SQL generation default',
+      },
+      {
+        'name': 'tables'
+      }
+    ]
   },
   'pgexec': {
     'description': 'Execute SQL commands against a PostgreSQL database',
-    'template': templates.PGEXEC_TEMPLATE
+    'template': templates.PGEXEC_TEMPLATE,
+    'config_object_types': ['targets']
   },
   'pgmeta': {
     'description': 'Extract table metadata as JSON from a PostgreSQL database',
-    'template': templates.PGMETA_TEMPLATE
+    'template': templates.PGMETA_TEMPLATE,
+    'config_object_types': ['targets']
   },
   'profilr': {
     'description': 'Run custom data profiling logic against a file-based dataset',
-    'template': templates.PROFILR_TEMPLATE
+    'template': templates.PROFILR_TEMPLATE,
+    'config_object_types': ['globals', 'service_objects', 'profilers', 'datasets']
   },
   'quasr': {
     'description': 'Run custom QA/profiling code against a relational dataset',
-    'template': templates.QUASR_TEMPLATE
+    'template': templates.QUASR_TEMPLATE,
+    'config_object_types': ['globals', 'service_objects', 'templates', 'jobs']
   }
 }
 
+
+def find_global_by_name():
+  pass
+
+def find_service_object_by_name():
+  pass
+
+def find_dfproc_processor_by_name():
+  pass
+
+def find_xfile_map_by_name():
+  pass
+
+def create_global():
+  pass
+
+def create_service_object():
+  pass
+
+def create_dfproc_processor():
+  pass
+
+def create_xfile_datasource():
+  pass
+
+def create_xfile_map():
+  pass
+
+def edit_global():
+  pass
+
+def edit_service_object():
+  pass
+
+def edit_dfproc_processor():
+  pass
+
+def edit_xfile_datasource():
+  pass
+
+def edit_xfile_map():
+  pass
+
+def list_globals():
+  pass
+
+def list_service_objects():
+  pass
+
+def list_dfproc_processors():
+  pass
+
+def list_xfile_datasources():
+  pass
+
+def list_xfile_maps():
+  pass
+
+
+def docopt_cmd(func):
+    """
+    This decorator is used to simplify the try/except block and pass the result
+    of the docopt parsing to the called action.
+    """
+    def fn(self, arg):
+        try:
+            opt = docopt_func(fn.__doc__, arg)
+
+        except DocoptExit as e:
+            # The DocoptExit is thrown when the args do not match.
+            # We print a message to the user and the usage block.
+
+            print '\nPlease specify one or more valid command parameters.'
+            print e
+            return
+
+        except SystemExit:
+            # The SystemExit exception prints the usage for --help
+            # We do not need to do the print here.
+
+            return
+
+        return func(self, opt)
+
+    fn.__name__ = func.__name__
+    fn.__doc__ = func.__doc__
+    fn.__dict__.update(func.__dict__)
+    return fn
+
+
+def create_service_object():
+  pass
+
+def add_global():
+  pass
+
+def find_service_object_by_name():
+  pass
+
+def create_xfile_map():
+  pass
+
+def create_ngst_datastore():
+  pass
+
+
+
+
+class ConfigCLI(Cmd):
+    def __init__(self, name, config_target_name, **kwargs):
+        Cmd.__init__(self)
+        self.name = name
+        self.prompt = ':::%s [%s]> ' % self.name        
+        
+        #self.replay_stack = Stack()
+
+    def do_save(self, *cmd_args):
+      print('save placeholder')
+
+
+    @docopt_cmd
+    def do_show(self, cmd_args):
+        '''Usage:
+                  show (transform | shape | svcobj)
+                  show transform <name>
+                  show shape <name>
+                  show svcobj <name>
+        '''
 
 def main(args):
     if args['--list-targets']:
@@ -75,7 +346,9 @@ def main(args):
       print(BANNER_CLOSE)
       return
 
-    
+    config_target = args['<target>']
+    config_cli = ConfigCLI('mkcfg', config_target)
+    config_cli.cmdloop()
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)
