@@ -180,31 +180,124 @@ targets = {
       {
         'name': 'defaults',
         'singular_label': 'SQL generation default',
+        'find_func': find_j2sql_default_by_name,
+        'create_func': create_j2sql_default,
+        'update_func': edit_j2sql_default,
+        'list_func': list_j2sql_defaults
       },
       {
-        'name': 'tables'
+        'name': 'tables',
+        'singular_label': 'j2sql target table',
+        'find_func': find_j2sql_target_by_name,
+        'create_func': create_j2sql_target,
+        'update_func': edit_j2sql_target,
+        'list_func': list_j2sql_targets
       }
     ]
   },
   'pgexec': {
     'description': 'Execute SQL commands against a PostgreSQL database',
     'template': templates.PGEXEC_TEMPLATE,
-    'config_object_types': ['targets']
+    'config_object_types': [
+        {
+          'name': 'targets',
+          'singular_label': 'target',
+          'find_func': find_pgexec_target_by_name,
+          'create_func': create_pgexec_target,
+          'update_func': edit_pgexec_target,
+          'list_func': list_pgexec_targets
+        },
+      ]
   },
   'pgmeta': {
     'description': 'Extract table metadata as JSON from a PostgreSQL database',
     'template': templates.PGMETA_TEMPLATE,
-    'config_object_types': ['targets']
+    'config_object_types': [
+        {
+          'name': 'targets',
+          'singular_label': 'target',
+          'find_func': find_pgexec_target_by_name, # pgmeta and pgexec use the same target
+          'create_func': create_pgexec_target,
+          'update_func': edit_pgexec_target,
+          'list_func': list_pgexec_targets
+        }
+      ]
   },
   'profilr': {
     'description': 'Run custom data profiling logic against a file-based dataset',
     'template': templates.PROFILR_TEMPLATE,
-    'config_object_types': ['globals', 'service_objects', 'profilers', 'datasets']
+    'config_object_types': [
+        {
+        'name': 'globals',
+        'singular_label': 'global',
+        'find_func': find_global_by_name,
+        'create_func': create_global,
+        'update_func': edit_global,
+        'list_func': list_globals
+      },
+      {
+        'name': 'service_objects',
+        'singular_label': 'service object',
+        'find_func': find_service_object_by_name,
+        'create_func': create_service_object,
+        'update_func': edit_service_object,
+        'list_func': list_service_objects
+      },
+      {
+        'name': 'profilers',
+        'singular_label': 'profiler',
+        'find_func': find_profiler,
+        'create_func': create_profiler,
+        'update_func': edit_profiler,
+        'list_func': list_profilers
+      },
+      {
+        'name': 'datasets',
+        'singular_label': 'profilr dataset',
+        'find_func': find_profilr_dataset,
+        'create_func': create_profilr_dataset,
+        'update_func': edit_profilr_dataset,
+        'list_func': list_profilr_datasets
+      }
+    ]
   },
   'quasr': {
     'description': 'Run custom QA/profiling code against a relational dataset',
     'template': templates.QUASR_TEMPLATE,
-    'config_object_types': ['globals', 'service_objects', 'templates', 'jobs']
+    'config_object_types': [
+      {
+        'name': 'globals',
+        'singular_label': 'global',
+        'find_func': find_global_by_name,
+        'create_func': create_global,
+        'update_func': edit_global,
+        'list_func': list_globals
+      },
+      {
+          'name': 'service_objects',
+          'singular_label': 'service object',
+          'find_func': find_service_object_by_name,
+          'create_func': create_service_object,
+          'update_func': edit_service_object,
+          'list_func': list_service_objects
+      },
+      {
+          'name': 'templates',
+          'singular_label': 'template',
+          'find_func': find_quasr_template_by_name,
+          'create_func': create_quasr_template,
+          'update_func': edit_quasr_template,
+          'list_func': list_quasr_templates
+      },
+      {
+          'name': 'jobs',
+          'singular_label': 'job',
+          'find_func': find_quasr_job_by_name,
+          'create_func': create_quasr_job,
+          'update_func': edit_quasr_job,
+          'list_func': list_quasr_jobs
+      }
+    ]
   }
 }
 
@@ -312,7 +405,6 @@ def create_xfile_map():
 
 def create_ngst_datastore():
   pass
-
 
 
 
