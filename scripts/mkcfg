@@ -2,16 +2,31 @@
 
 '''
 Usage:
-  mkcfg (xfile | ngst | cyclops | j2sqlgen | pgexec | pgmeta | profilr | quasr)
+  mkcfg --list-targets
+  mkcfg <target>
 
+Options:
+  -l --list-targets       show the available configuration targets
 '''
 
 import os, sys
 import docopt
-
 from mercury import configtemplates as templates
 
-UTILITIES = {
+
+BANNER = '''
+___________________________________________________________________________
+|::
+|:: mkcfg interactive configfile generator
+|:: issue "mkcfg <target>" to create a config file for a target utility.
+|::
+|::
+|:: available config targets:
+|:'''
+
+BANNER_CLOSE = '|__________________________________________________________________________\n'
+
+targets = {
   'dfproc': {
     'description': 'Create and transform Pandas dataframes',
     'template': templates.DFPROC_TEMPLATE
@@ -37,7 +52,7 @@ UTILITIES = {
     'template': templates.PGEXEC_TEMPLATE
   },
   'pgmeta': {
-    'description': 'Extract table metadata from a PostgreSQL database',
+    'description': 'Extract table metadata as JSON from a PostgreSQL database',
     'template': templates.PGMETA_TEMPLATE
   },
   'profilr': {
@@ -52,8 +67,15 @@ UTILITIES = {
 
 
 def main(args):
-    pass
+    if args['--list-targets']:
+      print(BANNER)
+      for key, value in targets.items():
+        print('|: %s (%s)' % (key, value['description']))
+        print('|:')      
+      print(BANNER_CLOSE)
+      return
 
+    
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)
