@@ -10,10 +10,13 @@ Options:
 '''
 
 import os, sys
+from contextlib import contextmanager
 from cmd import Cmd
 from snap import cli_tools as cli
 from mercury import configtemplates as templates
 import docopt
+from docopt import docopt as docopt_func
+from docopt import DocoptExit
 
 BANNER = '''
 ___________________________________________________________________________
@@ -28,10 +31,195 @@ ___________________________________________________________________________
 BANNER_CLOSE = '|__________________________________________________________________________\n'
 
 
+
+def find_global_by_name():
+  pass
+
+def find_service_object_by_name():
+  pass
+
+def find_dfproc_processor_by_name():
+  pass
+
+def find_xfile_map_by_name():
+  pass
+
+def find_xfile_datasource_by_name():
+  pass
+
+def find_ngst_datastore_by_name():
+  pass
+
+def find_ngst_target_by_name():
+  pass
+
+def find_cyclops_trigger_by_name():
+  pass
+
+def find_j2sqlgen_target_by_name():
+  pass
+
+def find_j2sqlgen_default_by_name():
+  pass
+
+def find_pgexec_target_by_name():
+  pass
+
+def find_profiler_by_name():
+  pass
+
+def find_profilr_dataset_by_name():
+  pass
+
+def find_quasr_template_by_name():
+  pass
+
+def find_quasr_job_by_name():
+  pass
+
+def create_global():
+  pass
+
+def create_service_object():
+  pass
+
+def create_dfproc_processor():
+  pass
+
+def create_xfile_datasource():
+  pass
+
+def create_xfile_map():
+  pass
+
+def create_ngst_target():
+  pass
+
+def create_ngst_datastore():
+  pass
+
+def create_cyclops_trigger():
+  pass
+
+def create_j2sqlgen_default():
+  pass
+
+def create_j2sqlgen_target():
+  pass
+
+def create_pgexec_target():
+  pass
+
+def create_profiler():
+  pass
+
+def create_profilr_dataset():
+  pass
+
+def create_quasr_template():
+  pass
+
+def create_quasr_job():
+  pass
+
+def edit_global():
+  pass
+
+def edit_service_object():
+  pass
+
+def edit_dfproc_processor():
+  pass
+
+def edit_xfile_datasource():
+  pass
+
+def edit_xfile_map():
+  pass
+
+def edit_ngst_datastore():
+  pass
+
+def edit_ngst_target():
+  pass
+
+def edit_cyclops_trigger():
+  pass
+
+def edit_j2sqlgen_default():
+  pass
+
+def edit_j2sqlgen_target():
+  pass
+
+def edit_pgexec_target():
+  pass
+
+def edit_profiler():
+  pass
+
+def edit_profilr_dataset():
+  pass
+
+def edit_quasr_template():
+  pass
+
+def edit_quasr_job():
+  pass
+
+def list_globals():
+  pass
+
+def list_service_objects():
+  pass
+
+def list_dfproc_processors():
+  pass
+
+def list_xfile_datasources():
+  pass
+
+def list_xfile_maps():
+  pass
+
+def list_ngst_datastores():
+  pass
+
+def list_ngst_targets():
+  pass
+
+def list_cyclops_triggers():
+  pass
+
+def list_j2sqlgen_defaults():
+  pass
+
+def list_j2sqlgen_targets():
+  pass
+
+def list_pgexec_targets():
+  pass
+
+def list_profilers():
+  pass
+
+def list_profilr_datasets():
+  pass
+
+def list_quasr_templates():
+  pass
+
+def list_quasr_jobs():
+  pass
+
+
+def validate_xfile_config():
+  pass
+
 targets = {
   'dfproc': {
     'description': 'Create and transform Pandas dataframes',
-    'template': templates.DFPROC_TEMPLATE,
+    'template': templates.DFPROC_TEMPLATE,    
     'config_object_types': [
       {
         'name': 'globals',
@@ -62,6 +250,7 @@ targets = {
   'xfile': {
     'description': 'Read and transform CSV or JSON records',
     'template': templates.XFILE_TEMPLATE,
+    'validator_func': validate_xfile_config,
     'config_object_types': [
       {
         'name': 'globals',
@@ -69,7 +258,7 @@ targets = {
         'find_func': find_global_by_name,
         'create_func': create_global,
         'update_func': edit_global,
-        'list_func': list_globals
+        'list_func': list_globals,
       },
       {
         'name': 'service_objects',
@@ -82,7 +271,7 @@ targets = {
       {
         'name': 'sources', 
         'singular_label': 'datasource',
-        'find_func': find_datasource_by_name,
+        'find_func': find_xfile_datasource_by_name,
         'create_func': create_xfile_datasource,
         'update_func': edit_xfile_datasource,
         'list_func': list_xfile_datasources
@@ -123,7 +312,7 @@ targets = {
         'find_func': find_ngst_datastore_by_name,
         'create_func': create_ngst_datastore,
         'update_func': edit_ngst_datastore,
-        'list_func': list_ngst_datastore
+        'list_func': list_ngst_datastores
       },
       {
         'name': 'ingest_targets',
@@ -158,9 +347,9 @@ targets = {
       {
         'name': 'triggers',
         'singular_label': 'filesystem event trigger',
-        'find_func': find_trigger_by_name,
+        'find_func': find_cyclops_trigger_by_name,
         'create_func': create_cyclops_trigger,
-        'update_func': update_cyclops_trigger,
+        'update_func': edit_cyclops_trigger,
         'list_func': list_cyclops_triggers
       }
     ]
@@ -180,18 +369,18 @@ targets = {
       {
         'name': 'defaults',
         'singular_label': 'SQL generation default',
-        'find_func': find_j2sql_default_by_name,
-        'create_func': create_j2sql_default,
-        'update_func': edit_j2sql_default,
-        'list_func': list_j2sql_defaults
+        'find_func': find_j2sqlgen_default_by_name,
+        'create_func': create_j2sqlgen_default,
+        'update_func': edit_j2sqlgen_default,
+        'list_func': list_j2sqlgen_defaults
       },
       {
         'name': 'tables',
         'singular_label': 'j2sql target table',
-        'find_func': find_j2sql_target_by_name,
-        'create_func': create_j2sql_target,
-        'update_func': edit_j2sql_target,
-        'list_func': list_j2sql_targets
+        'find_func': find_j2sqlgen_target_by_name,
+        'create_func': create_j2sqlgen_target,
+        'update_func': edit_j2sqlgen_target,
+        'list_func': list_j2sqlgen_targets
       }
     ]
   },
@@ -246,7 +435,7 @@ targets = {
       {
         'name': 'profilers',
         'singular_label': 'profiler',
-        'find_func': find_profiler,
+        'find_func': find_profiler_by_name,
         'create_func': create_profiler,
         'update_func': edit_profiler,
         'list_func': list_profilers
@@ -254,7 +443,7 @@ targets = {
       {
         'name': 'datasets',
         'singular_label': 'profilr dataset',
-        'find_func': find_profilr_dataset,
+        'find_func': find_profilr_dataset_by_name,
         'create_func': create_profilr_dataset,
         'update_func': edit_profilr_dataset,
         'list_func': list_profilr_datasets
@@ -302,62 +491,7 @@ targets = {
 }
 
 
-def find_global_by_name():
-  pass
 
-def find_service_object_by_name():
-  pass
-
-def find_dfproc_processor_by_name():
-  pass
-
-def find_xfile_map_by_name():
-  pass
-
-def create_global():
-  pass
-
-def create_service_object():
-  pass
-
-def create_dfproc_processor():
-  pass
-
-def create_xfile_datasource():
-  pass
-
-def create_xfile_map():
-  pass
-
-def edit_global():
-  pass
-
-def edit_service_object():
-  pass
-
-def edit_dfproc_processor():
-  pass
-
-def edit_xfile_datasource():
-  pass
-
-def edit_xfile_map():
-  pass
-
-def list_globals():
-  pass
-
-def list_service_objects():
-  pass
-
-def list_dfproc_processors():
-  pass
-
-def list_xfile_datasources():
-  pass
-
-def list_xfile_maps():
-  pass
 
 
 def docopt_cmd(func):
@@ -368,19 +502,19 @@ def docopt_cmd(func):
     def fn(self, arg):
         try:
             opt = docopt_func(fn.__doc__, arg)
+            #opt = docopt_func(usage_string, arg)
 
         except DocoptExit as e:
             # The DocoptExit is thrown when the args do not match.
             # We print a message to the user and the usage block.
 
-            print '\nPlease specify one or more valid command parameters.'
-            print e
+            print('\nPlease specify one or more valid command parameters.')
+            print(e)
             return
 
         except SystemExit:
             # The SystemExit exception prints the usage for --help
             # We do not need to do the print here.
-
             return
 
         return func(self, opt)
@@ -391,55 +525,127 @@ def docopt_cmd(func):
     return fn
 
 
-def create_service_object():
-  pass
-
-def add_global():
-  pass
-
-def find_service_object_by_name():
-  pass
-
-def create_xfile_map():
-  pass
-
-def create_ngst_datastore():
-  pass
-
+def docstring(docstr, sep="\n"):
+    """
+    Decorator: Append to a function's docstring.
+    """
+    def _decorator(func):
+        if func.__doc__ == None:
+            func.__doc__ = docstr
+        else:
+            func.__doc__ = sep.join([func.__doc__, docstr])
+        return func
+    return _decorator
 
 
 class ConfigCLI(Cmd):
-    def __init__(self, name, config_target_name, **kwargs):
+    def __init__(self,
+                 name,
+                 target_name,
+                 target_package,
+                 **kwargs):
+
         Cmd.__init__(self)
         self.name = name
-        self.prompt = ':::%s [%s]> ' % self.name        
-        
+        self.prompt = '__%s [%s]> ' % (self.name, target_name)
+        self.target_package = target_package
         #self.replay_stack = Stack()
 
-    def do_save(self, *cmd_args):
-      print('save placeholder')
+
+    def config_object_types(self):
+      return [conftype['singular_label'] for conftype in self.target_package['config_object_types']]
 
 
-    @docopt_cmd
-    def do_show(self, cmd_args):
-        '''Usage:
+    def usage_string_for_new(self):
+      template = '''Usage:
+          new ({options})
+      '''
+      return template.format(options=' | '.join(self.config_object_types()))
+    
+
+    def usage_string_for_find(self):
+      template = '''Usage:
+          find ({options})
+      '''      
+      return template.format(options=' | '.join(self.config_object_types()))
+
+
+    def usage_string_for_list(self):
+      template = '''Usage:
+          show ({options})
+      '''
+      return template.format(options=' | '.join(self.config_object_types()))
+
+
+    def get_selected_option(self, arg_dict, option_list):
+      for item in option_list:
+        if arg_dict.get(item) == True:
+          return item
+      return None
+
+
+    @contextmanager
+    def docopt_parse(self, usage_string, *cmd_args):
+      try:
+        args = docopt.docopt(usage_string, *cmd_args)
+        yield args, None            
+
+      except DocoptExit as e:
+        # The DocoptExit is thrown when the args do not match.
+        # We print a message to the user and the usage block.
+
+        error_msg = '\nPlease specify one or more valid command parameters.\n%s\n' % e
+        yield None, error_msg
+
+      except SystemExit:
+        # The SystemExit exception prints the usage for --help
+        # We do not need to do the print here.
+        raise
+
+    def do_new(self, *cmd_args):            
+      with self.docopt_parse(self.usage_string_for_new(), *cmd_args) as (args, error):
+        if not error:
+          
+          selection = self.get_selected_option(args, self.config_object_types())
+          print('you selected %s.' % selection)
+        else:
+          print(error)
+
+
+    def do_quit(self, *cmd_args):
+        print('%s CLI exiting.' % self.name)        
+        raise SystemExit
+
+
+    do_q = do_quit
+
+
+    '''
+    @docopt_cmd()
+    def do_show(self, *cmd_args):
+        Usage:
                   show (transform | shape | svcobj)
                   show transform <name>
                   show shape <name>
                   show svcobj <name>
-        '''
+       
+    '''
 
 def main(args):
     if args['--list-targets']:
       print(BANNER)
-      for key, value in targets.items():
-        print('|: %s (%s)' % (key, value['description']))
+      for name, target in targets.items():
+        print('|: %s (%s)' % (name, target['description']))
         print('|:')      
       print(BANNER_CLOSE)
       return
 
-    config_target = args['<target>']
-    config_cli = ConfigCLI('mkcfg', config_target)
+    config_target_name = args['<target>']
+    target_pkg = targets.get(config_target_name)
+    if not target_pkg:
+      print('Unsupported configuration target: %s' % config_target_name)
+
+    config_cli = ConfigCLI('mkcfg', config_target_name, target_pkg)
     config_cli.cmdloop()
 
 if __name__ == '__main__':
