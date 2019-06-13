@@ -80,9 +80,34 @@ def find_quasr_job_by_name():
 def create_global():
   pass
 
-def create_service_object():
-  pass
 
+def create_service_object_params():
+  so_params = {}
+  while True:
+      param_name = cli.InputPrompt('parameter name').show()
+      if not param_name:
+          break
+      param_value = cli.InputPrompt('parameter value').show()
+      if not param_value:
+          break
+
+      so_params[param_name] = param_value
+
+      should_continue = cli.InputPrompt('add another parameter (Y/n)?', 'y').show()
+      if should_continue.lower() != 'y':
+          break
+
+  return so_params
+
+
+def create_service_object(name=None):
+  print('+++ Register new service object')
+  so_name = name or cli.InputPrompt('service object name').show()
+  so_classname = cli.InputPrompt('service object class').show()
+  so_params = create_service_object_params()
+  return ServiceObjectSpec(so_name, so_classname, **so_params)
+
+  
 def create_dfproc_processor():
   pass
 
@@ -262,7 +287,7 @@ targets = {
       },
       {
         'name': 'service_objects',
-        'singular_label': 'service object',
+        'singular_label': 'service_object',
         'find_func': find_service_object_by_name,
         'create_func': create_service_object,
         'update_func': edit_service_object,
@@ -602,6 +627,7 @@ class ConfigCLI(Cmd):
         # We do not need to do the print here.
         raise
 
+
     def do_new(self, *cmd_args):            
       with self.docopt_parse(self.usage_string_for_new(), *cmd_args) as (args, error):
         if not error:
@@ -616,20 +642,8 @@ class ConfigCLI(Cmd):
         print('%s CLI exiting.' % self.name)        
         raise SystemExit
 
-
     do_q = do_quit
 
-
-    '''
-    @docopt_cmd()
-    def do_show(self, *cmd_args):
-        Usage:
-                  show (transform | shape | svcobj)
-                  show transform <name>
-                  show shape <name>
-                  show svcobj <name>
-       
-    '''
 
 def main(args):
     if args['--list-targets']:

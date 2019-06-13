@@ -32,12 +32,11 @@ mysql-connector-python = "==8.0.5"
 Flask = "==0.10.1"
 "Jinja2" = ">=2.8"
 MarkupSafe = "==0.23"
-"pyyaml" = "==4.2b1"
 SQLAlchemy = "==1.0.14"
 SQLAlchemy-Utils = "==0.32.14"
 Werkzeug = "==0.11.9"
 sh = "*"
-snap-micro = "*"
+snap-micro = ">=0.9.94"
 
 [dev-packages]
 
