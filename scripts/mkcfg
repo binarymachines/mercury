@@ -120,6 +120,9 @@ def create_xfile_datasource(name=None):
 
 
 def create_xfile_fields():
+  print('+++')
+  print('+++ Add fields to this map')
+  print('+++')
   fieldspecs = []
   while True:
       field_name = cli.InputPrompt('field name').show()
@@ -242,16 +245,25 @@ def edit_quasr_job():
 def list_globals():
   pass
 
-def list_service_objects():
-  pass
+def list_service_objects(service_objects):
+  if not len(service_objects):
+    print('No service objects registered.')
+    return
+    
 
 def list_dfproc_processors():
   pass
 
-def list_xfile_datasources():
-  pass
+def list_xfile_datasources(datasources):
+  if not len(datasources):
+    print("No datasources registered.")
+    return
 
 def list_xfile_maps(maps):
+  if not len(maps):
+    print("No maps registered.")
+    return
+
   print('maps:')
   for mapspec in maps:
     print('\t%s:' % mapspec.name)
@@ -333,6 +345,7 @@ targets = {
       {
         'name': 'globals',
         'singular_label': 'global',
+        'plural_label': 'globals',
         'find_func': find_global_by_name,
         'create_func': create_global,
         'update_func': edit_global,
@@ -341,6 +354,7 @@ targets = {
       {
         'name': 'service_objects',
         'singular_label': 'service_object',
+        'plural_label': 'service_objects',
         'find_func': find_service_object_by_name,
         'create_func': create_service_object,
         'update_func': edit_service_object,
@@ -349,6 +363,7 @@ targets = {
       {
         'name': 'sources', 
         'singular_label': 'datasource',
+        'plural_label': 'datasources',
         'find_func': find_xfile_datasource_by_name,
         'create_func': create_xfile_datasource,
         'update_func': edit_xfile_datasource,
@@ -357,6 +372,7 @@ targets = {
       {
         'name': 'maps',
         'singular_label': 'map',
+        'plural_label': 'maps',
         'find_func': find_xfile_map_by_name,
         'create_func': create_xfile_map,
         'update_func': edit_xfile_map,
@@ -627,35 +643,39 @@ class ConfigCLI(Cmd):
         self.configuration = {}
         #self.replay_stack = Stack()
 
-    def find_config_package_by_label(self, label):
+    def find_config_package_by_plural_label(self, label):
       for config_object_type in self.target_package['config_object_types']:
-        if config_object_type['singular_label'] == label:
+        if config_object_type['plural_label'] == label:
           return config_object_type
       
 
-    def config_object_types(self):
+    def config_object_singular_labels(self):
       return [conftype['singular_label'] for conftype in self.target_package['config_object_types']]
+
+
+    def config_object_plural_labels(self):
+      return [conftype['plural_label'] for conftype in self.target_package['config_object_types']]
 
 
     def usage_string_for_new(self):
       template = '''Usage:
           new ({options})
       '''
-      return template.format(options=' | '.join(self.config_object_types()))
+      return template.format(options=' | '.join(self.config_object_singular_labels()))
     
 
     def usage_string_for_find(self):
       template = '''Usage:
           find ({options})
       '''      
-      return template.format(options=' | '.join(self.config_object_types()))
+      return template.format(options=' | '.join(self.config_object_singular_labels()))
 
 
     def usage_string_for_list(self):
       template = '''Usage:
           list ({options})
       '''
-      return template.format(options=' | '.join(self.config_object_types()))
+      return template.format(options=' | '.join(self.config_object_plural_labels()))
 
 
     def get_selected_option(self, arg_dict, option_list):
@@ -687,22 +707,25 @@ class ConfigCLI(Cmd):
     def do_list(self, *cmd_args):
       with self.docopt_parse(self.usage_string_for_list(), *cmd_args) as (args, error):
         if not error:
-          
-          selection = self.get_selected_option(args, self.config_object_types())
-          pkg = self.find_config_package_by_label(selection)
+          selection = self.get_selected_option(args, self.config_object_plural_labels())
+          pkg = self.find_config_package_by_plural_label(selection)
           if not pkg:
             print('!!! ERROR: No configuration package found with label "%s".' % selection)
 
           list_function = pkg['list_func']
+          if not self.configuration.get(pkg['name']):
+            self.configuration[pkg['name']] = []
           objects_to_list = self.configuration[pkg['name']]
-          list_function(pkg['name'], objects_to_list)
+          list_function(objects_to_list)
+        else:
+          print(error)
 
 
     def do_new(self, *cmd_args):            
       with self.docopt_parse(self.usage_string_for_new(), *cmd_args) as (args, error):
         if not error:
           
-          selection = self.get_selected_option(args, self.config_object_types())
+          selection = self.get_selected_option(args, self.config_object_singular_labels())
           #print('you selected %s.' % selection)
           pkg = self.find_config_package_by_label(selection)
           if not pkg:
@@ -710,7 +733,7 @@ class ConfigCLI(Cmd):
 
           config_object = pkg['create_func']()
 
-          if not self.configuration[pkg['name']]:
+          if not self.configuration.get(pkg['name']):
             self.configuration[pkg['name']] = []
 
           self.configuration[pkg['name']].append(config_object)
