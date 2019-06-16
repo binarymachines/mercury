@@ -336,7 +336,23 @@ def main(args):
                                                       table_creation_context)
 
         print(generate_sql(tablespec, table_creation_context))
-        return       
+        return 
+    if args.get('--tables'):
+        list_string = args['<comma_delim_tbl_list>']
+        table_names = [t.lstrip().rstrip() for t in list_string.split(',')]
+        for table_name in table_names:
+            tablecfg = find_table_config(table_name, json_dbschema)
+            if not tablecfg:
+                print('No table "%s" defined in schema file %s.' % (table_name, schema_filename))
+                return
+            tablespec = create_tablespec_from_json_config(table_name,
+                                                      tablecfg,
+                                                      project_schema,
+                                                      table_creation_context)
+
+            print(generate_sql(tablespec, table_creation_context))
+            print('\n')
+
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)

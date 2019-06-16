@@ -19,6 +19,7 @@ import re
 import docopt
 from collections import namedtuple
 from snap import snap, common
+from mercury import journaling as jrnl
 
 
 PARAM_DELIMITER = ':'
@@ -38,6 +39,16 @@ type_formats = {
 }
 
 Slot = namedtuple('Slot', 'name datatype')
+ # We are standardizing on three categories of DataCondition: "note", "flag", and "error".
+ # A "note" indicates something which the reader of the report may want to know about,
+ # but is not consequential in terms of data quality, and therefore is safe to ignore.
+ #
+ # A "flag" is a condition which requires human attention, but does not necessarily mean
+ # that the dataset under analysis contains an error.
+ #
+ # An "error" means that some property of the analyzed dataset violates expected standards. 
+
+DataCondition = namedtuple('DataCondition', 'category message')
 
 class QaSqlNode(object):
     def __init__(self, query_template):
@@ -85,7 +96,9 @@ class QaJobRunner(object):
     def __init__(self, yaml_config):
         self.qa_nodes = {}
         self.config = yaml_config
+        print('### initializing services...', file=sys.stderr)
         self.service_registry = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
+        print('### services spun up.', file=sys.stderr)
         self.analyzers = {}
 
         job_config_group = yaml_config['jobs']
@@ -206,15 +219,15 @@ class QaJobRunner(object):
         result = []
         analyzer_func = self._lookup_analyzer(job_name)
         if analyzer_func:
-            for condition in analyzer_func(raw_outputs):
-                result.append({'type': condition.type, 'message': condition.message})
+            for condition in analyzer_func(raw_outputs, self.service_registry):
+                result.append({'type': condition.category, 'message': condition.message})
         return result
 
 
     def run(self, job_name, preview_mode=False, **kwargs):
         # execute query -- must return record generator
-        # call job node's generate_outputs() method and pass in generator
-        # if there is an analyzer attached to this job, pass it the outputs
+        # call the job node's generate_outputs() method and pass in generator
+        # if there is an analyzer attached to this job, pass the outputs to it
         # return the raw and analyzed outputs
         node = self._lookup_node(job_name)
         query = node.generate_query(**kwargs)
@@ -222,6 +235,7 @@ class QaJobRunner(object):
         if preview_mode:
             print(query)
         else:
+            print('### running QA job "%s".' % job_name, file=sys.stderr)
             job_config_group = self.config['jobs']
             exec_func_name = job_config_group[job_name]['executor_function']
             output_builder_func_name = job_config_group[job_name]['builder_function']
@@ -233,7 +247,6 @@ class QaJobRunner(object):
             raw_outputs =  output_builder_func(query_executor(query, self.service_registry, **kwargs))
             self.validate_outputs(raw_outputs, job_name)
             result['job_output'] = raw_outputs
-
             result['analysis_ouptut'] = self.analyze(raw_outputs, job_name)
 
         return result
@@ -281,6 +294,7 @@ def main(args):
     configfile = args['<configfile>']
     yaml_config = common.read_config_file(configfile)
     preview_mode = False
+    timelog = jrnl.TimeLog()
 
     if args['--preview'] == True:
         preview_mode = True
@@ -307,11 +321,16 @@ def main(args):
     job_runner = QaJobRunner(yaml_config)
 
     if args['--job']:
-        jobname = args['<jobname>']
-        #print(job_runner.get_sql_template(jobname))        
+        jobname = args['<jobname>']       
         input_params = read_params_from_args(args)
 
+        print('### running in single-job mode.', file=sys.stderr)
+        print('### target job: %s' % jobname, file=sys.stderr)
+        
         job_params = job_runner.convert_input_params(jobname, **input_params)
+        print('### job parameters:',  file=sys.stderr)
+        print(common.jsonpretty(job_params), file=sys.stderr)
+
         if preview_mode:
             job_runner._lookup_node(jobname).validate_input_types(**input_params)
             print(job_runner.get_sql_template(jobname).format(**input_params))
@@ -348,7 +367,9 @@ def main(args):
                 if preview_mode:
                     print(job_runner.get_sql_template(jobname).format(**input_params))
                 else:
-                    print(json.dumps(job_runner.run(jobname, **input_params)))
+                    with jrnl.stopwatch('qa_job', timelog):
+                        print(json.dumps(job_runner.run(jobname, **input_params)))
+                    print(common.jsonpretty(timelog.readout), file=sys.stderr)
         return
 
 

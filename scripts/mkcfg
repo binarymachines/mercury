@@ -14,9 +14,11 @@ from contextlib import contextmanager
 from cmd import Cmd
 from snap import cli_tools as cli
 from mercury import configtemplates as templates
+from mercury import metaobjects as meta
 import docopt
 from docopt import docopt as docopt_func
 from docopt import DocoptExit
+
 
 BANNER = '''
 ___________________________________________________________________________
@@ -101,21 +103,66 @@ def create_service_object_params():
 
 
 def create_service_object(name=None):
+  print('+++')
   print('+++ Register new service object')
+  print('+++')
   so_name = name or cli.InputPrompt('service object name').show()
   so_classname = cli.InputPrompt('service object class').show()
   so_params = create_service_object_params()
-  return ServiceObjectSpec(so_name, so_classname, **so_params)
+  return meta.ServiceObjectSpec(so_name, so_classname, **so_params)
 
   
 def create_dfproc_processor():
   pass
 
-def create_xfile_datasource():
+def create_xfile_datasource(name=None):
   pass
 
-def create_xfile_map():
-  pass
+
+def create_xfile_fields():
+  fieldspecs = []
+  while True:
+      field_name = cli.InputPrompt('field name').show()
+      if not field_name:
+          break
+      
+      fieldspec = meta.XfileFieldSpec(field_name)
+
+      should_add_parameters = cli.InputPrompt('add parameters to this field (Y/n)?', 'y').show()
+      if should_add_parameters.lower() == 'y':
+        while True:
+          param_name = cli.InputPrompt('parameter name').show()
+          if not param_name:
+              break
+          param_value = cli.InputPrompt('parameter value').show()
+          if param_value is None:
+            param_value = ''
+          
+          fieldspec.add_parameter(param_name, param_value)
+          should_continue = cli.InputPrompt('add another parameter (Y/n)?', 'y').show()
+          if should_continue.lower() != 'y':
+            break
+
+      fieldspecs.append(fieldspec)
+      should_continue = cli.InputPrompt('add another field (Y/n)?', 'y').show()
+      if should_continue.lower() != 'y':
+          break
+
+  return fieldspecs
+
+
+def create_xfile_map(name=None):
+  print('+++')
+  print('+++ Register new xfile map')
+  print('+++')
+  map_name = name or cli.InputPrompt('map name').show()
+
+  map_fields = create_xfile_fields()
+  lookup_src_name = 'nosource'
+  mapspec = meta.XfileMapSpec(map_name, lookup_src_name)
+  mapspec.add_field_specs(map_fields)
+  return mapspec
+
 
 def create_ngst_target():
   pass
@@ -204,8 +251,14 @@ def list_dfproc_processors():
 def list_xfile_datasources():
   pass
 
-def list_xfile_maps():
-  pass
+def list_xfile_maps(maps):
+  print('maps:')
+  for mapspec in maps:
+    print('\t%s:' % mapspec.name)
+    for field in mapspec.fields:
+      print('\t\t- %s:' % field.name)
+      for param in field.parameters:
+        print('\t\t\t%s: %s' % (param.name, param.value))
 
 def list_ngst_datastores():
   pass
@@ -516,9 +569,6 @@ targets = {
 }
 
 
-
-
-
 def docopt_cmd(func):
     """
     This decorator is used to simplify the try/except block and pass the result
@@ -574,8 +624,14 @@ class ConfigCLI(Cmd):
         self.name = name
         self.prompt = '__%s [%s]> ' % (self.name, target_name)
         self.target_package = target_package
+        self.configuration = {}
         #self.replay_stack = Stack()
 
+    def find_config_package_by_label(self, label):
+      for config_object_type in self.target_package['config_object_types']:
+        if config_object_type['singular_label'] == label:
+          return config_object_type
+      
 
     def config_object_types(self):
       return [conftype['singular_label'] for conftype in self.target_package['config_object_types']]
@@ -597,7 +653,7 @@ class ConfigCLI(Cmd):
 
     def usage_string_for_list(self):
       template = '''Usage:
-          show ({options})
+          list ({options})
       '''
       return template.format(options=' | '.join(self.config_object_types()))
 
@@ -628,12 +684,37 @@ class ConfigCLI(Cmd):
         raise
 
 
+    def do_list(self, *cmd_args):
+      with self.docopt_parse(self.usage_string_for_list(), *cmd_args) as (args, error):
+        if not error:
+          
+          selection = self.get_selected_option(args, self.config_object_types())
+          pkg = self.find_config_package_by_label(selection)
+          if not pkg:
+            print('!!! ERROR: No configuration package found with label "%s".' % selection)
+
+          list_function = pkg['list_func']
+          objects_to_list = self.configuration[pkg['name']]
+          list_function(pkg['name'], objects_to_list)
+
+
     def do_new(self, *cmd_args):            
       with self.docopt_parse(self.usage_string_for_new(), *cmd_args) as (args, error):
         if not error:
           
           selection = self.get_selected_option(args, self.config_object_types())
-          print('you selected %s.' % selection)
+          #print('you selected %s.' % selection)
+          pkg = self.find_config_package_by_label(selection)
+          if not pkg:
+            print('!!! ERROR: No configuration package found with label "%s".' % selection)
+
+          config_object = pkg['create_func']()
+
+          if not self.configuration[pkg['name']]:
+            self.configuration[pkg['name']] = []
+
+          self.configuration[pkg['name']].append(config_object)
+
         else:
           print(error)
 
@@ -658,6 +739,7 @@ def main(args):
     target_pkg = targets.get(config_target_name)
     if not target_pkg:
       print('Unsupported configuration target: %s' % config_target_name)
+      return
 
     config_cli = ConfigCLI('mkcfg', config_target_name, target_pkg)
     config_cli.cmdloop()

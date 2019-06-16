@@ -36,7 +36,7 @@ SQLAlchemy = "==1.0.14"
 SQLAlchemy-Utils = "==0.32.14"
 Werkzeug = "==0.11.9"
 sh = "*"
-snap-micro = ">=0.9.94"
+snap-micro = ">=0.9.95"
 
 [dev-packages]
 

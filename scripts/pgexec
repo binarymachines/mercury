@@ -68,7 +68,17 @@ def read_stdin():
         yield line.lstrip().rstrip()
 
 
-def main(args):    
+def parse_params(param_string):
+    params = {}
+    tokens = param_string.split(',')
+    for t in tokens:
+        subtokens=t.split(':')
+        key = subtokens[0].strip()
+        value = subtokens[1].strip()
+        params[key] = value
+    return params
+
+def main(args):
     preview_mode = False
     if args['--preview']:
         preview_mode = True
@@ -98,7 +108,18 @@ def main(args):
                      '-d', args['<database>']]
         
         if args['--file'] is True:
-            psql_args.extend(['-f', args['<sqlfile>']])
+            if len(args['--params']):
+                raw_query = None
+                with open(args['<sqlfile>']) as f:
+                    raw_query = f.read()
+                params = parse_params(args['--params'][0])
+                query = raw_query.format(**params)
+                if preview_mode:
+                    print(query)
+                    return
+                psql_args.extend(['-c', query])                
+            else:
+                psql_args.extend(['-f', args['<sqlfile>']])
 
         elif args['--query'] is True:
             psql_args.extend(['-c', args['<query>']])

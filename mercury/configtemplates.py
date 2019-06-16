@@ -7,7 +7,37 @@ globals:
 '''
 
 XFILE_TEMPLATE = '''
+globals:
+  project_home:                {{ project.home }}
+  service_module:              {{ project.service_module }} 
+  datastore_module:            {{ project.datastore_module }}
 
+service_objects:
+{% for service in config.services %}
+  {{service.alias}}:
+      class: {{service.classname}}
+      init_params:
+      {% for param in service.params %}
+          - name: param.name
+            value: param.value
+      {% endfor %}
+{% endfor %}
+
+maps:
+{% for map in config.maps%}
+  {{ map.name }}:
+    lookup_source: {{ map.lookup_source}}
+    settings: 
+      - name: use_default_identity_transform
+              value: True
+    fields:
+      {% for field in map.fields %}
+        - {{ field.name }}
+          {% for p in field.parameters %}
+          {{ p.name }}: {{ p.value }}
+          {% endfor %}
+      {% endfor %}
+{% endfor %}}
 '''
 
 NGST_TEMPLATE = '''
