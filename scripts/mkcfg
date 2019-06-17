@@ -11,6 +11,8 @@ Options:
 
 import os, sys
 from contextlib import contextmanager
+import itertools
+from enum import Enum
 from cmd import Cmd
 from snap import cli_tools as cli
 from mercury import configtemplates as templates
@@ -32,6 +34,22 @@ ___________________________________________________________________________
 
 BANNER_CLOSE = '|__________________________________________________________________________\n'
 
+
+class Whitespace(Enum):
+  space = ' '
+  tab = '\t'
+
+
+def tab(num_tabs):
+  return ''.join(itertools.repeat('\t', num_tabs))
+  
+
+def space(num_spaces):
+  return ''.join(itertools.repeat(' ', num_spaces))
+
+
+def indent(num_indents, whitespace_type):
+  return ''.join(itertools.repeat(whitespace_type, num_indents))
 
 
 def find_global_by_name():
@@ -249,7 +267,16 @@ def list_service_objects(service_objects):
   if not len(service_objects):
     print('No service objects registered.')
     return
-    
+
+  print('service_objects:')
+  for so in service_objects:
+    print('%s%s:' % (tab(1), so.alias))
+    print('%sclass: %s' % (tab(2), so.classname))
+    print('%sinit_params:' % tab(2))
+    for p in so.init_params:
+      print('%s- name: %s' % (tab(3), p.name))
+      print('%s  value: %s' % (tab(3), p.value))
+
 
 def list_dfproc_processors():
   pass
@@ -266,11 +293,11 @@ def list_xfile_maps(maps):
 
   print('maps:')
   for mapspec in maps:
-    print('\t%s:' % mapspec.name)
+    print('%s%s:' % (tab(1), mapspec.name))
     for field in mapspec.fields:
-      print('\t\t- %s:' % field.name)
+      print('%s- %s:' % (tab(2), field.name))
       for param in field.parameters:
-        print('\t\t\t%s: %s' % (param.name, param.value))
+        print('%s%s: %s' % (tab(3), param.name, param.value))
 
 def list_ngst_datastores():
   pass
@@ -647,6 +674,12 @@ class ConfigCLI(Cmd):
       for config_object_type in self.target_package['config_object_types']:
         if config_object_type['plural_label'] == label:
           return config_object_type
+
+
+    def find_config_package_by_singular_label(self, label):
+      for config_object_type in self.target_package['config_object_types']:
+        if config_object_type['singular_label'] == label:
+          return config_object_type
       
 
     def config_object_singular_labels(self):
@@ -727,7 +760,7 @@ class ConfigCLI(Cmd):
           
           selection = self.get_selected_option(args, self.config_object_singular_labels())
           #print('you selected %s.' % selection)
-          pkg = self.find_config_package_by_label(selection)
+          pkg = self.find_config_package_by_singular_label(selection)
           if not pkg:
             print('!!! ERROR: No configuration package found with label "%s".' % selection)
 
