@@ -4,6 +4,7 @@
      Usage:  
         j2sqlgen --config <configfile> --source <schemafile> [(--schema <db_schema>)] --table <tablename>
         j2sqlgen --config <configfile> --source <schemafile> [(--schema <db_schema>)] --tables <comma_delim_tbl_list>
+        j2sqlgen --config <configfile> --source <schemafile> [(--schema <db_schema>)] --all_tables
         j2sqlgen --config <configfile> --source <schemafile> --list_tables
 
 '''
@@ -337,10 +338,10 @@ def main(args):
 
         print(generate_sql(tablespec, table_creation_context))
         return 
-    if args.get('--tables'):
+    elif args.get('--tables'):
         list_string = args['<comma_delim_tbl_list>']
-        table_names = [t.lstrip().rstrip() for t in list_string.split(',')]
-        for table_name in table_names:
+        selected_table_names = [t.lstrip().rstrip() for t in list_string.split(',')]
+        for table_name in selected_table_names:
             tablecfg = find_table_config(table_name, json_dbschema)
             if not tablecfg:
                 print('No table "%s" defined in schema file %s.' % (table_name, schema_filename))
@@ -351,7 +352,22 @@ def main(args):
                                                       table_creation_context)
 
             print(generate_sql(tablespec, table_creation_context))
+            print('\n')                
+    elif args.get('--all_tables'):
+        # generate all the tables specified in the metadata file
+        for table_name in tablenames:
+            tablecfg = find_table_config(table_name, json_dbschema)
+            if not tablecfg:
+                print('No table "%s" defined in schema file %s.' % (table_name, schema_filename), file=sys.stderr)
+                exit(1)
+            tablespec = create_tablespec_from_json_config(table_name,
+                                                        tablecfg,
+                                                        project_schema,
+                                                        table_creation_context)
+
+            print(generate_sql(tablespec, table_creation_context))
             print('\n')
+        return 
 
 
 if __name__ == '__main__':
