@@ -40,3 +40,9 @@ class XfileMapSpec(object):
 
     def add_field_specs(self, fieldspec_array):
         self.fields.extend(fieldspec_array)
+
+
+class DatasourceSpec(object):
+    def __init__(self, name, classname):
+        self.name = name
+        self.classname = classname

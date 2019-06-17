@@ -14,12 +14,14 @@ from contextlib import contextmanager
 import itertools
 from enum import Enum
 from cmd import Cmd
+from snap import common
 from snap import cli_tools as cli
 from mercury import configtemplates as templates
 from mercury import metaobjects as meta
 import docopt
 from docopt import docopt as docopt_func
 from docopt import DocoptExit
+import jinja2
 
 
 BANNER = '''
@@ -133,8 +135,21 @@ def create_service_object(name=None):
 def create_dfproc_processor():
   pass
 
+
 def create_xfile_datasource(name=None):
-  pass
+  print('+++')
+  print('+++ Create new datasource')
+  print('+++')
+
+  source_name = cli.InputPrompt('datasource name').show()
+  if not source_name:
+    return
+
+  classname = cli.InputPrompt('datasource class').show()
+  if not classname:
+    return
+
+  return meta.DatasourceSpec(source_name, classname)
 
 
 def create_xfile_fields():
@@ -285,6 +300,7 @@ def list_xfile_datasources(datasources):
   if not len(datasources):
     print("No datasources registered.")
     return
+  
 
 def list_xfile_maps(maps):
   if not len(maps):
@@ -298,6 +314,7 @@ def list_xfile_maps(maps):
       print('%s- %s:' % (tab(2), field.name))
       for param in field.parameters:
         print('%s%s: %s' % (tab(3), param.name, param.value))
+
 
 def list_ngst_datastores():
   pass
@@ -670,6 +687,18 @@ class ConfigCLI(Cmd):
         self.configuration = {}
         #self.replay_stack = Stack()
 
+
+
+    def build_project(self, config):
+      return {}
+
+    def generate_yaml_config(self):
+      print(common.jsonpretty(self.configuration))
+      config_template = self.target_package['template']
+      prj = self.build_project(self.configuration)
+      j2template = jinja2.Environment(loader=jinja2.BaseLoader).from_string(config_template)
+      #data = j2template.render(project=prj)
+      
     def find_config_package_by_plural_label(self, label):
       for config_object_type in self.target_package['config_object_types']:
         if config_object_type['plural_label'] == label:
@@ -773,6 +802,23 @@ class ConfigCLI(Cmd):
 
         else:
           print(error)
+
+    def do_validate(self, *cmd_args):
+      validate = self.target_package['validator_func']
+      yaml_config = self.generate_yaml_config()
+      errors = validate(yaml_config)
+      if not len(errors):
+        print('+++')
+        print('+++ Configuration is valid.')
+        print('+++')
+        return True
+      else:
+        print('!!!')
+        print('!!! The current configuration contains errors:')
+        for err in errors:
+          print('!%s%s' % (tab(1), err))
+        print('!!!')
+        return False
 
 
     def do_quit(self, *cmd_args):

@@ -195,8 +195,6 @@ def main(args):
     elif interactive_mode:
         print('placeholder for interactive mode')
 
-    
-        
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)    
