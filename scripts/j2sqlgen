@@ -185,7 +185,7 @@ class TableCreationContext(object):
         if not self.overrides:
             return self.defaults.get('column_suffix', '')
         if not self.overrides.get(table_name):
-            return self.defaults.get('column_suffix')
+            return self.defaults.get('column_suffix', '')
 
         suffix = self.overrides[table_name].get('column_suffix', '')
 
