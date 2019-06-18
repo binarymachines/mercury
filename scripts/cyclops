@@ -14,8 +14,10 @@ Options:
 
 import os
 import sys
+import re
 import time
 import json
+from collections import namedtuple
 import datetime
 import docopt
 from watchdog.observers import Observer
@@ -46,6 +48,7 @@ class Watcher:
             print('Error handling filesystem evemt: %s' % err)
         self.observer.join()
 
+DispatchTarget = namedtuple('DispatchTarget', 'filter_regex handler_func')
 
 class EventDispatcher(FileSystemEventHandler):
     def __init__(self, service_registry, **kwargs):
@@ -53,12 +56,12 @@ class EventDispatcher(FileSystemEventHandler):
         self.dispatch_table = {}
         self.preview_mode = kwargs.get('preview', False) 
 
-    def register_event_type(self, event_type, handler_function):
+    def register_event_type(self, event_type, regex, handler_function):
         '''event_type may be one of: created, modified, ...
         '''
         if event_type not in FILESYSTEM_EVENT_TYPES:
             raise Exception('Invalid event type: %s. Valid event types are: %s' % (event_type, FILESYSTEM_EVENT_TYPES))
-        self.dispatch_table[event_type] = handler_function
+        self.dispatch_table[event_type] = DispatchTarget(filter_regex=regex, handler_func=handler_function)
 
     def event_to_data(self, event):
         if hasattr(event, 'dest_path'):
@@ -76,11 +79,17 @@ class EventDispatcher(FileSystemEventHandler):
     def on_any_event(self, event):
         event_data = self.event_to_data(event)
         print('Detected filesystem event: %s' % event_data, file=sys.stderr)
-        target_function = self.dispatch_table.get(event.event_type)
-        if not target_function:
+        dispatch_target = self.dispatch_table.get(event.event_type)
+        if not dispatch_target:
             return
+
+        filepath = event_data['src_path']
+        filename = filepath.split(os.sep)[-1]
+        if not dispatch_target.filter_regex.match(filename):
+            return 
+
         if not self.preview_mode:
-            target_function(event_data, self.services)
+            dispatch_target.handler_func(event_data, self.services)
 
 
 def load_trigger_function(trigger_config, yaml_config):
@@ -110,7 +119,12 @@ def build_filesystem_watcher(trigger_name, yaml_config, **kwargs):
         raise Exception('The target watch-directory %s either does not exist, or is not a directory. Please check your config file.' 
                         % target_directory)
 
-    dispatcher.register_event_type(event_type, trigger_function)
+    filter_rx_string = trigger_config.get('filename_filter', '')
+    if filter_rx_string == '*':
+        filter_rx_string = ''
+    filter_regex = re.compile(filter_rx_string)
+    
+    dispatcher.register_event_type(event_type, filter_regex, trigger_function)
     watch_interval = 1  # TODO: make this a setting
     return Watcher(target_directory, dispatcher, watch_interval)
 
