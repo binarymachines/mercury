@@ -8,23 +8,22 @@ globals:
 
 XFILE_TEMPLATE = '''
 globals:
-  project_home:                {{ project.home }}
-  service_module:              {{ project.service_module }} 
-  datastore_module:            {{ project.datastore_module }}
+{% for gspec in project['globals'] %}  
+  {{ gspec.name }}: {{ gspec.value }}{% endfor %}
+  
 
 service_objects:
-{% for service in config.services %}
+{% for service in project['service_objects'] %}
   {{service.alias}}:
       class: {{service.classname}}
       init_params:
-      {% for param in service.params %}
+      {% for param in service.init_params %}
           - name: param.name
-            value: param.value
-      {% endfor %}
+            value: param.value{% endfor %}
 {% endfor %}
 
 maps:
-{% for map in config.maps%}
+{% for map in project['maps'] %}
   {{ map.name }}:
     lookup_source: {{ map.lookup_source}}
     settings: 
@@ -34,8 +33,7 @@ maps:
       {% for field in map.fields %}
         - {{ field.name }}
           {% for p in field.parameters %}
-          {{ p.name }}: {{ p.value }}
-          {% endfor %}
+          {{ p.name }}: {{ p.value }}{% endfor %}
       {% endfor %}
 {% endfor %}}
 '''

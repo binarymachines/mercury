@@ -2,7 +2,7 @@
 
 '''
 Usage:
-  mkcfg --list-targets
+  mkcfg --list
   mkcfg <target>
 
 Options:
@@ -100,7 +100,17 @@ def find_quasr_job_by_name():
   pass
 
 def create_global():
-  pass
+  print('+++')
+  print('+++ Create global setting')
+  print('+++')
+  setting_name = cli.InputPrompt('setting name').show()
+  if not setting_name:
+    return None
+  setting_value = cli.InputPrompt('setting value').show()
+  if not setting_value:
+    setting_value = ''
+  
+  return meta.Parameter(name=setting_name, value=setting_value)
 
 
 def create_service_object_params():
@@ -275,8 +285,15 @@ def edit_quasr_template():
 def edit_quasr_job():
   pass
 
-def list_globals():
-  pass
+def list_globals(global_settings):
+  if not len(global_settings):
+    print('No globals registered.')
+    return
+  
+  print('globals:')
+  for gs in global_settings:
+    print('%s%s: %s' % (tab(1), gs.name, gs.value))
+  
 
 def list_service_objects(service_objects):
   if not len(service_objects):
@@ -688,16 +705,16 @@ class ConfigCLI(Cmd):
         #self.replay_stack = Stack()
 
 
-
     def build_project(self, config):
       return {}
 
     def generate_yaml_config(self):
-      print(common.jsonpretty(self.configuration))
+      print(self.configuration)
       config_template = self.target_package['template']
       prj = self.build_project(self.configuration)
       j2template = jinja2.Environment(loader=jinja2.BaseLoader).from_string(config_template)
-      #data = j2template.render(project=prj)
+      yaml_conf = j2template.render(project=self.configuration)
+      return yaml_conf
       
     def find_config_package_by_plural_label(self, label):
       for config_object_type in self.target_package['config_object_types']:
@@ -803,6 +820,10 @@ class ConfigCLI(Cmd):
         else:
           print(error)
 
+    def do_preview(self, *cmd_args):
+      yconf = self.generate_yaml_config()
+      print(yconf)
+
     def do_validate(self, *cmd_args):
       validate = self.target_package['validator_func']
       yaml_config = self.generate_yaml_config()
@@ -829,7 +850,7 @@ class ConfigCLI(Cmd):
 
 
 def main(args):
-    if args['--list-targets']:
+    if args['--list']:
       print(BANNER)
       for name, target in targets.items():
         print('|: %s (%s)' % (name, target['description']))
