@@ -10,7 +10,6 @@ XFILE_TEMPLATE = '''
 globals:
 {% for gspec in project['globals'] %}  
   {{ gspec.name }}: {{ gspec.value }}{% endfor %}
-  
 
 service_objects:
 {% for service in project['service_objects'] %}
@@ -18,24 +17,23 @@ service_objects:
       class: {{service.classname}}
       init_params:
       {% for param in service.init_params %}
-          - name: param.name
-            value: param.value{% endfor %}
+          - name: {{ param.name }}
+            value: {{ param.value }}
+      {% endfor %}
 {% endfor %}
-
 maps:
 {% for map in project['maps'] %}
   {{ map.name }}:
     lookup_source: {{ map.lookup_source}}
     settings: 
       - name: use_default_identity_transform
-              value: True
+        value: True
     fields:
-      {% for field in map.fields %}
-        - {{ field.name }}
-          {% for p in field.parameters %}
+    {% for field in map.fields %}
+      - {{ field.name }}:{% for p in field.parameters %}
           {{ p.name }}: {{ p.value }}{% endfor %}
-      {% endfor %}
-{% endfor %}}
+    {% endfor %}
+{% endfor %}
 '''
 
 NGST_TEMPLATE = '''

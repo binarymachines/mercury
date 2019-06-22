@@ -10,6 +10,7 @@ Options:
 '''
 
 import os, sys
+from os import system, name
 from contextlib import contextmanager
 import itertools
 from enum import Enum
@@ -52,6 +53,159 @@ def space(num_spaces):
 
 def indent(num_indents, whitespace_type):
   return ''.join(itertools.repeat(whitespace_type, num_indents))
+
+def clear(): 
+    # for windows 
+    if name == 'nt': 
+        _ = system('cls') 
+
+    # for mac and linux(here, os.name is 'posix') 
+    else: 
+        _ = system('clear') 
+
+
+XFILE_FIELD_SOURCE_TYPES = [
+  {'name': 'record', 'label': 'input record'},
+  {'name': 'lookup', 'label': 'lookup function'},
+  {'name': 'lambda', 'label': 'lambda expression'}
+]
+
+xfile_field_type_lambda = {
+  'marquee': '''
+  :::
+  ::: set lambda-type field params
+  :::
+  ''',
+  'inputs': [
+    'name'
+  ],
+  'builder_func': lambda **kwargs: meta.XfileFieldSpec(kwargs['inputs']['name'],
+                                                       **(kwargs['outputs'])),
+  'outputs': [
+    {
+      'field_name': 'key',
+      'prompt': cli.InputPrompt('field from source record:'),
+      'required': True
+    },
+    {
+      'field_name': 'expression',
+      'prompt': cli.InputPrompt('lambda expression:'),
+      'required': True
+    },
+  ]
+}
+
+xfile_field_type_record = {
+  'marquee': '''
+  :::
+  ::: set record-type field params
+  :::
+  ''',
+  'inputs': [
+    'name'
+  ],
+  'builder_func': lambda **kwargs: meta.XfileFieldSpec(kwargs['inputs']['name'],
+                                                       **(kwargs['outputs'])),
+  'outputs': [
+    {
+      'field_name': 'key',
+      'prompt': cli.InputPrompt('field from source record:'),
+      'required': True
+    },
+  ]
+}
+
+xfile_field_sequence = {
+  'marquee': '''
+  +++ 
+  +++ Add field to xfile map
+  +++
+  ''',
+  'builder_func': lambda **kwargs: meta.XfileFieldSpec(kwargs['fieldname'], **(kwargs['parameters'])),
+  'prompts': [
+    {
+      'field_name': 'field_name',
+      'prompt': cli.InputPrompt('output field name'),
+      'required': True
+    },
+    {
+      'field_name': 'source',
+      'prompt': cli.MenuPrompt('field source:', XFILE_FIELD_SOURCE_TYPES),
+      'required': True,
+      'conditions': {
+        'lambda': {  
+          'sequence': xfile_field_type_lambda
+        },
+        'record': {
+          'sequence': xfile_field_type_record
+        },
+      } 
+    }
+  ]
+}
+
+
+xfile_globals_interaction_sequence = {
+  'marquee': '''
+  +++ 
+  +++ Create global settings group
+  +++
+  ''',
+  'builder_func': lambda **kwargs: kwargs['outputs'],
+  'prompts': [
+    {
+      'field_name': 'project_home',
+      'prompt': cli.InputPrompt('project home'),
+      'required': True
+    },
+    {
+      'field_name': 'datasource module',
+      'prompt': cli.InputPrompt('datasource module'),
+      'required': True
+    },
+    {
+      'field_name': 'service module',
+      'prompt': cli.InputPrompt('service module'),
+      'required': True
+    }
+
+  ]
+}
+
+class UISequenceRunner(object):
+  def __init__(self):
+    pass
+
+  def run(self, **sequence):
+    print(sequence['marquee'])
+    context = {
+      'inputs': {},
+      'outputs': {}
+    }
+    
+    for step in sequence['prompts']:
+      answer = step['prompt'].show()
+      if answer is None and step['required'] == True:
+        break
+      if answer is None and hasattr(step, 'default'):
+        answer = step['default']
+
+      context['outputs'][step['field_name']] = answer
+  
+    return sequence['builder_func'](**context)
+
+
+xfile_field_param_sequence = {
+
+  'marquee': '''
+  :::
+  ::: add parameter(s) to xfile map field
+  :::
+  ''',
+  'builder_func': lambda **kwargs: kwargs
+}
+
+
 
 
 def find_global_by_name():
@@ -99,7 +253,30 @@ def find_quasr_template_by_name():
 def find_quasr_job_by_name():
   pass
 
+
 def create_global():
+  # this will return a dictionary containing all global parameters for an xfile project
+  result =  UISequenceRunner().run(**xfile_globals_interaction_sequence)
+  print(common.jsonpretty(result))
+
+  # return all Parameter specs
+  for key, value in result.items():
+    yield meta.Parameter(name=key, value=value)
+
+  '''
+  answers = {}
+  print(xfile_globals_interaction_sequence['marquee'])
+
+  for step in xfile_globals_interaction_sequence['prompts']:
+    answer = step['prompt'].show()
+    if answer is None and step['required'] == True:
+      break
+    if answer is None and hasattr(step, 'default'):
+      answer = step['default']
+    answers[step['field_name']] = answer
+  
+  return xfile_globals_interaction_sequence['builder_func'](**answers)
+
   print('+++')
   print('+++ Create global setting')
   print('+++')
@@ -111,7 +288,7 @@ def create_global():
     setting_value = ''
   
   return meta.Parameter(name=setting_name, value=setting_value)
-
+  '''
 
 def create_service_object_params():
   so_params = {}
@@ -367,6 +544,8 @@ def list_quasr_jobs():
 def validate_xfile_config():
   pass
 
+
+
 targets = {
   'dfproc': {
     'description': 'Create and transform Pandas dataframes',
@@ -405,7 +584,7 @@ targets = {
     'config_object_types': [
       {
         'name': 'globals',
-        'singular_label': 'global',
+        'singular_label': 'globals',
         'plural_label': 'globals',
         'find_func': find_global_by_name,
         'create_func': create_global,
@@ -414,8 +593,8 @@ targets = {
       },
       {
         'name': 'service_objects',
-        'singular_label': 'service_object',
-        'plural_label': 'service_objects',
+        'singular_label': 'service',
+        'plural_label': 'services',
         'find_func': find_service_object_by_name,
         'create_func': create_service_object,
         'update_func': edit_service_object,
@@ -799,30 +978,37 @@ class ConfigCLI(Cmd):
         else:
           print(error)
 
+    do_ls = do_list
 
     def do_new(self, *cmd_args):            
       with self.docopt_parse(self.usage_string_for_new(), *cmd_args) as (args, error):
         if not error:
           
-          selection = self.get_selected_option(args, self.config_object_singular_labels())
-          #print('you selected %s.' % selection)
+          selection = self.get_selected_option(args, self.config_object_singular_labels())        
           pkg = self.find_config_package_by_singular_label(selection)
           if not pkg:
             print('!!! ERROR: No configuration package found with label "%s".' % selection)
 
-          config_object = pkg['create_func']()
+          # create func should always be a generator
+          config_objects = pkg['create_func']() 
 
           if not self.configuration.get(pkg['name']):
             self.configuration[pkg['name']] = []
 
-          self.configuration[pkg['name']].append(config_object)
+          for obj in config_objects:
+            self.configuration[pkg['name']].append(obj)
 
         else:
           print(error)
 
+    do_n = do_new
+
     def do_preview(self, *cmd_args):
       yconf = self.generate_yaml_config()
       print(yconf)
+
+    do_pre = do_preview
+
 
     def do_validate(self, *cmd_args):
       validate = self.target_package['validator_func']
@@ -840,6 +1026,31 @@ class ConfigCLI(Cmd):
           print('!%s%s' % (tab(1), err))
         print('!!!')
         return False
+
+    do_val = do_validate
+
+    def do_save(self, *cmd_args):
+
+      # TODO: validate config first
+      print('***')
+      print('*** Save xfile configuration file')
+      print('***')
+      
+      while True:
+        filename = cli.InputPrompt('output filename ').show()
+        if not filename:
+          return
+        if os.path.isfile(filename):
+          answer = cli.InputPrompt('filename "%s" already exists. Overwrite (y/N)?' % filename, 'n').show()
+          should_overwrite = answer.lower()
+          if should_overwrite == 'n':
+            print('\n')
+            continue
+
+        yaml_config = self.generate_yaml_config()
+        with open(filename, 'w') as f:
+          f.write(yaml_config)
+        break
 
 
     def do_quit(self, *cmd_args):
@@ -864,6 +1075,7 @@ def main(args):
       print('Unsupported configuration target: %s' % config_target_name)
       return
 
+    clear()
     config_cli = ConfigCLI('mkcfg', config_target_name, target_pkg)
     config_cli.cmdloop()
 
