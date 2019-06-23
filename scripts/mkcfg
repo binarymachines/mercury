@@ -12,6 +12,7 @@ Options:
 import os, sys
 from os import system, name
 from contextlib import contextmanager
+import copy
 import itertools
 from enum import Enum
 from cmd import Cmd
@@ -65,23 +66,21 @@ def clear():
 
 
 XFILE_FIELD_SOURCE_TYPES = [
-  {'name': 'record', 'label': 'input record'},
-  {'name': 'lookup', 'label': 'lookup function'},
-  {'name': 'lambda', 'label': 'lambda expression'}
+  {'value': 'record', 'label': 'input record'},
+  {'value': 'lookup', 'label': 'lookup function'},
+  {'value': 'lambda', 'label': 'lambda expression'}
 ]
 
-xfile_field_type_lambda = {
+xfile_field_src_lambda = {
   'marquee': '''
   :::
   ::: set lambda-type field params
   :::
   ''',
-  'inputs': [
-    'name'
-  ],
-  'builder_func': lambda **kwargs: meta.XfileFieldSpec(kwargs['inputs']['name'],
-                                                       **(kwargs['outputs'])),
-  'outputs': [
+  'inputs': {
+    'source': 'lambda'
+  },  
+  'prompts': [
     {
       'field_name': 'key',
       'prompt': cli.InputPrompt('field from source record:'),
@@ -95,15 +94,13 @@ xfile_field_type_lambda = {
   ]
 }
 
-xfile_field_type_record = {
+xfile_field_src_record = {
   'marquee': '''
   :::
   ::: set record-type field params
   :::
   ''',
-  'inputs': [
-    'name'
-  ],
+  'inputs': {},
   'builder_func': lambda **kwargs: meta.XfileFieldSpec(kwargs['inputs']['name'],
                                                        **(kwargs['outputs'])),
   'outputs': [
@@ -115,13 +112,36 @@ xfile_field_type_record = {
   ]
 }
 
+xfile_field_src_lookup = {
+  'marquee': '''
+  :::
+  ::: set record-type field params
+  :::
+  ''',
+  'inputs': {},
+  'builder_func': lambda **kwargs: meta.XfileFieldSpec(kwargs['inputs']['name'],
+                                                       **(kwargs['outputs'])),
+  'prompts': [
+    {
+      'field_name': 'key',
+      'prompt': cli.InputPrompt('field from source record:'),
+      'required': True
+    },
+  ]
+}
+
+
+def new_xfile_fieldspec(**kwargs):
+  return meta.XfileFieldSpec(kwargs['field_name'], **kwargs['field_params'])
+                             
+
 xfile_field_sequence = {
   'marquee': '''
   +++ 
-  +++ Add field to xfile map
+  +++ Add field to xfile record map
   +++
   ''',
-  'builder_func': lambda **kwargs: meta.XfileFieldSpec(kwargs['fieldname'], **(kwargs['parameters'])),
+  'builder_func': new_xfile_fieldspec,
   'prompts': [
     {
       'field_name': 'field_name',
@@ -129,17 +149,38 @@ xfile_field_sequence = {
       'required': True
     },
     {
-      'field_name': 'source',
+      'field_name': 'field_params',
       'prompt': cli.MenuPrompt('field source:', XFILE_FIELD_SOURCE_TYPES),
       'required': True,
       'conditions': {
         'lambda': {  
-          'sequence': xfile_field_type_lambda
+          'sequence': xfile_field_src_lambda
         },
         'record': {
-          'sequence': xfile_field_type_record
+          'sequence': xfile_field_src_record
         },
       } 
+    }
+  ]
+}
+
+xfile_map_sequence = {
+  'marquee': '''
+  +++
+  +++ Create new xfile map
+  +++
+  ''',
+  'builder_func': lambda **kwargs: meta.XfileMapSpec(kwargs['map_name'], kwargs['lookup_source']),
+  'prompts': [
+    {
+      'field_name': 'map_name',
+      'prompt': cli.InputPrompt('map name'),
+      'required': True
+    },
+    {
+      'field_name': 'lookup_source',
+      'prompt': cli.InputPrompt('lookup datasource name'),
+      'required': True
     }
   ]
 }
@@ -151,7 +192,7 @@ xfile_globals_interaction_sequence = {
   +++ Create global settings group
   +++
   ''',
-  'builder_func': lambda **kwargs: kwargs['outputs'],
+  'builder_func': lambda **kwargs: kwargs,
   'prompts': [
     {
       'field_name': 'project_home',
@@ -168,7 +209,6 @@ xfile_globals_interaction_sequence = {
       'prompt': cli.InputPrompt('service module'),
       'required': True
     }
-
   ]
 }
 
@@ -176,36 +216,48 @@ class UISequenceRunner(object):
   def __init__(self):
     pass
 
-  def run(self, **sequence):
+  def process_sequence(self, init_context=None, **sequence):
     print(sequence['marquee'])
-    context = {
-      'inputs': {},
-      'outputs': {}
-    }
+    context = {}
+    if init_context:
+      context.update(init_context)
     
+    if sequence.get('inputs'):
+      context.update(sequence['inputs'])
+
     for step in sequence['prompts']:
+      
       answer = step['prompt'].show()
+      print('$$ user entered "%s".' % answer)
+      print('$$ step conditions')
+      print(step.get('conditions'))
+
       if answer is None and step['required'] == True:
+        print('### BREAKOUT')
         break
+
       if answer is None and hasattr(step, 'default'):
+        print('## setting answer to default.')
         answer = step['default']
 
-      context['outputs'][step['field_name']] = answer
+      if step.get('conditions'):
+        print('## this step has conditions.')
+        if not step['conditions'].get(answer):
+          raise Exception('a step in the UI sequence returned an answer "%s" for which there is no condition.' % answer)
+        next_sequence = step['conditions'][answer]['sequence']
+        outgoing_context = copy.deepcopy(context)
+        context[step['field_name']] = self.process_sequence(**next_sequence)
+
+      else:
+        print('this step has NO conditions.')
+        context[step['field_name']] = answer
   
+    print(common.jsonpretty(context))
+    return context
+
+  def run(self, **sequence):
+    context = self.process_sequence(**sequence)
     return sequence['builder_func'](**context)
-
-
-xfile_field_param_sequence = {
-
-  'marquee': '''
-  :::
-  ::: add parameter(s) to xfile map field
-  :::
-  ''',
-  'builder_func': lambda **kwargs: kwargs
-}
-
-
 
 
 def find_global_by_name():
@@ -263,32 +315,6 @@ def create_global():
   for key, value in result.items():
     yield meta.Parameter(name=key, value=value)
 
-  '''
-  answers = {}
-  print(xfile_globals_interaction_sequence['marquee'])
-
-  for step in xfile_globals_interaction_sequence['prompts']:
-    answer = step['prompt'].show()
-    if answer is None and step['required'] == True:
-      break
-    if answer is None and hasattr(step, 'default'):
-      answer = step['default']
-    answers[step['field_name']] = answer
-  
-  return xfile_globals_interaction_sequence['builder_func'](**answers)
-
-  print('+++')
-  print('+++ Create global setting')
-  print('+++')
-  setting_name = cli.InputPrompt('setting name').show()
-  if not setting_name:
-    return None
-  setting_value = cli.InputPrompt('setting value').show()
-  if not setting_value:
-    setting_value = ''
-  
-  return meta.Parameter(name=setting_name, value=setting_value)
-  '''
 
 def create_service_object_params():
   so_params = {}
@@ -316,7 +342,7 @@ def create_service_object(name=None):
   so_name = name or cli.InputPrompt('service object name').show()
   so_classname = cli.InputPrompt('service object class').show()
   so_params = create_service_object_params()
-  return meta.ServiceObjectSpec(so_name, so_classname, **so_params)
+  yield meta.ServiceObjectSpec(so_name, so_classname, **so_params)
 
   
 def create_dfproc_processor():
@@ -375,16 +401,13 @@ def create_xfile_fields():
 
 
 def create_xfile_map(name=None):
-  print('+++')
-  print('+++ Register new xfile map')
-  print('+++')
-  map_name = name or cli.InputPrompt('map name').show()
-
-  map_fields = create_xfile_fields()
-  lookup_src_name = 'nosource'
-  mapspec = meta.XfileMapSpec(map_name, lookup_src_name)
-  mapspec.add_field_specs(map_fields)
-  return mapspec
+  mapspec = UISequenceRunner().run(**xfile_map_sequence)
+  while True:
+    fieldspec = UISequenceRunner().run(**xfile_field_sequence)
+    mapspec.add_field_spec(fieldspec)
+    break
+  
+  yield mapspec
 
 
 def create_ngst_target():

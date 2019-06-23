@@ -38,6 +38,9 @@ class XfileMapSpec(object):
     def add_field(self, name, **params):
         self.fields.append(XfileFieldSpec(name, **params))
 
+    def add_field_spec(self, fieldspec):
+        self.fields.append(fieldspec)
+
     def add_field_specs(self, fieldspec_array):
         self.fields.extend(fieldspec_array)
 
