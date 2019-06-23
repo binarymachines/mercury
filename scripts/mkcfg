@@ -65,6 +65,27 @@ def clear():
         _ = system('clear') 
 
 
+service_object_sequence = {
+  'marquee': '''
+  +++
+  +++ Register service object
+  +++
+  ''',
+  'steps': [
+    {
+      'field_name': 'alias',
+      'prompt': cli.InputPrompt('service object alias'),
+      'required': True
+    },
+    {
+      'field_name': 'class',
+      'prompt': cli.InputPrompt('service object class'),
+      'required': True
+    }
+  ]
+
+}
+
 XFILE_FIELD_SOURCE_TYPES = [
   {'value': 'record', 'label': 'input record'},
   {'value': 'lookup', 'label': 'lookup function'},
@@ -80,7 +101,7 @@ xfile_field_src_lambda = {
   'inputs': {
     'source': 'lambda'
   },  
-  'prompts': [
+  'steps': [
     {
       'field_name': 'key',
       'prompt': cli.InputPrompt('field from source record:'),
@@ -103,7 +124,7 @@ xfile_field_src_record = {
   'inputs': {},
   'builder_func': lambda **kwargs: meta.XfileFieldSpec(kwargs['inputs']['name'],
                                                        **(kwargs['outputs'])),
-  'outputs': [
+  'steps': [
     {
       'field_name': 'key',
       'prompt': cli.InputPrompt('field from source record:'),
@@ -121,7 +142,7 @@ xfile_field_src_lookup = {
   'inputs': {},
   'builder_func': lambda **kwargs: meta.XfileFieldSpec(kwargs['inputs']['name'],
                                                        **(kwargs['outputs'])),
-  'prompts': [
+  'steps': [
     {
       'field_name': 'key',
       'prompt': cli.InputPrompt('field from source record:'),
@@ -142,7 +163,7 @@ xfile_field_sequence = {
   +++
   ''',
   'builder_func': new_xfile_fieldspec,
-  'prompts': [
+  'steps': [
     {
       'field_name': 'field_name',
       'prompt': cli.InputPrompt('output field name'),
@@ -171,7 +192,7 @@ xfile_map_sequence = {
   +++
   ''',
   'builder_func': lambda **kwargs: meta.XfileMapSpec(kwargs['map_name'], kwargs['lookup_source']),
-  'prompts': [
+  'steps': [
     {
       'field_name': 'map_name',
       'prompt': cli.InputPrompt('map name'),
@@ -192,8 +213,7 @@ xfile_globals_interaction_sequence = {
   +++ Create global settings group
   +++
   ''',
-  'builder_func': lambda **kwargs: kwargs,
-  'prompts': [
+  'steps': [
     {
       'field_name': 'project_home',
       'prompt': cli.InputPrompt('project home'),
@@ -212,6 +232,26 @@ xfile_globals_interaction_sequence = {
   ]
 }
 
+xfile_datasource_sequence = {
+  'marquee': '''
+  +++
+  +++ Register datasource
+  +++
+  ''',
+  'steps': [
+    {
+      'field_name': 'alias',
+      'prompt': cli.InputPrompt('datasource alias'),
+      'required': True
+    },
+    {
+      'field_name': 'class',
+      'prompt': cli.InputPrompt('datasource class'),
+      'required': True 
+    }
+  ]
+}
+
 class UISequenceRunner(object):
   def __init__(self):
     pass
@@ -225,31 +265,23 @@ class UISequenceRunner(object):
     if sequence.get('inputs'):
       context.update(sequence['inputs'])
 
-    for step in sequence['prompts']:
+    for step in sequence['steps']:
       
       answer = step['prompt'].show()
-      print('$$ user entered "%s".' % answer)
-      print('$$ step conditions')
-      print(step.get('conditions'))
-
-      if answer is None and step['required'] == True:
-        print('### BREAKOUT')
+      if answer is None and step['required'] == True:        
         break
 
-      if answer is None and hasattr(step, 'default'):
-        print('## setting answer to default.')
+      if answer is None and hasattr(step, 'default'):        
         answer = step['default']
 
-      if step.get('conditions'):
-        print('## this step has conditions.')
+      if step.get('conditions'):        
         if not step['conditions'].get(answer):
           raise Exception('a step in the UI sequence returned an answer "%s" for which there is no condition.' % answer)
         next_sequence = step['conditions'][answer]['sequence']
         outgoing_context = copy.deepcopy(context)
         context[step['field_name']] = self.process_sequence(**next_sequence)
 
-      else:
-        print('this step has NO conditions.')
+      else:        
         context[step['field_name']] = answer
   
     print(common.jsonpretty(context))
@@ -257,7 +289,10 @@ class UISequenceRunner(object):
 
   def run(self, **sequence):
     context = self.process_sequence(**sequence)
-    return sequence['builder_func'](**context)
+    output_builder = sequence.get('builder_func')
+    if output_builder:
+      return output_builder(**context)
+    return context
 
 
 def find_global_by_name():
@@ -309,7 +344,6 @@ def find_quasr_job_by_name():
 def create_global():
   # this will return a dictionary containing all global parameters for an xfile project
   result =  UISequenceRunner().run(**xfile_globals_interaction_sequence)
-  print(common.jsonpretty(result))
 
   # return all Parameter specs
   for key, value in result.items():
@@ -336,13 +370,10 @@ def create_service_object_params():
 
 
 def create_service_object(name=None):
-  print('+++')
-  print('+++ Register new service object')
-  print('+++')
-  so_name = name or cli.InputPrompt('service object name').show()
-  so_classname = cli.InputPrompt('service object class').show()
-  so_params = create_service_object_params()
-  yield meta.ServiceObjectSpec(so_name, so_classname, **so_params)
+  data = UISequenceRunner().run(**service_object_sequence)
+  if data:
+    yield meta.ServiceObjectSpec(data['alias'], data['class'])
+  return None
 
   
 def create_dfproc_processor():
@@ -350,55 +381,11 @@ def create_dfproc_processor():
 
 
 def create_xfile_datasource(name=None):
-  print('+++')
-  print('+++ Create new datasource')
-  print('+++')
-
-  source_name = cli.InputPrompt('datasource name').show()
-  if not source_name:
-    return
-
-  classname = cli.InputPrompt('datasource class').show()
-  if not classname:
-    return
-
-  return meta.DatasourceSpec(source_name, classname)
-
-
-def create_xfile_fields():
-  print('+++')
-  print('+++ Add fields to this map')
-  print('+++')
-  fieldspecs = []
-  while True:
-      field_name = cli.InputPrompt('field name').show()
-      if not field_name:
-          break
-      
-      fieldspec = meta.XfileFieldSpec(field_name)
-
-      should_add_parameters = cli.InputPrompt('add parameters to this field (Y/n)?', 'y').show()
-      if should_add_parameters.lower() == 'y':
-        while True:
-          param_name = cli.InputPrompt('parameter name').show()
-          if not param_name:
-              break
-          param_value = cli.InputPrompt('parameter value').show()
-          if param_value is None:
-            param_value = ''
-          
-          fieldspec.add_parameter(param_name, param_value)
-          should_continue = cli.InputPrompt('add another parameter (Y/n)?', 'y').show()
-          if should_continue.lower() != 'y':
-            break
-
-      fieldspecs.append(fieldspec)
-      should_continue = cli.InputPrompt('add another field (Y/n)?', 'y').show()
-      if should_continue.lower() != 'y':
-          break
-
-  return fieldspecs
-
+  data = UISequenceRunner().run(**xfile_datasource_sequence)
+  if data:
+    yield meta.DatasourceSpec(data['alias'], data['class'])
+  return None
+  
 
 def create_xfile_map(name=None):
   mapspec = UISequenceRunner().run(**xfile_map_sequence)

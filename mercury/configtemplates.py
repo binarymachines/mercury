@@ -7,8 +7,7 @@ globals:
 '''
 
 XFILE_TEMPLATE = '''
-globals:
-{% for gspec in project['globals'] %}  
+globals:{% for gspec in project['globals'] %}  
   {{ gspec.name }}: {{ gspec.value }}{% endfor %}
 
 service_objects:
@@ -20,6 +19,11 @@ service_objects:
           - name: {{ param.name }}
             value: {{ param.value }}
       {% endfor %}
+{% endfor %}
+sources:
+{% for source in project['sources'] %}
+  {{ source.name }}:
+    class: {{ source.classname }}
 {% endfor %}
 maps:
 {% for map in project['maps'] %}
@@ -37,23 +41,19 @@ maps:
 '''
 
 NGST_TEMPLATE = '''
-globals:
-  project_home:                {{ project.home }}
-  service_module:              {{ project.service_module }} 
-  datastore_module:            {{ project.datastore_module }}
-
+globals:{% for gspec in project['globals'] %}  
+  {{ gspec.name }}: {{ gspec.value }}{% endfor %}
 
 service_objects:
-{% for service in services %}
+{% for service in project['service_objects'] %}
   {{service.alias}}:
       class: {{service.classname}}
       init_params:
-      {% for param in service.params %}
-          - name: param.name
-            value: param.value
+      {% for param in service.init_params %}
+          - name: {{ param.name }}
+            value: {{ param.value }}
       {% endfor %}
 {% endfor %}
-
 
 datastores:
   {% for datastore in project.datastores %}
@@ -69,7 +69,6 @@ datastores:
         - name: {{ param.name }}
           value: {{ param.value }} {% endfor %}
 
-
 ingest_targets:
   {% for target in project.ingest_targets %}
   {{ target.alias }}:
@@ -82,8 +81,8 @@ CYCLOPS_TEMPLATE = '''
 '''
 
 J2SQLGEN_TEMPLATE = '''
-globals:
-    project_home: {{ project.home }}
+globals:{% for gspec in project['globals'] %}  
+  {{ gspec.name }}: {{ gspec.value }}{% endfor %}
 
 defaults:
     autocreate_pk_if_missing: {{ project.defaults.autocreate_pk }}
@@ -118,10 +117,8 @@ PGMETA_TEMPLATE = '''
 '''
 
 PROFILR_TEMPLATE = '''
-globals:
-  project_home: {project_home}
-  profiler_module: {logic_module_name}  
-  service_module: {service_module_name}
+globals:{% for gspec in project['globals'] %}  
+  {{ gspec.name }}: {{ gspec.value }}{% endfor %}
 
 service_objects:
 {% for service in services %}
@@ -154,11 +151,8 @@ datasets:
 '''
 
 QUASR_TEMPLATE = '''
-globals:
-  project_home: {project_home}
-  qa_logic_module: {logic_module_name}
-  template_module: {template_module_name}
-  service_module: {service_module_name}
+globals:{% for gspec in project['globals'] %}  
+  {{ gspec.name }}: {{ gspec.value }}{% endfor %}
 
 service_objects:
 {% for service in services %}
