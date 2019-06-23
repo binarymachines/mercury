@@ -12,11 +12,13 @@ class ServiceObjectSpec(object):
         self.classname = classname
         self.init_params = []
         for key, value in init_params.items():
-            self.init_params.append(InitParam(name=key, value=value))
+            self.init_params.append(Parameter(name=key, value=value))
 
     def add_init_param(self, name, value):
-        self.init_params.append(InitParam(name=name, value=value))
+        self.init_params.append(Parameter(name=name, value=value))
 
+    def add_paramspec(self, parameter):
+        self.init_params.append(parameter)
 
 class XfileFieldSpec(object):
     def __init__(self, name, **params):

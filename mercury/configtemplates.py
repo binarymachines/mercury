@@ -18,8 +18,7 @@ service_objects:
       {% for param in service.init_params %}
           - name: {{ param.name }}
             value: {{ param.value }}
-      {% endfor %}
-{% endfor %}
+      {% endfor %}{% endfor %}
 sources:
 {% for source in project['sources'] %}
   {{ source.name }}:

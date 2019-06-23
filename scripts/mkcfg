@@ -43,14 +43,11 @@ class Whitespace(Enum):
   space = ' '
   tab = '\t'
 
-
 def tab(num_tabs):
   return ''.join(itertools.repeat('\t', num_tabs))
   
-
 def space(num_spaces):
   return ''.join(itertools.repeat(' ', num_spaces))
-
 
 def indent(num_indents, whitespace_type):
   return ''.join(itertools.repeat(whitespace_type, num_indents))
@@ -64,6 +61,24 @@ def clear():
     else: 
         _ = system('clear') 
 
+
+service_object_param_sequence = {
+  'marquee': '''
+  +++ Add init parameter to service object
+  ''',
+  'steps': [
+    {
+      'field_name': 'name',
+      'prompt': cli.InputPrompt('parameter name'),
+      'required': True
+    },
+    {
+      'field_name': 'value',
+      'prompt': cli.InputPrompt('parameter value'),
+      'required': True
+    }
+  ]
+}
 
 service_object_sequence = {
   'marquee': '''
@@ -83,7 +98,6 @@ service_object_sequence = {
       'required': True
     }
   ]
-
 }
 
 XFILE_FIELD_SOURCE_TYPES = [
@@ -104,12 +118,12 @@ xfile_field_src_lambda = {
   'steps': [
     {
       'field_name': 'key',
-      'prompt': cli.InputPrompt('field from source record:'),
+      'prompt': cli.InputPrompt('field from source record'),
       'required': True
     },
     {
       'field_name': 'expression',
-      'prompt': cli.InputPrompt('lambda expression:'),
+      'prompt': cli.InputPrompt('lambda expression'),
       'required': True
     },
   ]
@@ -121,13 +135,13 @@ xfile_field_src_record = {
   ::: set record-type field params
   :::
   ''',
-  'inputs': {},
-  'builder_func': lambda **kwargs: meta.XfileFieldSpec(kwargs['inputs']['name'],
-                                                       **(kwargs['outputs'])),
+  'inputs': { 
+    'source': 'record'
+  },
   'steps': [
     {
       'field_name': 'key',
-      'prompt': cli.InputPrompt('field from source record:'),
+      'prompt': cli.InputPrompt('source-record field name'),
       'required': True
     },
   ]
@@ -139,22 +153,20 @@ xfile_field_src_lookup = {
   ::: set record-type field params
   :::
   ''',
-  'inputs': {},
-  'builder_func': lambda **kwargs: meta.XfileFieldSpec(kwargs['inputs']['name'],
-                                                       **(kwargs['outputs'])),
+  'inputs': {
+    'source': 'lookup'
+  },
   'steps': [
     {
       'field_name': 'key',
-      'prompt': cli.InputPrompt('field from source record:'),
+      'prompt': cli.InputPrompt('lookup function (RETURN to use default)', ''),
       'required': True
     },
   ]
 }
 
-
 def new_xfile_fieldspec(**kwargs):
   return meta.XfileFieldSpec(kwargs['field_name'], **kwargs['field_params'])
-                             
 
 xfile_field_sequence = {
   'marquee': '''
@@ -180,6 +192,9 @@ xfile_field_sequence = {
         'record': {
           'sequence': xfile_field_src_record
         },
+        'lookup': {
+          'sequence': xfile_field_src_lookup
+        }
       } 
     }
   ]
@@ -205,7 +220,6 @@ xfile_map_sequence = {
     }
   ]
 }
-
 
 xfile_globals_interaction_sequence = {
   'marquee': '''
@@ -266,15 +280,14 @@ class UISequenceRunner(object):
       context.update(sequence['inputs'])
 
     for step in sequence['steps']:
-      
       answer = step['prompt'].show()
-      if answer is None and step['required'] == True:        
+      if not answer and step['required'] == True:        
         break
 
-      if answer is None and hasattr(step, 'default'):        
+      if not answer and hasattr(step, 'default'):        
         answer = step['default']
 
-      if step.get('conditions'):        
+      if step.get('conditions'):
         if not step['conditions'].get(answer):
           raise Exception('a step in the UI sequence returned an answer "%s" for which there is no condition.' % answer)
         next_sequence = step['conditions'][answer]['sequence']
@@ -340,7 +353,6 @@ def find_quasr_template_by_name():
 def find_quasr_job_by_name():
   pass
 
-
 def create_global():
   # this will return a dictionary containing all global parameters for an xfile project
   result =  UISequenceRunner().run(**xfile_globals_interaction_sequence)
@@ -350,29 +362,22 @@ def create_global():
     yield meta.Parameter(name=key, value=value)
 
 
-def create_service_object_params():
-  so_params = {}
-  while True:
-      param_name = cli.InputPrompt('parameter name').show()
-      if not param_name:
-          break
-      param_value = cli.InputPrompt('parameter value').show()
-      if not param_value:
-          break
-
-      so_params[param_name] = param_value
-
-      should_continue = cli.InputPrompt('add another parameter (Y/n)?', 'y').show()
-      if should_continue.lower() != 'y':
-          break
-
-  return so_params
-
-
 def create_service_object(name=None):
   data = UISequenceRunner().run(**service_object_sequence)
   if data:
-    yield meta.ServiceObjectSpec(data['alias'], data['class'])
+    so_spec = meta.ServiceObjectSpec(data['alias'], data['class'])
+    while True:
+      param_data = UISequenceRunner().run(**service_object_param_sequence)
+      if param_data:
+        so_spec.add_init_param(param_data['name'], param_data['value'])
+        answer = cli.InputPrompt('add another parameter (Y/n)?', 'y').show()
+        should_continue = answer.lower()
+        if should_continue != 'y':
+            break
+      else:
+        break
+    yield so_spec
+
   return None
 
   
@@ -392,7 +397,10 @@ def create_xfile_map(name=None):
   while True:
     fieldspec = UISequenceRunner().run(**xfile_field_sequence)
     mapspec.add_field_spec(fieldspec)
-    break
+    answer = cli.InputPrompt('add another field (Y/n)?').show()
+    should_continue = answer.lower()
+    if should_continue == 'n':
+      break
   
   yield mapspec
 
@@ -550,11 +558,8 @@ def list_quasr_templates():
 def list_quasr_jobs():
   pass
 
-
 def validate_xfile_config():
   pass
-
-
 
 targets = {
   'dfproc': {
@@ -898,7 +903,7 @@ class ConfigCLI(Cmd):
       return {}
 
     def generate_yaml_config(self):
-      print(self.configuration)
+      #print(self.configuration)
       config_template = self.target_package['template']
       prj = self.build_project(self.configuration)
       j2template = jinja2.Environment(loader=jinja2.BaseLoader).from_string(config_template)
