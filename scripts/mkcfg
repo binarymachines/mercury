@@ -267,25 +267,6 @@ xfile_datasource_create_sequence = {
   ]
 }
 
-
-service_object_edit_sequence = {
-  'marquee': '''
-  ::: Editing service object
-  ''',
-  'steps': [
-    {
-      'field_name': 'alias',
-      'prompt_type': cli.InputPrompt,
-      'prompt_args': ['update alias', '{current_value}']
-    },
-    {
-      'field_name': 'classname',
-      'prompt_type': cli.InputPrompt,
-      'prompt_args': ['update classname', '{current_value}']
-    }
-  ]
-}
-
 parameter_edit_sequence = {
   'marquee': '''
   ::: Editing parameter values
@@ -301,6 +282,88 @@ parameter_edit_sequence = {
 }
 
 
+xfile_datasource_edit_sequence = {
+  'marquee': '''
+  ::: Editing xfile datasource
+  ''',
+  'steps': [
+    {
+      'field_name': 'name',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update name', '{current_value}']
+    },
+    {
+      'field_name': 'classname',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update datasource class', '{current_value}']
+    }
+  ]
+}
+
+xfile_field_edit_sequence = {
+  'marquee': '''
+  ::: Editing xfile map field
+  ''',
+  'steps': [
+    {
+      'field_name': 'name',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update output field name', '{current_value}']      
+    },
+    {
+      'field_name': 'parameters',
+      'sequence': parameter_edit_sequence
+    }
+  ]
+}
+
+xfile_map_edit_sequence = {
+  'marquee': '''
+  ::: Editing xfile map
+  ''',
+  'steps': [
+    {
+      'field_name': 'name',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update name', '{current_value}']
+    },
+    {
+      'field_name': 'lookup_source',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update lookup source', '{current_value}']
+    },
+    {
+      'field_name': 'fields',
+      'sequence': xfile_field_edit_sequence
+    }
+  ]
+}
+
+
+service_object_edit_sequence = {
+  'marquee': '''
+  ::: Editing service object
+  ''',
+  'steps': [
+    {
+      'field_name': 'alias',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update alias', '{current_value}']
+    },
+    {
+      'field_name': 'classname',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update classname', '{current_value}']
+    },
+    {
+      'field_name': 'init_params',
+      'sequence': parameter_edit_sequence
+    }
+
+  ]
+}
+
+
 class UISequenceRunner(object):
   def __init__(self):
     pass
@@ -310,8 +373,34 @@ class UISequenceRunner(object):
     print(sequence['marquee'])
     context = {}
     for step in sequence['steps']:
+
+      current_target = getattr(config_object, step['field_name'])
+      if step.get('sequence'):
+        if isinstance(current_target, list):
+          # recursively edit embedded lists 
+          response = []
+          for obj in current_target:
+            output = self.process_edit_sequence(obj, **step['sequence'])
+            if output is not None:
+              response.append(output)
+
+          setattr(config_object, step['field_name'], response)
+          continue
+
+        else:
+          output = self.process_edit_sequence(**step['sequence'])
+          if output:
+            setattr(config_object, step['field_name'], output)
+          continue
+      else:
+        if isinstance(current_target, list):
+          raise Exception('!!! An edit sequence which handles a list-type attribute must use a child sequence.')   
+
+
       context['current_value'] = getattr(config_object, step['field_name'])
-      context['current_name'] = getattr(config_object, step['label'])
+      label = step.get('label', step['field_name'])
+      context['current_name'] = label
+      #context['current_name'] = getattr(config_object, step['label'])
       prompt = step['prompt_type']
       args = []
       for a in step['prompt_args']:
@@ -319,7 +408,7 @@ class UISequenceRunner(object):
       response = prompt(*args).show()
       if response is not None:
         setattr(config_object, step['field_name'], response)
-
+    return config_object
 
   def process_create_sequence(self, init_context=None, **sequence):
     print(sequence['marquee'])
@@ -424,16 +513,18 @@ def create_service_object(name=None):
   data = UISequenceRunner().create(**service_object_create_sequence)
   if data:
     so_spec = meta.ServiceObjectSpec(data['alias'], data['class'])
-    while True:
-      param_data = UISequenceRunner().create(**service_object_param_sequence)
-      if param_data:
-        so_spec.add_init_param(param_data['name'], param_data['value'])
-        answer = cli.InputPrompt('add another parameter (Y/n)?', 'y').show()
-        should_continue = answer.lower()
-        if should_continue != 'y':
-            break
-      else:
-        break
+    add_params = cli.InputPrompt('Add one or more init params (Y/n)?', 'y').show()
+    if add_params.lower() == 'y':
+      while True:
+        param_data = UISequenceRunner().create(**service_object_param_sequence)
+        if param_data:
+          so_spec.add_init_param(param_data['name'], param_data.get('value', ''))
+          answer = cli.InputPrompt('add another parameter (Y/n)?', 'y').show()
+          should_continue = answer.lower()
+          if should_continue != 'y':
+              break
+        else:
+          break
     yield so_spec
 
   return None
@@ -493,21 +584,27 @@ def create_quasr_template():
 def create_quasr_job():
   pass
 
-def edit_global():
-  pass
+def edit_globals(config_objects):
+  for obj in config_objects:
+    UISequenceRunner().process_edit_sequence(obj, **parameter_edit_sequence)
+             
 
-def edit_service_object():
-  pass
+def edit_service_object(config_objects):
+  for obj in config_objects:
+    UISequenceRunner().process_edit_sequence(obj, **service_object_edit_sequence)
+
 
 def edit_dfproc_processor():
   pass
 
-def edit_xfile_datasource():
-  pass
+def edit_xfile_datasource(config_objects):
+  for obj in config_objects:
+    UISequenceRunner().process_edit_sequence(obj, **xfile_datasource_edit_sequence)
 
-def edit_xfile_map():
-  pass
-
+def edit_xfile_map(config_objects):
+  for obj in config_objects:
+    UISequenceRunner().process_edit_sequence(obj, **xfile_map_edit_sequence)
+  
 def edit_ngst_datastore():
   pass
 
@@ -629,7 +726,7 @@ targets = {
         'singular_label': 'global',
         'find_func': find_global_by_name,
         'create_func': create_global,
-        'update_func': edit_global,
+        'update_func': edit_globals,
         'list_func': list_globals
       },
       {
@@ -661,7 +758,7 @@ targets = {
         'plural_label': 'globals',
         'find_func': find_global_by_name,
         'create_func': create_global,
-        'update_func': edit_global,
+        'update_func': edit_globals,
         'list_func': list_globals,
       },
       {
@@ -702,7 +799,7 @@ targets = {
         'singular_label': 'global',
         'find_func': find_global_by_name,
         'create_func': create_global,
-        'update_func': edit_global,
+        'update_func': edit_globals,
         'list_func': list_globals
       },
       {
@@ -740,7 +837,7 @@ targets = {
         'singular_label': 'global',
         'find_func': find_global_by_name,
         'create_func': create_global,
-        'update_func': edit_global,
+        'update_func': edit_globals,
         'list_func': list_globals
       },
       {
@@ -770,7 +867,7 @@ targets = {
         'singular_label': 'global',
         'find_func': find_global_by_name,
         'create_func': create_global,
-        'update_func': edit_global,
+        'update_func': edit_globals,
         'list_func': list_globals
       },
       {
@@ -828,7 +925,7 @@ targets = {
         'singular_label': 'global',
         'find_func': find_global_by_name,
         'create_func': create_global,
-        'update_func': edit_global,
+        'update_func': edit_globals,
         'list_func': list_globals
       },
       {
@@ -866,7 +963,7 @@ targets = {
         'singular_label': 'global',
         'find_func': find_global_by_name,
         'create_func': create_global,
-        'update_func': edit_global,
+        'update_func': edit_globals,
         'list_func': list_globals
       },
       {
@@ -1118,10 +1215,8 @@ class ConfigCLI(Cmd):
           else:
             config_obj_array = self.configuration[pkg['name']]
             print('::: Edit %s' % selection)
-
-            for obj in config_obj_array:
-              UISequenceRunner().process_edit_sequence(obj, **parameter_edit_sequence)
-             
+            pkg['update_func'](config_obj_array)
+          
             '''
             yconf = yaml.safe_load(self.generate_yaml_config())            
             config_section = yconf[pkg['name']]
@@ -1143,7 +1238,7 @@ class ConfigCLI(Cmd):
             print('### Updated value is %s.' % updated_value)            
             self.update_config_data(config_obj_array, edit_target, updated_value)
             '''
-            self.do_list(selection)            
+            self.do_list(pkg['plural_label'])           
         else:
           print(error)
 

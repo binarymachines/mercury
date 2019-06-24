@@ -8,10 +8,10 @@ from snap import common
 
 class Parameter(object):
     def __init__(self, **kwargs):
-        kwreader = common.KeywordArgReader('name', 'value')
+        kwreader = common.KeywordArgReader('name')
         kwreader.read(**kwargs)
         self.name = kwargs['name']
-        self.value = kwargs['value']
+        self.value = kwargs.get('value')
     
     def data(self):
         return {'name': self.name, 'value': self.value }
