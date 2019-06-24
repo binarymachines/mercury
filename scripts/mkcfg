@@ -16,6 +16,7 @@ import copy
 import itertools
 from enum import Enum
 from cmd import Cmd
+import yaml
 from snap import common
 from snap import cli_tools as cli
 from mercury import configtemplates as templates
@@ -80,7 +81,7 @@ service_object_param_sequence = {
   ]
 }
 
-service_object_sequence = {
+service_object_create_sequence = {
   'marquee': '''
   +++
   +++ Register service object
@@ -168,7 +169,7 @@ xfile_field_src_lookup = {
 def new_xfile_fieldspec(**kwargs):
   return meta.XfileFieldSpec(kwargs['field_name'], **kwargs['field_params'])
 
-xfile_field_sequence = {
+xfile_field_create_sequence = {
   'marquee': '''
   +++ 
   +++ Add field to xfile record map
@@ -200,7 +201,7 @@ xfile_field_sequence = {
   ]
 }
 
-xfile_map_sequence = {
+xfile_map_create_sequence = {
   'marquee': '''
   +++
   +++ Create new xfile map
@@ -221,7 +222,7 @@ xfile_map_sequence = {
   ]
 }
 
-xfile_globals_interaction_sequence = {
+xfile_globals_create_sequence = {
   'marquee': '''
   +++ 
   +++ Create global settings group
@@ -234,19 +235,19 @@ xfile_globals_interaction_sequence = {
       'required': True
     },
     {
-      'field_name': 'datasource module',
+      'field_name': 'datasource_module',
       'prompt': cli.InputPrompt('datasource module'),
       'required': True
     },
     {
-      'field_name': 'service module',
+      'field_name': 'service_module',
       'prompt': cli.InputPrompt('service module'),
       'required': True
     }
   ]
 }
 
-xfile_datasource_sequence = {
+xfile_datasource_create_sequence = {
   'marquee': '''
   +++
   +++ Register datasource
@@ -266,11 +267,61 @@ xfile_datasource_sequence = {
   ]
 }
 
+
+service_object_edit_sequence = {
+  'marquee': '''
+  ::: Editing service object
+  ''',
+  'steps': [
+    {
+      'field_name': 'alias',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update alias', '{current_value}']
+    },
+    {
+      'field_name': 'classname',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update classname', '{current_value}']
+    }
+  ]
+}
+
+parameter_edit_sequence = {
+  'marquee': '''
+  ::: Editing parameter values
+  ''',
+  'steps': [
+    {
+      'label': 'name',
+      'field_name': 'value',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update {current_name}', '{current_value}']
+    }
+  ]
+}
+
+
 class UISequenceRunner(object):
   def __init__(self):
     pass
 
-  def process_sequence(self, init_context=None, **sequence):
+  def process_edit_sequence(self, config_object, **sequence):
+    
+    print(sequence['marquee'])
+    context = {}
+    for step in sequence['steps']:
+      context['current_value'] = getattr(config_object, step['field_name'])
+      context['current_name'] = getattr(config_object, step['label'])
+      prompt = step['prompt_type']
+      args = []
+      for a in step['prompt_args']:
+        args.append(a.format(**context))
+      response = prompt(*args).show()
+      if response is not None:
+        setattr(config_object, step['field_name'], response)
+
+
+  def process_create_sequence(self, init_context=None, **sequence):
     print(sequence['marquee'])
     context = {}
     if init_context:
@@ -292,7 +343,7 @@ class UISequenceRunner(object):
           raise Exception('a step in the UI sequence returned an answer "%s" for which there is no condition.' % answer)
         next_sequence = step['conditions'][answer]['sequence']
         outgoing_context = copy.deepcopy(context)
-        context[step['field_name']] = self.process_sequence(**next_sequence)
+        context[step['field_name']] = self.process_create_sequence(**next_sequence)
 
       else:        
         context[step['field_name']] = answer
@@ -300,12 +351,18 @@ class UISequenceRunner(object):
     print(common.jsonpretty(context))
     return context
 
-  def run(self, **sequence):
-    context = self.process_sequence(**sequence)
-    output_builder = sequence.get('builder_func')
+
+  def create(self, **create_sequence):
+    context = self.process_create_sequence(**create_sequence)
+    output_builder = create_sequence.get('builder_func')
     if output_builder:
       return output_builder(**context)
     return context
+
+
+  def edit(self, config_object, **edit_sequence):
+    self.process_edit_sequence(config_object, **edit_sequence)
+    return config_object
 
 
 def find_global_by_name():
@@ -353,9 +410,10 @@ def find_quasr_template_by_name():
 def find_quasr_job_by_name():
   pass
 
+
 def create_global():
   # this will return a dictionary containing all global parameters for an xfile project
-  result =  UISequenceRunner().run(**xfile_globals_interaction_sequence)
+  result =  UISequenceRunner().create(**xfile_globals_create_sequence)
 
   # return all Parameter specs
   for key, value in result.items():
@@ -363,11 +421,11 @@ def create_global():
 
 
 def create_service_object(name=None):
-  data = UISequenceRunner().run(**service_object_sequence)
+  data = UISequenceRunner().create(**service_object_create_sequence)
   if data:
     so_spec = meta.ServiceObjectSpec(data['alias'], data['class'])
     while True:
-      param_data = UISequenceRunner().run(**service_object_param_sequence)
+      param_data = UISequenceRunner().create(**service_object_param_sequence)
       if param_data:
         so_spec.add_init_param(param_data['name'], param_data['value'])
         answer = cli.InputPrompt('add another parameter (Y/n)?', 'y').show()
@@ -386,16 +444,16 @@ def create_dfproc_processor():
 
 
 def create_xfile_datasource(name=None):
-  data = UISequenceRunner().run(**xfile_datasource_sequence)
+  data = UISequenceRunner().create(**xfile_datasource_create_sequence)
   if data:
     yield meta.DatasourceSpec(data['alias'], data['class'])
   return None
   
 
 def create_xfile_map(name=None):
-  mapspec = UISequenceRunner().run(**xfile_map_sequence)
+  mapspec = UISequenceRunner().create(**xfile_map_create_sequence)
   while True:
-    fieldspec = UISequenceRunner().run(**xfile_field_sequence)
+    fieldspec = UISequenceRunner().create(**xfile_field_create_sequence)
     mapspec.add_field_spec(fieldspec)
     answer = cli.InputPrompt('add another field (Y/n)?').show()
     should_continue = answer.lower()
@@ -910,6 +968,7 @@ class ConfigCLI(Cmd):
       yaml_conf = j2template.render(project=self.configuration)
       return yaml_conf
       
+
     def find_config_package_by_plural_label(self, label):
       for config_object_type in self.target_package['config_object_types']:
         if config_object_type['plural_label'] == label:
@@ -936,6 +995,10 @@ class ConfigCLI(Cmd):
       '''
       return template.format(options=' | '.join(self.config_object_singular_labels()))
     
+
+    def usage_string_for_edit(self):
+      return self.usage_string_for_new()
+
 
     def usage_string_for_find(self):
       template = '''Usage:
@@ -995,6 +1058,7 @@ class ConfigCLI(Cmd):
 
     do_ls = do_list
 
+
     def do_new(self, *cmd_args):            
       with self.docopt_parse(self.usage_string_for_new(), *cmd_args) as (args, error):
         if not error:
@@ -1017,6 +1081,72 @@ class ConfigCLI(Cmd):
           print(error)
 
     do_n = do_new
+
+    def find_config_data(self, config_obj_array, target):
+      print('names of config objects under edit:')
+      for config_object in config_obj_array:
+        if config_object.name == target:
+          return config_object
+    
+    def update_config_data(self, config_obj_array, name, value):
+      config_object = self.find_config_data(config_obj_array, name)
+      if config_object:
+        config_object.value = value
+
+
+    def globals_config_section_to_menu(self, config_section):
+      menudata = []
+      for name, setting in config_section.items():
+        menudata.append({
+          'label': '%s (current: %s)' % (name, setting),
+          'value': name
+        })
+        return menudata
+
+
+    def do_edit(self, *cmd_args):
+      with self.docopt_parse(self.usage_string_for_edit(), *cmd_args) as (args, error):
+        if not error:
+          selection = self.get_selected_option(args, self.config_object_singular_labels())
+
+          pkg = self.find_config_package_by_singular_label(selection)
+          if not pkg:
+            print('!!! ERROR: No configuration package found with label "%s".' % selection)
+            return
+          if not self.configuration.get(pkg['name']):
+            print('No %s yet configured.' % pkg['name'])
+          else:
+            config_obj_array = self.configuration[pkg['name']]
+            print('::: Edit %s' % selection)
+
+            for obj in config_obj_array:
+              UISequenceRunner().process_edit_sequence(obj, **parameter_edit_sequence)
+             
+            '''
+            yconf = yaml.safe_load(self.generate_yaml_config())            
+            config_section = yconf[pkg['name']]
+
+            menudata = []
+            for name, setting in config_section.items():
+              menudata.append({
+                'label': '%s (current: %s)' % (name, setting),
+                'value': name
+              })
+            edit_target = cli.MenuPrompt('value to edit', menudata).show()
+
+            current_setting = None
+            for name, setting in config_section.items():
+              if name == edit_target:
+                current_setting = setting
+            
+            updated_value = cli.InputPrompt('New value for %s' % edit_target, current_setting).show()
+            print('### Updated value is %s.' % updated_value)            
+            self.update_config_data(config_obj_array, edit_target, updated_value)
+            '''
+            self.do_list(selection)            
+        else:
+          print(error)
+
 
     def do_preview(self, *cmd_args):
       yconf = self.generate_yaml_config()

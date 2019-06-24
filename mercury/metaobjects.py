@@ -2,9 +2,19 @@
 
 
 from collections import namedtuple
+from snap import common
 
-InitParam = namedtuple('InitParam', 'name value')
-Parameter = namedtuple('Parameter', 'name value')
+#Parameter = namedtuple('Parameter', 'name value')
+
+class Parameter(object):
+    def __init__(self, **kwargs):
+        kwreader = common.KeywordArgReader('name', 'value')
+        kwreader.read(**kwargs)
+        self.name = kwargs['name']
+        self.value = kwargs['value']
+    
+    def data(self):
+        return {'name': self.name, 'value': self.value }
 
 class ServiceObjectSpec(object):
     def __init__(self, name, classname, **init_params):
@@ -19,6 +29,15 @@ class ServiceObjectSpec(object):
 
     def add_paramspec(self, parameter):
         self.init_params.append(parameter)
+
+    def data(self):
+        return {
+            'alias': self.alias,
+            'class': self.classname,
+            'init_params': [
+                {'name': p.name, 'value': p.value} for p in self.init_params
+            ]
+        }
 
 class XfileFieldSpec(object):
     def __init__(self, name, **params):
