@@ -562,10 +562,12 @@ def create_xfile_map(live_config, target_package):
     print('!!! No datasources registered. Please create a datasource first.')
     return None
 
+  # look up existing datasources in the live configuration
   datasource_select_menudata = []
   for datasource in live_config['sources']:
     datasource_select_menudata.append({'label': datasource.name, 'value': datasource.name})
 
+  # use this generated menu prompt in the uisequence step whose field_name is "lookup_source"
   prompts = {
     'lookup_source': cli.MenuPrompt('lookup datasource', datasource_select_menudata)
   }
@@ -1221,6 +1223,14 @@ class ConfigCLI(Cmd):
           print(error)
 
     do_n = do_new
+
+    def do_wizard(self, *cmd_args):
+      for config_object_type in self.target_package['config_object_types']:
+        self.do_new(config_object_type['singular_label'])
+        clear()
+
+      self.do_preview()
+
 
     def find_config_data(self, config_obj_array, target):
       print('names of config objects under edit:')
