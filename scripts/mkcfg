@@ -399,7 +399,7 @@ class UISequenceRunner(object):
 
       context['current_value'] = getattr(config_object, step['field_name'])
       label = step.get('label', step['field_name'])
-      context['current_name'] = label
+      context['current_name'] = getattr(config_object, label)
       #context['current_name'] = getattr(config_object, step['label'])
       prompt = step['prompt_type']
       args = []
@@ -597,14 +597,17 @@ def edit_service_object(config_objects):
 def edit_dfproc_processor():
   pass
 
+
 def edit_xfile_datasource(config_objects):
   for obj in config_objects:
     UISequenceRunner().process_edit_sequence(obj, **xfile_datasource_edit_sequence)
 
+
 def edit_xfile_map(config_objects):
   for obj in config_objects:
     UISequenceRunner().process_edit_sequence(obj, **xfile_map_edit_sequence)
-  
+
+
 def edit_ngst_datastore():
   pass
 
