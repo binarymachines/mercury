@@ -167,6 +167,8 @@ xfile_field_src_lookup = {
 }
 
 def new_xfile_fieldspec(**kwargs):
+  if not kwargs.get('field_name'):
+    return None
   return meta.XfileFieldSpec(kwargs['field_name'], **kwargs['field_params'])
 
 xfile_field_create_sequence = {
@@ -216,7 +218,7 @@ xfile_map_create_sequence = {
     },
     {
       'field_name': 'lookup_source',
-      'prompt': cli.InputPrompt('lookup datasource name'),
+      'prompt': cli.InputPrompt('lookup datasource'),
       'required': True
     }
   ]
@@ -365,8 +367,19 @@ service_object_edit_sequence = {
 
 
 class UISequenceRunner(object):
-  def __init__(self):
-    pass
+  def __init__(self, **kwargs):
+    #
+    # keyword args:
+    # override_create_prompts is an optional dictionary
+    # where <key> is the field name of a step in a UI sequence
+    # and <value> is a prompt instance from the cli library.
+    # This gives users of the UISequenceRunner the option to 
+    # override the default Prompt type specified in the ui sequence 
+    # dictionary passed to the create() method.
+    #
+    
+    self.create_prompts = kwargs.get('override_create_prompts', {})
+
 
   def process_edit_sequence(self, config_object, **sequence):
     
@@ -408,6 +421,7 @@ class UISequenceRunner(object):
         setattr(config_object, step['field_name'], response)
     return config_object
 
+
   def process_create_sequence(self, init_context=None, **sequence):
     print(sequence['marquee'])
     context = {}
@@ -418,7 +432,10 @@ class UISequenceRunner(object):
       context.update(sequence['inputs'])
 
     for step in sequence['steps']:
-      answer = step['prompt'].show()
+      # override the prompt in the UI sequence if one was passed to us
+      # in our constructor
+      prompt =  self.create_prompts.get(step['field_name'], step['prompt'])         
+      answer = prompt.show()
       if not answer and step['required'] == True:        
         break
 
@@ -498,7 +515,7 @@ def find_quasr_job_by_name():
   pass
 
 
-def create_global():
+def create_global(live_config, target_package):
   # this will return a dictionary containing all global parameters for an xfile project
   result =  UISequenceRunner().create(**xfile_globals_create_sequence)
 
@@ -507,7 +524,7 @@ def create_global():
     yield meta.Parameter(name=key, value=value)
 
 
-def create_service_object(name=None):
+def create_service_object(live_config, target_package):
   data = UISequenceRunner().create(**service_object_create_sequence)
   if data:
     so_spec = meta.ServiceObjectSpec(data['alias'], data['class'])
@@ -528,21 +545,36 @@ def create_service_object(name=None):
   return None
 
   
-def create_dfproc_processor():
+def create_dfproc_processor(live_config, target_package):
   pass
 
 
-def create_xfile_datasource(name=None):
+def create_xfile_datasource(live_config, target_package):
   data = UISequenceRunner().create(**xfile_datasource_create_sequence)
   if data:
     yield meta.DatasourceSpec(data['alias'], data['class'])
   return None
   
 
-def create_xfile_map(name=None):
-  mapspec = UISequenceRunner().create(**xfile_map_create_sequence)
+def create_xfile_map(live_config, target_package):
+
+  if not live_config.get('sources'):
+    print('!!! No datasources registered. Please create a datasource first.')
+    return None
+
+  datasource_select_menudata = [
+    {'label': 'source1', 'value': 'source1'},
+    {'label': 'source2', 'value': 'source2'}
+  ]
+  prompts = {
+    'lookup_source': cli.MenuPrompt('lookup datasource', datasource_select_menudata)
+  }
+
+  mapspec = UISequenceRunner(override_create_prompts=prompts).create(**xfile_map_create_sequence)
   while True:
     fieldspec = UISequenceRunner().create(**xfile_field_create_sequence)
+    if not fieldspec:
+      break
     mapspec.add_field_spec(fieldspec)
     answer = cli.InputPrompt('add another field (Y/n)?').show()
     should_continue = answer.lower()
@@ -552,34 +584,34 @@ def create_xfile_map(name=None):
   yield mapspec
 
 
-def create_ngst_target():
+def create_ngst_target(live_config, target_package):
   pass
 
-def create_ngst_datastore():
+def create_ngst_datastore(live_config, target_package):
   pass
 
-def create_cyclops_trigger():
+def create_cyclops_trigger(live_config, target_package):
   pass
 
-def create_j2sqlgen_default():
+def create_j2sqlgen_default(live_config, target_package):
   pass
 
-def create_j2sqlgen_target():
+def create_j2sqlgen_target(live_config, target_package):
   pass
 
-def create_pgexec_target():
+def create_pgexec_target(live_config, target_package):
   pass
 
-def create_profiler():
+def create_profiler(live_config, target_package):
   pass
 
-def create_profilr_dataset():
+def create_profilr_dataset(live_config, target_package):
   pass
 
-def create_quasr_template():
+def create_quasr_template(live_config, target_package):
   pass
 
-def create_quasr_job():
+def create_quasr_job(live_config, target_package):
   pass
 
 def edit_globals(config_objects):
@@ -1177,7 +1209,7 @@ class ConfigCLI(Cmd):
             return
 
           # create func should always be a generator
-          config_objects = pkg['create_func']() 
+          config_objects = pkg['create_func'](self.configuration, pkg) 
 
           if not self.configuration.get(pkg['name']):
             self.configuration[pkg['name']] = []
@@ -1310,6 +1342,11 @@ class ConfigCLI(Cmd):
         raise SystemExit
 
     do_q = do_quit
+
+
+    def do_cls(self, *cmd_args):
+      clear()
+
 
 
 def main(args):
