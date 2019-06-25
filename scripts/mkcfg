@@ -396,11 +396,9 @@ class UISequenceRunner(object):
         if isinstance(current_target, list):
           raise Exception('!!! An edit sequence which handles a list-type attribute must use a child sequence.')   
 
-
       context['current_value'] = getattr(config_object, step['field_name'])
       label = step.get('label', step['field_name'])
-      context['current_name'] = getattr(config_object, label)
-      #context['current_name'] = getattr(config_object, step['label'])
+      context['current_name'] = getattr(config_object, label)      
       prompt = step['prompt_type']
       args = []
       for a in step['prompt_args']:
@@ -768,6 +766,7 @@ targets = {
         'name': 'service_objects',
         'singular_label': 'service',
         'plural_label': 'services',
+        'index_attribute': 'alias',
         'find_func': find_service_object_by_name,
         'create_func': create_service_object,
         'update_func': edit_service_object,
@@ -777,6 +776,7 @@ targets = {
         'name': 'sources', 
         'singular_label': 'datasource',
         'plural_label': 'datasources',
+        'index_attribute': 'name',
         'find_func': find_xfile_datasource_by_name,
         'create_func': create_xfile_datasource,
         'update_func': edit_xfile_datasource,
@@ -786,6 +786,7 @@ targets = {
         'name': 'maps',
         'singular_label': 'map',
         'plural_label': 'maps',
+        'index_attribute': 'name',
         'find_func': find_xfile_map_by_name,
         'create_func': create_xfile_map,
         'update_func': edit_xfile_map,
@@ -1203,6 +1204,19 @@ class ConfigCLI(Cmd):
         })
         return menudata
 
+    def find_config_object(self, attrib, config_object_array, target_pkg):
+      for obj in config_object_array:
+        if getattr(obj, target_pkg['index_attribute']) == attrib:
+          return obj
+
+    def generate_menu_data(self, config_object_array, target_pkg):
+      menudata = []
+      for obj in config_object_array:
+        menudata.append({
+          'value': getattr(obj, target_pkg['index_attribute']),
+          'label': getattr(obj, target_pkg['index_attribute'])
+        })
+      return menudata
 
     def do_edit(self, *cmd_args):
       with self.docopt_parse(self.usage_string_for_edit(), *cmd_args) as (args, error):
@@ -1216,32 +1230,20 @@ class ConfigCLI(Cmd):
           if not self.configuration.get(pkg['name']):
             print('No %s yet configured.' % pkg['name'])
           else:
+
             config_obj_array = self.configuration[pkg['name']]
-            print('::: Edit %s' % selection)
-            pkg['update_func'](config_obj_array)
-          
-            '''
-            yconf = yaml.safe_load(self.generate_yaml_config())            
-            config_section = yconf[pkg['name']]
+            #print('::: Edit %s' % selection)
 
-            menudata = []
-            for name, setting in config_section.items():
-              menudata.append({
-                'label': '%s (current: %s)' % (name, setting),
-                'value': name
-              })
-            edit_target = cli.MenuPrompt('value to edit', menudata).show()
+            #if selection != 'globals' and len(config_obj_array) > 1:
+            object_menudata = self.generate_menu_data(config_obj_array, pkg)
+            object_name = cli.MenuPrompt('object to edit', object_menudata).show()
+            config_object = self.find_config_object(object_name, config_obj_array, pkg)
 
-            current_setting = None
-            for name, setting in config_section.items():
-              if name == edit_target:
-                current_setting = setting
-            
-            updated_value = cli.InputPrompt('New value for %s' % edit_target, current_setting).show()
-            print('### Updated value is %s.' % updated_value)            
-            self.update_config_data(config_obj_array, edit_target, updated_value)
-            '''
-            self.do_list(pkg['plural_label'])           
+            pkg['update_func']([config_object])
+            #else:
+            #  pkg['update_func'](config_obj_array)
+
+            self.do_list(pkg['plural_label'])      
         else:
           print(error)
 
