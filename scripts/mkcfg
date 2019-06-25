@@ -757,10 +757,13 @@ targets = {
         'name': 'globals',
         'singular_label': 'globals',
         'plural_label': 'globals',
+        'index_attribute': 'name',
         'find_func': find_global_by_name,
         'create_func': create_global,
         'update_func': edit_globals,
         'list_func': list_globals,
+        'unit_size': 3,
+        'singleton': True
       },
       {
         'name': 'service_objects',
@@ -1168,6 +1171,10 @@ class ConfigCLI(Cmd):
           pkg = self.find_config_package_by_singular_label(selection)
           if not pkg:
             print('!!! ERROR: No configuration package found with label "%s".' % selection)
+            return
+          if pkg.get('singleton') == True and len(self.configuration.get(pkg['name'], [])) == pkg.get('unit_size'):
+            print('Cannot create more than one "%s" config section.' % selection)
+            return
 
           # create func should always be a generator
           config_objects = pkg['create_func']() 
