@@ -562,10 +562,10 @@ def create_xfile_map(live_config, target_package):
     print('!!! No datasources registered. Please create a datasource first.')
     return None
 
-  datasource_select_menudata = [
-    {'label': 'source1', 'value': 'source1'},
-    {'label': 'source2', 'value': 'source2'}
-  ]
+  datasource_select_menudata = []
+  for datasource in live_config['sources']:
+    datasource_select_menudata.append({'label': datasource.name, 'value': datasource.name})
+
   prompts = {
     'lookup_source': cli.MenuPrompt('lookup datasource', datasource_select_menudata)
   }
