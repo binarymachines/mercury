@@ -6,7 +6,7 @@ Usage:
   mkcfg <target>
 
 Options:
-  -l --list-targets       show the available configuration targets
+  -l --list       show the available configuration targets
 '''
 
 import os, sys
@@ -366,6 +366,128 @@ service_object_edit_sequence = {
 }
 
 
+quasr_globals_create_sequence = {
+  'marquee': '''
+  +++ 
+  +++ Create global settings group
+  +++
+  ''',
+  'steps': [
+    {
+      'field_name': 'project_home',
+      'prompt': cli.InputPrompt('project home'),
+      'required': True
+    },
+    {
+      'field_name': 'qa_logic_module',
+      'prompt': cli.InputPrompt('QA logic module'),
+      'required': True
+    },
+    {
+      'field_name': 'service_module',
+      'prompt': cli.InputPrompt('service module'),
+      'required': True
+    },
+    {
+      'field_name': 'template_module',
+      'prompt': cli.InputPrompt('template module'),
+      'required': True
+    }
+  ]
+}
+
+
+
+QUASR_SLOT_TYPES = [
+  {'label': 'integer', 'value': 'int'},
+  {'label': 'floating-point', 'value': 'float'},
+  {'label': 'string', 'value': 'str'}
+]
+
+quasr_input_slot_create_sequence = {
+  'marquee': '''
+  +++
+  +++ Create QUASR input slot
+  +++
+  ''',
+  'steps': [
+    {
+      'field_name': 'name',
+      'prompt': cli.InputPrompt('input slot name'),
+      'required': True
+    },
+    {
+      'field_name': 'datatype',
+      'prompt': cli.MenuPrompt('input slot datatype', QUASR_SLOT_TYPES),
+      'required': True
+    }
+  ]
+}
+
+quasr_output_slot_create_sequence = {
+  'marquee': '''
+  +++
+  +++ Create QUASR output slot
+  +++
+  ''',
+  'steps': [
+    {
+      'field_name': 'name',
+      'prompt': cli.InputPrompt('output slot name'),
+      'required': True
+    },
+    {
+      'field_name': 'datatype',
+      'prompt': cli.MenuPrompt('output slot datatype', QUASR_SLOT_TYPES),
+      'required': True
+    }
+
+  ]
+}
+
+quasr_job_create_sequence = {
+  'marquee': '''
+  +++
+  +++ Create QUASR job
+  +++
+  ''',
+  'steps': [
+    {
+      'field_name': 'name',
+      'prompt': cli.InputPrompt('job name'),
+      'required': True
+    },
+    {
+      'field_name': 'template_alias',
+      'prompt': cli.InputPrompt('template alias'),
+      'required': True
+    },
+    {
+      'field_name': 'executor_function',
+      'prompt': cli.InputPrompt('SQL executor function name'),
+      'required': True
+    },
+    {
+      'field_name': 'builder_function',
+      'prompt': cli.InputPrompt('output builder function name'),
+      'required': True
+    },
+    {
+      'field_name': 'analyzer_function',
+      'prompt': cli.InputPrompt('output analyzer function name'),
+      'required': False
+    },
+    {
+      'field_name': 'inputs',
+      'sequence': quasr_input_slot_create_sequence
+    },
+    {
+      'field_name': 'outputs',
+      'sequence': quasr_output_slot_create_sequence
+    }
+  ]
+}
+
 class UISequenceRunner(object):
   def __init__(self, **kwargs):
     #
@@ -515,7 +637,7 @@ def find_quasr_job_by_name():
   pass
 
 
-def create_global(live_config, target_package):
+def create_xfile_globals(live_config, target_package):
   # this will return a dictionary containing all global parameters for an xfile project
   result =  UISequenceRunner().create(**xfile_globals_create_sequence)
 
@@ -545,6 +667,9 @@ def create_service_object(live_config, target_package):
   return None
 
   
+def create_dfproc_globals(live_config, target_package):
+  pass
+
 def create_dfproc_processor(live_config, target_package):
   pass
 
@@ -586,6 +711,9 @@ def create_xfile_map(live_config, target_package):
   yield mapspec
 
 
+def create_ngst_globals(live_config, target_package):
+  pass
+
 def create_ngst_target(live_config, target_package):
   pass
 
@@ -593,6 +721,12 @@ def create_ngst_datastore(live_config, target_package):
   pass
 
 def create_cyclops_trigger(live_config, target_package):
+  pass
+
+def create_cyclops_globals(live_config, target_package):
+  pass
+
+def create_j2sqlgen_globals(live_config, target_package):
   pass
 
 def create_j2sqlgen_default(live_config, target_package):
@@ -604,7 +738,10 @@ def create_j2sqlgen_target(live_config, target_package):
 def create_pgexec_target(live_config, target_package):
   pass
 
-def create_profiler(live_config, target_package):
+def create_profilr_globals(live_config, target_package):
+  pass
+
+def create_profilr_profiler(live_config, target_package):
   pass
 
 def create_profilr_dataset(live_config, target_package):
@@ -613,8 +750,23 @@ def create_profilr_dataset(live_config, target_package):
 def create_quasr_template(live_config, target_package):
   pass
 
+
 def create_quasr_job(live_config, target_package):
-  pass
+  while True:
+    jobspec = UISequenceRunner().create(**quasr_job_create_sequence)
+    yield jobspec
+    answer = cli.InputPrompt('create another job (Y/n)?').show()
+    should_continue = answer.lower()
+    if should_continue == 'n':
+      break
+
+
+def create_quasr_globals(live_config, target_package):
+  # this will return a dictionary containing all global parameters for a quasr project
+  result =  UISequenceRunner().create(**quasr_globals_create_sequence)  
+  for key, value in result.items():
+    yield meta.Parameter(name=key, value=value)
+
 
 def edit_globals(config_objects):
   for obj in config_objects:
@@ -788,7 +940,7 @@ targets = {
         'name': 'globals',
         'singular_label': 'global',
         'find_func': find_global_by_name,
-        'create_func': create_global,
+        'create_func': create_dfproc_globals,
         'update_func': edit_globals,
         'list_func': list_globals
       },
@@ -821,7 +973,7 @@ targets = {
         'plural_label': 'globals',
         'index_attribute': 'name',
         'find_func': find_global_by_name,
-        'create_func': create_global,
+        'create_func': create_xfile_globals,
         'update_func': edit_globals,
         'list_func': list_globals,
         'unit_size': 3,
@@ -867,7 +1019,7 @@ targets = {
         'name': 'globals',
         'singular_label': 'global',
         'find_func': find_global_by_name,
-        'create_func': create_global,
+        'create_func': create_ngst_globals,
         'update_func': edit_globals,
         'list_func': list_globals
       },
@@ -905,7 +1057,7 @@ targets = {
         'name': 'globals',
         'singular_label': 'global',
         'find_func': find_global_by_name,
-        'create_func': create_global,
+        'create_func': create_cyclops_globals,
         'update_func': edit_globals,
         'list_func': list_globals
       },
@@ -935,7 +1087,7 @@ targets = {
         'name': 'globals',
         'singular_label': 'global',
         'find_func': find_global_by_name,
-        'create_func': create_global,
+        'create_func': create_j2sqlgen_globals,
         'update_func': edit_globals,
         'list_func': list_globals
       },
@@ -993,7 +1145,7 @@ targets = {
         'name': 'globals',
         'singular_label': 'global',
         'find_func': find_global_by_name,
-        'create_func': create_global,
+        'create_func': create_profilr_globals,
         'update_func': edit_globals,
         'list_func': list_globals
       },
@@ -1009,7 +1161,7 @@ targets = {
         'name': 'profilers',
         'singular_label': 'profiler',
         'find_func': find_profiler_by_name,
-        'create_func': create_profiler,
+        'create_func': create_profilr_profiler,
         'update_func': edit_profiler,
         'list_func': list_profilers
       },
@@ -1029,11 +1181,15 @@ targets = {
     'config_object_types': [
       {
         'name': 'globals',
-        'singular_label': 'global',
+        'singular_label': 'globals',
+        'plural_label': 'globals',
+        'index_attribute': 'name',
         'find_func': find_global_by_name,
-        'create_func': create_global,
+        'create_func': create_quasr_globals,
         'update_func': edit_globals,
-        'list_func': list_globals
+        'list_func': list_globals,
+        'unit_size': 4,
+        'singleton': True
       },
       {
           'name': 'service_objects',
@@ -1337,15 +1493,15 @@ class ConfigCLI(Cmd):
       yaml_config = self.generate_yaml_config()
       is_ok, errors = validate(yaml_config, self.configuration)
       if is_ok:
-        print('+++')
-        print('+++ Configuration is valid.')
-        print('+++')
+        print('***')
+        print('*** Configuration is valid.')
+        print('***')
         return True
       else:
         print('!!!')
         print('!!! The current configuration contains errors:')
         for err in errors:
-          print('!!! --%s%s' % (tab(1), err))
+          print('!!! * %s%s' % (tab(1), err))
         print('!!!')
         return False
 

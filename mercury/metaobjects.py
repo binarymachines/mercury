@@ -70,3 +70,15 @@ class DatasourceSpec(object):
     def __init__(self, name, classname):
         self.name = name
         self.classname = classname
+
+
+
+class QuasrJobSpec(object):
+    def __init__(self, name, template_alias):
+        self.name = name
+        self.template_alias = template_alias
+        self.inputs = []
+        self.outputs = []
+        self.executor_function = None
+        self.builder_function = None
+        self.analyzer_function = None
