@@ -748,8 +748,36 @@ def list_quasr_templates():
 def list_quasr_jobs():
   pass
 
-def validate_xfile_config():
-  pass
+def validate_xfile_config(yaml_string, live_config):
+  errors = []
+  yaml_config = yaml.safe_load(yaml_string)
+  print(common.jsonpretty(yaml_config))
+  if not 'globals' in yaml_config.keys():
+    errors.append('config is missing a "globals" section')
+
+  if not yaml_config['globals']:
+    errors.append('"globals" section is empty')
+  if not 'service_objects' in yaml_config.keys():
+    errors. append('config is missing a "service_objects" section')
+  if not 'sources' in yaml_config.keys():
+    errors.append('config is missing a "sources" section')
+  if not 'maps' in yaml_config.keys():
+    errors.append('config is missing a "maps" section')
+
+  if yaml_config['maps']:
+    for map_name in yaml_config['maps']:
+      if not yaml_config['maps'][map_name].get('lookup_source'):
+        errors.append('the map "%s" does not specify a lookup_source')
+      source_name = yaml_config['maps'][map_name]['lookup_source']
+      if source_name not in yaml_config['sources'].keys():
+        errors.append('map "%s" specifies an unregistered lookup_source "%s"' 
+                      % (map_name, source_name))
+
+  if len(errors):
+    return (False, errors)
+  else:
+    return (True, [])
+
 
 targets = {
   'dfproc': {
@@ -1307,8 +1335,8 @@ class ConfigCLI(Cmd):
     def do_validate(self, *cmd_args):
       validate = self.target_package['validator_func']
       yaml_config = self.generate_yaml_config()
-      errors = validate(yaml_config)
-      if not len(errors):
+      is_ok, errors = validate(yaml_config, self.configuration)
+      if is_ok:
         print('+++')
         print('+++ Configuration is valid.')
         print('+++')
@@ -1317,7 +1345,7 @@ class ConfigCLI(Cmd):
         print('!!!')
         print('!!! The current configuration contains errors:')
         for err in errors:
-          print('!%s%s' % (tab(1), err))
+          print('!!! --%s%s' % (tab(1), err))
         print('!!!')
         return False
 
