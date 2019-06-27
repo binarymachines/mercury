@@ -369,7 +369,7 @@ service_object_edit_sequence = {
 quasr_globals_create_sequence = {
   'marquee': '''
   +++ 
-  +++ Create global settings group
+  +++ Create QUASR global settings group
   +++
   ''',
   'steps': [
@@ -407,9 +407,10 @@ QUASR_SLOT_TYPES = [
 quasr_input_slot_create_sequence = {
   'marquee': '''
   +++
-  +++ Create QUASR input slot
+  +++ Create QUASR input slot for job template
   +++
   ''',
+  'builder_func': lambda **kwargs: meta.QuasrJobIOSlot(kwargs['name'], kwargs['datatype']),
   'steps': [
     {
       'field_name': 'name',
@@ -427,9 +428,10 @@ quasr_input_slot_create_sequence = {
 quasr_output_slot_create_sequence = {
   'marquee': '''
   +++
-  +++ Create QUASR output slot
+  +++ Create QUASR output slot for job results
   +++
   ''',
+  'builder_func': lambda **kwargs: meta.QuasrJobIOSlot(kwargs['name'], kwargs['datatype']),  
   'steps': [
     {
       'field_name': 'name',
@@ -441,9 +443,21 @@ quasr_output_slot_create_sequence = {
       'prompt': cli.MenuPrompt('output slot datatype', QUASR_SLOT_TYPES),
       'required': True
     }
-
   ]
 }
+
+def create_quasr_job_spec(**kwargs):
+  jobspec = meta.QuasrJobSpec(kwargs['name'], kwargs['template_alias'])
+  jobspec.executor_function = kwargs['executor_function']
+  jobspec.builder_function = kwargs['builder_function']
+  jobspec.analyzer_function = kwargs['analyzer_function']
+  for slot in kwargs['inputs']:
+    jobspec.inputs.append(slot)
+  for slot in kwargs['outputs']:
+    jobspec.outputs.append(slot)
+
+  return jobspec
+
 
 quasr_job_create_sequence = {
   'marquee': '''
@@ -451,6 +465,7 @@ quasr_job_create_sequence = {
   +++ Create QUASR job
   +++
   ''',
+  'builder_func': create_quasr_job_spec,
   'steps': [
     {
       'field_name': 'name',
@@ -479,11 +494,13 @@ quasr_job_create_sequence = {
     },
     {
       'field_name': 'inputs',
-      'sequence': quasr_input_slot_create_sequence
+      'sequence': quasr_input_slot_create_sequence,
+      'repeat': True
     },
     {
       'field_name': 'outputs',
-      'sequence': quasr_output_slot_create_sequence
+      'sequence': quasr_output_slot_create_sequence,
+      'repeat': True
     }
   ]
 }
@@ -554,27 +571,60 @@ class UISequenceRunner(object):
       context.update(sequence['inputs'])
 
     for step in sequence['steps']:
-      # override the prompt in the UI sequence if one was passed to us
-      # in our constructor
-      prompt =  self.create_prompts.get(step['field_name'], step['prompt'])         
-      answer = prompt.show()
-      if not answer and step['required'] == True:        
-        break
 
-      if not answer and hasattr(step, 'default'):        
-        answer = step['default']
+      if not step.get('prompt'):
+        if not step.get('conditions') and not step.get('sequence'):
+          # hard error
+          raise Exception('step "%s" in this UI sequence has no prompt and does not branch to a child sequence') 
 
+      # this is an input-dependent branch 
       if step.get('conditions'):
         if not step['conditions'].get(answer):
-          raise Exception('a step in the UI sequence returned an answer "%s" for which there is no condition.' % answer)
+          raise Exception('a step "%s" in the UI sequence returned an answer "%s" for which there is no condition.' 
+                          % (step['field_name'], answer))
+
         next_sequence = step['conditions'][answer]['sequence']
         outgoing_context = copy.deepcopy(context)
         context[step['field_name']] = self.process_create_sequence(**next_sequence)
+         
+      # unconditional branch
+      elif step.get('sequence'):
+        next_sequence = step['sequence']
+        outgoing_context = copy.deepcopy(context)
+        is_repeating_step =  step.get('repeat', False)
 
-      else:        
-        context[step['field_name']] = answer
+        while True:                 
+          sequence_output = self.create(**next_sequence)
+          if not sequence_output: 
+            break
+
+          if is_repeating_step:
+            if not context.get(step['field_name']):
+              context[step['field_name']] = []
+            context[step['field_name']].append(sequence_output)
+          else:
+            context[step['field_name']] = sequence_output
+
+          if is_repeating_step:
+            repeat_prompt = step.get('repeat_prompt', cli.InputPrompt('create another (Y/n)', 'y'))
+            should_repeat = repeat_prompt.show().lower()
+            if should_repeat == 'n':
+              break
+          else:
+            break
+
+      else:
+        # follow the prompt -- but override the one in the UI sequence if one was passed to us
+        # in our constructor
+        prompt =  self.create_prompts.get(step['field_name'], step['prompt'])         
+        answer = prompt.show()
+        if not answer and step['required'] == True:        
+          break
+        if not answer and hasattr(step, 'default'):        
+          answer = step['default']
+        else:        
+          context[step['field_name']] = answer
   
-    print(common.jsonpretty(context))
     return context
 
 
@@ -591,19 +641,19 @@ class UISequenceRunner(object):
     return config_object
 
 
-def find_global_by_name():
+def find_global():
   pass
 
-def find_service_object_by_name():
+def find_service_object():
   pass
 
-def find_dfproc_processor_by_name():
+def find_dfproc_processor():
   pass
 
-def find_xfile_map_by_name():
+def find_xfile_map():
   pass
 
-def find_xfile_datasource_by_name():
+def find_xfile_datasource():
   pass
 
 def find_ngst_datastore_by_name():
@@ -624,16 +674,16 @@ def find_j2sqlgen_default_by_name():
 def find_pgexec_target_by_name():
   pass
 
-def find_profiler_by_name():
+def find_profiler():
   pass
 
 def find_profilr_dataset_by_name():
   pass
 
-def find_quasr_template_by_name():
+def find_quasr_template():
   pass
 
-def find_quasr_job_by_name():
+def find_quasr_job():
   pass
 
 
@@ -938,24 +988,30 @@ targets = {
     'config_object_types': [
       {
         'name': 'globals',
-        'singular_label': 'global',
-        'find_func': find_global_by_name,
+        'singular_label': 'globals',
+        'plural_label': 'globals',
+        'index_attribute': 'name',
+        'find_func': find_global,
         'create_func': create_dfproc_globals,
         'update_func': edit_globals,
         'list_func': list_globals
       },
       {
         'name': 'service_objects',
-        'singular_label': 'service object',
-        'find_func': find_service_object_by_name,
+        'singular_label': 'service',
+        'plural_label': 'services',
+        'index_attribute': 'alias',
+        'find_func': find_service_object,
         'create_func': create_service_object,
         'update_func': edit_service_object,
         'list_func': list_service_objects
       },
       {
         'name': 'processors',
-        'singular_label': 'dataframe processor',
-        'find_func': find_dfproc_processor_by_name,
+        'singular_label': 'processor',
+        'plural_label': 'processors',
+        'index_attribute': 'name',
+        'find_func': find_dfproc_processor,
         'create_func': create_dfproc_processor,
         'update_func': edit_dfproc_processor,
         'list_func': list_dfproc_processors
@@ -972,7 +1028,7 @@ targets = {
         'singular_label': 'globals',
         'plural_label': 'globals',
         'index_attribute': 'name',
-        'find_func': find_global_by_name,
+        'find_func': find_global,
         'create_func': create_xfile_globals,
         'update_func': edit_globals,
         'list_func': list_globals,
@@ -984,7 +1040,7 @@ targets = {
         'singular_label': 'service',
         'plural_label': 'services',
         'index_attribute': 'alias',
-        'find_func': find_service_object_by_name,
+        'find_func': find_service_object,
         'create_func': create_service_object,
         'update_func': edit_service_object,
         'list_func': list_service_objects        
@@ -994,7 +1050,7 @@ targets = {
         'singular_label': 'datasource',
         'plural_label': 'datasources',
         'index_attribute': 'name',
-        'find_func': find_xfile_datasource_by_name,
+        'find_func': find_xfile_datasource,
         'create_func': create_xfile_datasource,
         'update_func': edit_xfile_datasource,
         'list_func': list_xfile_datasources
@@ -1004,7 +1060,7 @@ targets = {
         'singular_label': 'map',
         'plural_label': 'maps',
         'index_attribute': 'name',
-        'find_func': find_xfile_map_by_name,
+        'find_func': find_xfile_map,
         'create_func': create_xfile_map,
         'update_func': edit_xfile_map,
         'list_func': list_xfile_maps
@@ -1018,15 +1074,17 @@ targets = {
       {
         'name': 'globals',
         'singular_label': 'global',
-        'find_func': find_global_by_name,
+        'find_func': find_global,
         'create_func': create_ngst_globals,
         'update_func': edit_globals,
         'list_func': list_globals
       },
       {
         'name': 'service_objects',
-        'singular_label': 'service object',
-        'find_func': find_service_object_by_name,
+        'singular_label': 'service',
+        'plural_label': 'services',
+        'index_attribute': 'alias',
+        'find_func': find_service_object,
         'create_func': create_service_object,
         'update_func': edit_service_object,
         'list_func': list_service_objects        
@@ -1055,16 +1113,20 @@ targets = {
     'config_object_types': [
       {
         'name': 'globals',
-        'singular_label': 'global',
-        'find_func': find_global_by_name,
+        'singular_label': 'globals',
+        'plural_label': 'globals',
+        'index_attribute': 'name',
+        'find_func': find_global,
         'create_func': create_cyclops_globals,
         'update_func': edit_globals,
         'list_func': list_globals
       },
       {
         'name': 'service_objects',
-        'singular_label': 'service object',
-        'find_func': find_service_object_by_name,
+        'singular_label': 'service',
+        'plural_label': 'services',
+        'index_attribute': 'alias',
+        'find_func': find_service_object,
         'create_func': create_service_object,
         'update_func': edit_service_object,
         'list_func': list_service_objects        
@@ -1085,8 +1147,10 @@ targets = {
     'config_object_types': [
       {
         'name': 'globals',
-        'singular_label': 'global',
-        'find_func': find_global_by_name,
+        'singular_label': 'globals',
+        'plural_label': 'globals',
+        'index_attribute': 'name',
+        'find_func': find_global,
         'create_func': create_j2sqlgen_globals,
         'update_func': edit_globals,
         'list_func': list_globals
@@ -1144,7 +1208,7 @@ targets = {
         {
         'name': 'globals',
         'singular_label': 'global',
-        'find_func': find_global_by_name,
+        'find_func': find_global,
         'create_func': create_profilr_globals,
         'update_func': edit_globals,
         'list_func': list_globals
@@ -1152,7 +1216,8 @@ targets = {
       {
         'name': 'service_objects',
         'singular_label': 'service object',
-        'find_func': find_service_object_by_name,
+        'index_attribute': 'alias',
+        'find_func': find_service_object,
         'create_func': create_service_object,
         'update_func': edit_service_object,
         'list_func': list_service_objects
@@ -1160,7 +1225,8 @@ targets = {
       {
         'name': 'profilers',
         'singular_label': 'profiler',
-        'find_func': find_profiler_by_name,
+        'index_attribute': 'name',
+        'find_func': find_profiler,
         'create_func': create_profilr_profiler,
         'update_func': edit_profiler,
         'list_func': list_profilers
@@ -1184,7 +1250,7 @@ targets = {
         'singular_label': 'globals',
         'plural_label': 'globals',
         'index_attribute': 'name',
-        'find_func': find_global_by_name,
+        'find_func': find_global,
         'create_func': create_quasr_globals,
         'update_func': edit_globals,
         'list_func': list_globals,
@@ -1193,8 +1259,9 @@ targets = {
       },
       {
           'name': 'service_objects',
-          'singular_label': 'service object',
-          'find_func': find_service_object_by_name,
+          'singular_label': 'service',
+          'index_attribute': 'alias',
+          'find_func': find_service_object,
           'create_func': create_service_object,
           'update_func': edit_service_object,
           'list_func': list_service_objects
@@ -1202,7 +1269,8 @@ targets = {
       {
           'name': 'templates',
           'singular_label': 'template',
-          'find_func': find_quasr_template_by_name,
+          'index_attribute': 'name',
+          'find_func': find_quasr_template,
           'create_func': create_quasr_template,
           'update_func': edit_quasr_template,
           'list_func': list_quasr_templates
@@ -1210,7 +1278,9 @@ targets = {
       {
           'name': 'jobs',
           'singular_label': 'job',
-          'find_func': find_quasr_job_by_name,
+          'plural_label': 'jobs',
+          'index_attribute': 'name',
+          'find_func': find_quasr_job,
           'create_func': create_quasr_job,
           'update_func': edit_quasr_job,
           'list_func': list_quasr_jobs
@@ -1279,13 +1349,12 @@ class ConfigCLI(Cmd):
         #self.replay_stack = Stack()
 
 
-    def build_project(self, config):
-      return {}
+    #def build_project(self, config):
+    #  return {}
 
     def generate_yaml_config(self):
-      #print(self.configuration)
+      #print(common.jsonpretty(self.configuration))
       config_template = self.target_package['template']
-      prj = self.build_project(self.configuration)
       j2template = jinja2.Environment(loader=jinja2.BaseLoader).from_string(config_template)
       yaml_conf = j2template.render(project=self.configuration)
       return yaml_conf
@@ -1396,13 +1465,16 @@ class ConfigCLI(Cmd):
 
           # create func should always be a generator
           config_objects = pkg['create_func'](self.configuration, pkg) 
+          #print(common.jsonpretty([obj.data() for obj in config_objects]))
 
           if not self.configuration.get(pkg['name']):
             self.configuration[pkg['name']] = []
 
           for obj in config_objects:
             self.configuration[pkg['name']].append(obj)
-
+          
+          #print(common.jsonpretty(self.configuration))
+          self.do_pre()
         else:
           print(error)
 

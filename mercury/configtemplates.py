@@ -154,7 +154,7 @@ globals:{% for gspec in project['globals'] %}
   {{ gspec.name }}: {{ gspec.value }}{% endfor %}
 
 service_objects:
-{% for service in services %}
+{% for service in project['services'] %}
   {{service.alias}}:
       class: {{service.classname}}
       init_params:
@@ -168,23 +168,24 @@ templates:
     SELECT * FROM <TABLENAME>
 
 jobs:
-  {% for job in jobs %}
+  {% for job in project['jobs'] %}
   {{ job.name }}:
     sql_template: {{ job.template_alias }}
     inputs:
-      {% for slot in job.input_slots %}
+      {% for slot in job.inputs %}
       - name: {{ slot.name }}
         type: {{ slot.datatype }}
       {% endfor %}
     outputs:
-      {% for slot in job.output_slots %}
+      {% for slot in job.outputs %}
       - name: {{ slot.name }}
         type: {{ slot.datatype }}
       {% endfor %}
-      
+    
     executor_function: {{ job.executor_function }}
-    builder_function: {{ job.builder.function }}
+    builder_function: {{ job.builder_function }}
     analyzer: {{ job.analyzer_function }}
+  {% endfor %}
 '''
 
 

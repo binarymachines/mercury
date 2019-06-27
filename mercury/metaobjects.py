@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-
+import json
 from collections import namedtuple
 from snap import common
 
-#Parameter = namedtuple('Parameter', 'name value')
+
 
 class Parameter(object):
     def __init__(self, **kwargs):
@@ -49,6 +49,12 @@ class XfileFieldSpec(object):
     def add_parameter(self, name, value):
         self.parameters.append(Parameter(name=name, value=value))
 
+    def data(self):
+        return {
+            'name': self.name,
+            'parameters': [ p.data() for p in self.parameters ]
+        }
+
 
 class XfileMapSpec(object):
     def __init__(self, name, lookup_source_name):
@@ -65,12 +71,35 @@ class XfileMapSpec(object):
     def add_field_specs(self, fieldspec_array):
         self.fields.extend(fieldspec_array)
 
+    def data(self):
+        return {
+            'name': self.name,
+            'lookup_source': self.lookup_source,
+            'fields': [f.data() for f in self.fields]
+        }
+
 
 class DatasourceSpec(object):
     def __init__(self, name, classname):
         self.name = name
         self.classname = classname
 
+    def data(self):
+        return {
+            'name': self.name,
+            'classname': self.classname
+        }
+
+class QuasrJobIOSlot(object):
+    def __init__(self, name, datatype):
+        self.name = name
+        self.datatype = datatype
+
+    def data(self):
+        return {
+            'name': self.name,
+            'datatype': self.datatype
+        }
 
 
 class QuasrJobSpec(object):
@@ -82,3 +111,14 @@ class QuasrJobSpec(object):
         self.executor_function = None
         self.builder_function = None
         self.analyzer_function = None
+
+    def data(self):
+        return {
+            'name': self.name,
+            'template_alias': self.template_alias,
+            'executor_function': self.executor_function,
+            'builder_function': self.builder_function,
+            'analyzer_function': self.analyzer_function,
+            'inputs': [ i.data() for i in self.inputs ],
+            'outputs': [ o.data() for o in self.outputs ]
+        }
