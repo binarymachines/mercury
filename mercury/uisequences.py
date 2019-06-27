@@ -2,6 +2,7 @@
 
 import copy
 from snap import cli_tools as cli
+from snap import common
 from mercury import metaobjects as meta
 
 
@@ -514,21 +515,22 @@ class UISequenceRunner(object):
       context.update(sequence['inputs'])
 
     for step in sequence['steps']:
-
+      #print(step)
       if not step.get('prompt'):
         if not step.get('conditions') and not step.get('sequence'):
           # hard error
           raise Exception('step "%s" in this UI sequence has no prompt and does not branch to a child sequence') 
 
       # this is an input-dependent branch 
-      if step.get('conditions'):
+      if step.get('conditions'):        
+        answer = step['prompt'].show()
         if not step['conditions'].get(answer):
           raise Exception('a step "%s" in the UI sequence returned an answer "%s" for which there is no condition.' 
                           % (step['field_name'], answer))
 
         next_sequence = step['conditions'][answer]['sequence']
         outgoing_context = copy.deepcopy(context)
-        context[step['field_name']] = self.process_create_sequence(**next_sequence)
+        context[step['field_name']] = self.create(**next_sequence)
          
       # unconditional branch
       elif step.get('sequence'):

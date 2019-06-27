@@ -2,6 +2,7 @@
 
 from mercury import configtemplates as templates
 from mercury.uisequences import *
+from mercury.uisequences import UISequenceRunner
 
 
 def find_global():

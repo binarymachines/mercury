@@ -358,7 +358,7 @@ class ConfigCLI(Cmd):
 
       # TODO: validate config first
       print('***')
-      print('*** Save xfile configuration file')
+      print('*** Save %s configuration file' % self.name)
       print('***')
       
       while True:
