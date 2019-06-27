@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import copy
 from snap import cli_tools as cli
 from mercury import metaobjects as meta
 
@@ -445,3 +446,139 @@ quasr_job_create_sequence = {
     }
   ]
 }
+
+
+class UISequenceRunner(object):
+  def __init__(self, **kwargs):
+    #
+    # keyword args:
+    # override_create_prompts is an optional dictionary
+    # where <key> is the field name of a step in a UI sequence
+    # and <value> is a prompt instance from the cli library.
+    # This gives users of the UISequenceRunner the option to 
+    # override the default Prompt type specified in the ui sequence 
+    # dictionary passed to the create() method.
+    #
+    
+    self.create_prompts = kwargs.get('override_create_prompts', {})
+
+
+  def process_edit_sequence(self, config_object, **sequence):
+    
+    print(sequence['marquee'])
+    context = {}
+    for step in sequence['steps']:
+
+      current_target = getattr(config_object, step['field_name'])
+      if step.get('sequence'):
+        if isinstance(current_target, list):
+          # recursively edit embedded lists 
+          response = []
+          for obj in current_target:
+            output = self.process_edit_sequence(obj, **step['sequence'])
+            if output is not None:
+              response.append(output)
+
+          setattr(config_object, step['field_name'], response)
+          continue
+
+        else:
+          output = self.process_edit_sequence(**step['sequence'])
+          if output:
+            setattr(config_object, step['field_name'], output)
+          continue
+      else:
+        if isinstance(current_target, list):
+          raise Exception('!!! An edit sequence which handles a list-type attribute must use a child sequence.')   
+
+      context['current_value'] = getattr(config_object, step['field_name'])
+      label = step.get('label', step['field_name'])
+      context['current_name'] = getattr(config_object, label)      
+      prompt = step['prompt_type']
+      args = []
+      for a in step['prompt_args']:
+        args.append(a.format(**context))
+      response = prompt(*args).show()
+      if response is not None:
+        setattr(config_object, step['field_name'], response)
+    return config_object
+
+
+  def process_create_sequence(self, init_context=None, **sequence):
+    print(sequence['marquee'])
+    context = {}
+    if init_context:
+      context.update(init_context)
+    
+    if sequence.get('inputs'):
+      context.update(sequence['inputs'])
+
+    for step in sequence['steps']:
+
+      if not step.get('prompt'):
+        if not step.get('conditions') and not step.get('sequence'):
+          # hard error
+          raise Exception('step "%s" in this UI sequence has no prompt and does not branch to a child sequence') 
+
+      # this is an input-dependent branch 
+      if step.get('conditions'):
+        if not step['conditions'].get(answer):
+          raise Exception('a step "%s" in the UI sequence returned an answer "%s" for which there is no condition.' 
+                          % (step['field_name'], answer))
+
+        next_sequence = step['conditions'][answer]['sequence']
+        outgoing_context = copy.deepcopy(context)
+        context[step['field_name']] = self.process_create_sequence(**next_sequence)
+         
+      # unconditional branch
+      elif step.get('sequence'):
+        next_sequence = step['sequence']
+        outgoing_context = copy.deepcopy(context)
+        is_repeating_step =  step.get('repeat', False)
+
+        while True:                 
+          sequence_output = self.create(**next_sequence)
+          if not sequence_output: 
+            break
+
+          if is_repeating_step:
+            if not context.get(step['field_name']):
+              context[step['field_name']] = []
+            context[step['field_name']].append(sequence_output)
+          else:
+            context[step['field_name']] = sequence_output
+
+          if is_repeating_step:
+            repeat_prompt = step.get('repeat_prompt', cli.InputPrompt('create another (Y/n)', 'y'))
+            should_repeat = repeat_prompt.show().lower()
+            if should_repeat == 'n':
+              break
+          else:
+            break
+
+      else:
+        # follow the prompt -- but override the one in the UI sequence if one was passed to us
+        # in our constructor
+        prompt =  self.create_prompts.get(step['field_name'], step['prompt'])         
+        answer = prompt.show()
+        if not answer and step['required'] == True:        
+          break
+        if not answer and hasattr(step, 'default'):        
+          answer = step['default']
+        else:        
+          context[step['field_name']] = answer
+  
+    return context
+
+
+  def create(self, **create_sequence):
+    context = self.process_create_sequence(**create_sequence)
+    output_builder = create_sequence.get('builder_func')
+    if output_builder:
+      return output_builder(**context)
+    return context
+
+
+  def edit(self, config_object, **edit_sequence):
+    self.process_edit_sequence(config_object, **edit_sequence)
+    return config_object
