@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
+import yaml
 from mercury import configtemplates as templates
 from mercury.uisequences import *
 from mercury.uisequences import UISequenceRunner
+from mercury.utils import tab
 
 
 def find_global():
@@ -206,6 +208,17 @@ def edit_xfile_map(config_objects):
     UISequenceRunner().process_edit_sequence(obj, **xfile_map_edit_sequence)
 
 
+def edit_quasr_job(config_objects):
+  for obj in config_objects:
+    input_slot_menu = [{'label': slot.name, 'value': slot.name} for slot in obj.inputs]
+    output_slot_menu = [{'label': slot.name, 'value': slot.name} for slot in obj.outputs]
+    menus = {
+      'inputs': input_slot_menu,
+      'outputs': output_slot_menu
+    }
+    UISequenceRunner(edit_menus=menus).edit(obj, **quasr_job_edit_sequence)
+
+
 def edit_ngst_datastore():
   pass
 
@@ -233,8 +246,6 @@ def edit_profilr_dataset():
 def edit_quasr_template():
   pass
 
-def edit_quasr_job():
-  pass
 
 def list_globals(global_settings):
   if not len(global_settings):

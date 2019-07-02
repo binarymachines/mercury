@@ -268,16 +268,19 @@ xfile_map_edit_sequence = {
   ''',
   'steps': [
     {
+      'type': 'direct',
       'field_name': 'name',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update name', '{current_value}']
     },
     {
+      'type': 'direct',
       'field_name': 'lookup_source',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update lookup source', '{current_value}']
     },
     {
+      'type': 'static_sequence_trigger',
       'field_name': 'fields',
       'sequence': xfile_field_edit_sequence
     }
@@ -291,16 +294,19 @@ service_object_edit_sequence = {
   ''',
   'steps': [
     {
+      'type': 'direct',
       'field_name': 'alias',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update alias', '{current_value}']
     },
     {
+      'type': 'direct',
       'field_name': 'classname',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update classname', '{current_value}']
     },
     {
+      'type': 'static_sequence_trigger',
       'field_name': 'init_params',
       'sequence': parameter_edit_sequence
     }
@@ -448,6 +454,100 @@ quasr_job_create_sequence = {
   ]
 }
 
+quasr_input_slot_edit_sequence = {
+
+  'marquee': '''
+  :::
+  ::: Edit QUASR input slot
+  :::
+  ''',
+  'steps': [
+
+  ]
+}
+
+quasr_input_slot_edit_sequence = {
+
+  'marquee': '''
+  :::
+  ::: Edit QUASR input slot
+  :::
+  ''',
+  'steps': [
+    {
+      'field_name': 'name',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['input slot name', '{current_value}']
+    },
+    {
+      'field_name': 'datatype',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['slot datatype', '{current_value}']
+    }
+  ]
+}
+
+quasr_output_slot_edit_sequence = {
+
+  'marquee': '''
+  :::
+  ::: Edit QUASR output slot
+  :::
+  ''',
+  'steps': [
+    {
+      'field_name': 'name',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['output slot name', '{current_value}']
+    },
+    {
+      'field_name': 'datatype',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['slot datatype', '{current_value}']
+    }
+  ]
+}
+
+
+def select_target_input_slot(slot_name, config_object):
+  for slot in config_object.inputs:
+    if slot.name == slot_name:
+      return slot
+
+
+def select_target_output_slot(slot_name, config_object):
+  for slot in config_object.outputs:
+    if slot.name == slot_name:
+      return slot
+  
+
+quasr_job_edit_sequence = {
+  'marquee': '''
+  ''',
+  'steps': [
+    {
+      'type': 'direct',
+      'field_name': 'name',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update job name', '{current_value}']
+    },
+    {
+      'type': 'dyn_sequence_trigger', 
+      'field_name': 'inputs',
+      'prompt_type': cli.MenuPrompt,
+      'prompt_text': 'update input slot',
+      'selector_func': select_target_input_slot     
+    },
+    {
+      'type': 'dyn_sequence_trigger',
+      'field_name': 'outputs',
+      'prompt_type': cli.MenuPrompt,
+      'prompt_text': 'update output slot',
+      'selector_func': select_target_output_slot
+    }
+  ]
+}
+
 
 class UISequenceRunner(object):
   def __init__(self, **kwargs):
@@ -462,7 +562,10 @@ class UISequenceRunner(object):
     #
     
     self.create_prompts = kwargs.get('override_create_prompts', {})
-
+    self.edit_menus = kwargs.get('edit_menus', {})
+    self.allowed_edit_step_types = set(['direct',
+                                       'dyn_sequence_trigger',
+                                       'static_sequence_trigger'])
 
   def process_edit_sequence(self, config_object, **sequence):
     
@@ -470,8 +573,27 @@ class UISequenceRunner(object):
     context = {}
     for step in sequence['steps']:
 
+      step_type = step.get('type')
+
       current_target = getattr(config_object, step['field_name'])
-      if step.get('sequence'):
+      print('### pulling menu data for step with field name %s..' % step['field_name'])
+
+      context['current_value'] = getattr(config_object, step['field_name'])
+      label = step.get('label', step['field_name'])
+      context['current_name'] = getattr(config_object, label)
+      prompt = step['prompt_type']
+      '''
+      args = []
+      for a in step['prompt_args']:
+        args.append(a.format(**context))
+      '''
+
+      # fanout: execute a child sequence once for each element in a list
+      #if isinstance(current_target, list) and step.get('sequence'):
+      if not step_type in self.allowed_edit_step_types:
+        raise Exception('The step with field name "%s" is of an unsupported type "%s".' % (step['field_name'], step_type))
+
+      if step_type == 'static_sequence_trigger':
         if isinstance(current_target, list):
           # recursively edit embedded lists 
           response = []
@@ -479,29 +601,57 @@ class UISequenceRunner(object):
             output = self.process_edit_sequence(obj, **step['sequence'])
             if output is not None:
               response.append(output)
-
-          setattr(config_object, step['field_name'], response)
-          continue
-
+              setattr(config_object, step['field_name'], response)
+          
+        # directly execute a named sequence
         else:
           output = self.process_edit_sequence(**step['sequence'])
-          if output:
-            setattr(config_object, step['field_name'], output)
-          continue
-      else:
-        if isinstance(current_target, list):
-          raise Exception('!!! An edit sequence which handles a list-type attribute must use a child sequence.')   
+          if output is not None:
+            setattr(config_object, step['field_name'], response)
+        continue
 
-      context['current_value'] = getattr(config_object, step['field_name'])
-      label = step.get('label', step['field_name'])
-      context['current_name'] = getattr(config_object, label)      
-      prompt = step['prompt_type']
-      args = []
-      for a in step['prompt_args']:
-        args.append(a.format(**context))
-      response = prompt(*args).show()
-      if response is not None:
-        setattr(config_object, step['field_name'], response)
+      # execute one of N sequences depending on user input
+      if step_type == 'dyn_sequence_trigger':
+        if not 'selector_func' in step.keys():
+          raise Exception('a step of type "dyn_sequence_trigger" must specify a selector_func field.')
+        
+        selector_func = step['selector_func']
+        menudata = step.get('menu_data') or self.edit_menus.get(step['field_name'])
+        if not menudata:
+          raise Exception('a step of type "dyn_sequence_trigger" must have a menu_data field OR provide it in the context.')
+
+        prompt_text = step['prompt_text'].format(**context)
+        args = [prompt_text, menudata]
+        
+        # retrieve user input
+        selection = prompt(*args).show()
+        # dynamic dispatch; use user input to determine the next sequence
+        # (selector_func() MUST return a live UISequence dictionary)
+        next_sequence = selector_func(selection)
+        output = self.process_edit_sequence(**next_sequence)
+        if output:
+          setattr(config_object, step['field_name'], output)
+        continue
+
+      if step_type == 'direct':
+        args = []
+        for a in step['prompt_args']:
+          args.append(a.format(**context))
+        # just execute this step
+        response = prompt(*args).show()
+        if response is not None:
+          setattr(config_object, step['field_name'], response)
+
+      '''
+      
+      if 'sequence' in step.keys():
+        output = self.process_edit_sequence(**step['sequence'])
+        if output:
+          setattr(config_object, step['field_name'], output)
+        continue
+      ''' 
+
+      
     return config_object
 
 
@@ -515,17 +665,17 @@ class UISequenceRunner(object):
       context.update(sequence['inputs'])
 
     for step in sequence['steps']:
-      #print(step)
+      
       if not step.get('prompt'):
         if not step.get('conditions') and not step.get('sequence'):
           # hard error
           raise Exception('step "%s" in this UI sequence has no prompt and does not branch to a child sequence') 
 
       # this is an input-dependent branch 
-      if step.get('conditions'):        
+      if step.get('conditions'):
         answer = step['prompt'].show()
         if not step['conditions'].get(answer):
-          raise Exception('a step "%s" in the UI sequence returned an answer "%s" for which there is no condition.' 
+          raise Exception('a step "%s" in the UI sequence returned an answer "%s" for which there is no condition.'
                           % (step['field_name'], answer))
 
         next_sequence = step['conditions'][answer]['sequence']
@@ -584,3 +734,26 @@ class UISequenceRunner(object):
   def edit(self, config_object, **edit_sequence):
     self.process_edit_sequence(config_object, **edit_sequence)
     return config_object
+
+    '''
+    {
+      'field_name': 'template_alias',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update template alias', '{current_value}']
+    },
+    {
+      'field_name': 'executor_function',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update executor funcname', '{current_value}']
+    },
+    {
+      'field_name': 'builder_function',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update builder funcname', '{current_value}']
+    },
+    {
+      'field_name': 'analyzer_function',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update analyzer funcname', '{current_value}']
+    },
+    '''

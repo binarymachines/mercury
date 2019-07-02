@@ -4,6 +4,7 @@
 Usage:
   mkcfg --list
   mkcfg <target>
+  mkcfk <target> --edit <configfile>
 
 Options:
   -l --list       show the available configuration targets
@@ -13,8 +14,6 @@ import os, sys
 from os import system, name
 from contextlib import contextmanager
 import copy
-import itertools
-from enum import Enum
 from cmd import Cmd
 import yaml
 from snap import common
@@ -22,7 +21,8 @@ from snap import cli_tools as cli
 from mercury import configtemplates as templates
 from mercury import metaobjects as meta
 from mercury.uisequences import *
-from mercury.configtargets import targets
+from mercury.configtargets import *
+from mercury.utils import tab, clear
 import docopt
 from docopt import docopt as docopt_func
 from docopt import DocoptExit
@@ -41,28 +41,6 @@ ___________________________________________________________________________
 
 BANNER_CLOSE = '|__________________________________________________________________________\n'
 
-
-class Whitespace(Enum):
-  space = ' '
-  tab = '\t'
-
-def tab(num_tabs):
-  return ''.join(itertools.repeat('\t', num_tabs))
-  
-def space(num_spaces):
-  return ''.join(itertools.repeat(' ', num_spaces))
-
-def indent(num_indents, whitespace_type):
-  return ''.join(itertools.repeat(whitespace_type, num_indents))
-
-def clear(): 
-    # for windows 
-    if name == 'nt': 
-        _ = system('cls') 
-
-    # for mac and linux(here, os.name is 'posix') 
-    else: 
-        _ = system('clear') 
 
 
 def docopt_cmd(func):
@@ -343,14 +321,13 @@ class ConfigCLI(Cmd):
         print('***')
         print('*** Configuration is valid.')
         print('***')
-        return True
+        
       else:
         print('!!!')
         print('!!! The current configuration contains errors:')
         for err in errors:
           print('!!! * %s%s' % (tab(1), err))
-        print('!!!')
-        return False
+        print('!!!')        
 
     do_val = do_validate
 
