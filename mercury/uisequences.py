@@ -462,30 +462,21 @@ quasr_input_slot_edit_sequence = {
   :::
   ''',
   'steps': [
-
-  ]
-}
-
-quasr_input_slot_edit_sequence = {
-
-  'marquee': '''
-  :::
-  ::: Edit QUASR input slot
-  :::
-  ''',
-  'steps': [
     {
+      'type': 'direct',
       'field_name': 'name',
       'prompt_type': cli.InputPrompt,
-      'prompt_args': ['input slot name', '{current_value}']
+      'prompt_args': ['input-slot name', '{current_value}']
     },
     {
+      'type': 'direct',
       'field_name': 'datatype',
       'prompt_type': cli.InputPrompt,
-      'prompt_args': ['slot datatype', '{current_value}']
+      'prompt_args': ['input-slot datatype', '{current_value}']
     }
   ]
 }
+
 
 quasr_output_slot_edit_sequence = {
 
@@ -496,29 +487,34 @@ quasr_output_slot_edit_sequence = {
   ''',
   'steps': [
     {
+      'type': 'direct',
       'field_name': 'name',
       'prompt_type': cli.InputPrompt,
-      'prompt_args': ['output slot name', '{current_value}']
+      'prompt_args': ['output-slot name', '{current_value}']
     },
     {
+      'type': 'direct',
       'field_name': 'datatype',
       'prompt_type': cli.InputPrompt,
-      'prompt_args': ['slot datatype', '{current_value}']
+      'prompt_args': ['output-slot datatype', '{current_value}']
     }
   ]
 }
 
 
 def select_target_input_slot(slot_name, config_object):
+  index = 0
   for slot in config_object.inputs:
     if slot.name == slot_name:
-      return slot
-
+      return (slot, index, quasr_input_slot_edit_sequence)
+    index += 1
 
 def select_target_output_slot(slot_name, config_object):
+  index = 0
   for slot in config_object.outputs:
     if slot.name == slot_name:
-      return slot
+      return (slot, index, quasr_output_slot_edit_sequence)
+    index += 1
   
 
 quasr_job_edit_sequence = {
@@ -607,7 +603,7 @@ class UISequenceRunner(object):
         else:
           output = self.process_edit_sequence(**step['sequence'])
           if output is not None:
-            setattr(config_object, step['field_name'], response)
+            setattr(config_object, step['field_name'], output)
         continue
 
       # execute one of N sequences depending on user input
@@ -627,10 +623,24 @@ class UISequenceRunner(object):
         selection = prompt(*args).show()
         # dynamic dispatch; use user input to determine the next sequence
         # (selector_func() MUST return a live UISequence dictionary)
-        next_sequence = selector_func(selection)
-        output = self.process_edit_sequence(**next_sequence)
-        if output:
-          setattr(config_object, step['field_name'], output)
+        if not selection:
+          continue
+
+        print('### selected config object: %s' % config_object)  
+        target_object, object_index, next_sequence = selector_func(selection, config_object)
+        if not target_object:
+          continue
+        updated_object = self.edit(target_object, **next_sequence)
+        if updated_object:
+
+          if isinstance(getattr(config_object, step['field_name']), list):
+            # replace the list element
+            obj_list = getattr(config_object, step['field_name'])
+            obj_list[object_index] = updated_object
+            setattr(config_object, step['field_name'], obj_list)
+          else:
+            # just replace the object
+            setattr(config_object, step['field_name'], updated_object)
         continue
 
       if step_type == 'direct':

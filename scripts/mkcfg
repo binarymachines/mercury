@@ -4,7 +4,7 @@
 Usage:
   mkcfg --list
   mkcfg <target>
-  mkcfk <target> --edit <configfile>
+  mkcfg <target> --edit <configfile>
 
 Options:
   -l --list       show the available configuration targets
@@ -99,11 +99,11 @@ class ConfigCLI(Cmd):
         self.prompt = '__%s [%s]> ' % (self.name, target_name)
         self.target_package = target_package
         self.configuration = {}
-        #self.replay_stack = Stack()
 
+        yaml_config = kwargs.get('config')
+        if yaml_config:
+          self.configuration = self.target_package['loader'](yaml_config)
 
-    #def build_project(self, config):
-    #  return {}
 
     def generate_yaml_config(self):
       #print(common.jsonpretty(self.configuration))
@@ -375,6 +375,8 @@ def main(args):
       print(BANNER_CLOSE)
       return
 
+    edit_mode = args['--edit']
+    
     config_target_name = args['<target>']
     target_pkg = targets.get(config_target_name)
     if not target_pkg:
@@ -382,7 +384,15 @@ def main(args):
       return
 
     clear()
-    config_cli = ConfigCLI('mkcfg', config_target_name, target_pkg)
+    start_params = {}
+    if edit_mode:
+      yaml_config = common.read_config_file(args['<configfile>'])
+      start_params['config'] = yaml_config
+    
+    config_cli = ConfigCLI('mkcfg', config_target_name, target_pkg, **start_params)
+    #else:
+    #  config_cli = ConfigCLI('mkcfg', config_target_name, target_pkg)
+
     config_cli.cmdloop()
 
 if __name__ == '__main__':

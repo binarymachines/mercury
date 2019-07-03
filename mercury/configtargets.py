@@ -7,6 +7,85 @@ from mercury.uisequences import UISequenceRunner
 from mercury.utils import tab
 
 
+def load_xfile_config(yaml_config):
+  live_config = {}
+  live_config['globals'] = []
+  for key, value in yaml_config['globals'].items():
+    param = meta.Parameter(name=key, value=value)
+    live_config['globals'].append(param)
+
+  yaml_svcs = yaml_config.get('service_objects') or []
+  for so_name in yaml_svcs:  
+    service = meta.ServiceObjectSpec(so_name, yaml_config['service_objects'][so_name]['class'])
+    for param in yaml_config['service_objects'][so_name]['init_params']:
+      service.add_init_param(param['name'], param['value'])
+  
+    live_config['service_objects'].append(service)
+
+  live_config['sources'] = []
+  for src_name in yaml_config['sources']:
+    datasource = meta.DatasourceSpec(src_name, yaml_config['sources'][src_name]['class'])
+    live_config['sources'].append(datasource)
+
+  live_config['maps'] = []
+  for map_name in yaml_config['maps']:
+    xmap = meta.XfileMapSpec(map_name, yaml_config['maps'][map_name]['lookup_source'])
+
+    for setting in yaml_config['maps'][map_name]['settings']:
+      # TODO: fill out when we have more than just the default setting
+      pass
+
+    for field in yaml_config['maps'][map_name].get('fields') or []:
+      field_name = list(field.keys())[0]
+      field_params = field[field_name] or {}
+      xmap.add_field(field_name, **field_params)
+
+    live_config['maps'].append(xmap)
+  
+  return live_config
+
+
+def load_quasr_config(yaml_config):
+  live_config = {}
+  live_config['globals'] = []
+  for key, value in yaml_config['globals'].items():
+    param = meta.Parameter(name=key, value=value)
+    live_config['globals'].append(param)
+
+  live_config['service_objects'] = []
+  yaml_svcs = yaml_config.get('service_objects') or []
+  for so_name in yaml_svcs:
+    service = meta.ServiceObjectSpec(so_name, yaml_config['service_objects'][so_name]['class'])
+
+    for param in yaml_config['service_objects'][so_name]['init_params']:
+      service.add_init_param(param['name'], param['value'])
+  
+    live_config['service_objects'].append(service)
+  
+  live_config['templates'] = []
+  for template_name in yaml_config.get('templates', []):
+    live_config['templates'].append(meta.QuasrTemplateSpec(template_name,
+                                                           yaml_config['templates'][template_name]))                                                           
+  
+  live_config['jobs'] = []
+  for job_name in yaml_config['jobs']:
+    job = meta.QuasrJobSpec(job_name, yaml_config['jobs'][job_name]['sql_template'])
+    yaml_input_slots = yaml_config['jobs'][job_name].get('inputs') or []
+    for slot in yaml_input_slots:
+      job.add_input_slot(slot['name'], slot['type'])
+
+    yaml_output_slots = yaml_config['jobs'][job_name].get('outputs') or []
+    for slot in yaml_output_slots:
+      job.add_output_slot(slot['name'], slot['type'])
+    
+    job.executor_function = yaml_config['jobs'][job_name]['executor_function']
+    job.builder_function = yaml_config['jobs'][job_name]['builder_function']
+    job.analyzer_function = yaml_config['jobs'][job_name].get('analyzer_function') or  ''
+    live_config['jobs'].append(job)
+
+  return live_config
+
+
 def find_global():
   pass
 
@@ -322,8 +401,22 @@ def list_profilr_datasets():
 def list_quasr_templates():
   pass
 
-def list_quasr_jobs():
-  pass
+def list_quasr_jobs(jobs):
+  if not len(jobs):
+    print("No jobs registered.")
+    return
+
+  print('jobs:')
+  for job in jobs:
+    print('%s%s:' % (tab(1), job.name))
+    print(tab(2) + 'input slots:')
+    for slot in job.inputs:
+      print('%s%s(%s)' % (tab(2), slot.name, slot.datatype))
+    print('\n')
+    print(tab(2) + 'output slots:')
+    for slot in job.outputs:
+      print('%s%s(%s)' % (tab(2), slot.name, slot.datatype))
+
 
 def validate_xfile_config(yaml_string, live_config):
   errors = []
@@ -398,6 +491,7 @@ targets = {
     'description': 'Read and transform CSV or JSON records',
     'template': templates.XFILE_TEMPLATE,
     'validator_func': validate_xfile_config,
+    'loader': load_xfile_config,
     'config_object_types': [
       {
         'name': 'globals',
@@ -620,6 +714,7 @@ targets = {
   'quasr': {
     'description': 'Run custom QA/profiling code against a relational dataset',
     'template': templates.QUASR_TEMPLATE,
+    'loader': load_quasr_config,
     'config_object_types': [
       {
         'name': 'globals',
@@ -636,6 +731,7 @@ targets = {
       {
           'name': 'service_objects',
           'singular_label': 'service',
+          'plural_label': 'services',
           'index_attribute': 'alias',
           'find_func': find_service_object,
           'create_func': create_service_object,
@@ -645,6 +741,7 @@ targets = {
       {
           'name': 'templates',
           'singular_label': 'template',
+          'plural_label': 'templates',
           'index_attribute': 'name',
           'find_func': find_quasr_template,
           'create_func': create_quasr_template,

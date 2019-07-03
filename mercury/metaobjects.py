@@ -5,7 +5,6 @@ from collections import namedtuple
 from snap import common
 
 
-
 class Parameter(object):
     def __init__(self, **kwargs):
         kwreader = common.KeywordArgReader('name')
@@ -61,6 +60,9 @@ class XfileMapSpec(object):
         self.name = name
         self.lookup_source = lookup_source_name
         self.fields = []
+        self.settings = [
+            Parameter(name='use_default_identity_transform', value=True)
+        ]
 
     def add_field(self, name, **params):
         self.fields.append(XfileFieldSpec(name, **params))
@@ -101,6 +103,11 @@ class QuasrJobIOSlot(object):
             'datatype': self.datatype
         }
 
+class QuasrTemplateSpec(object):
+    def __init__(self, name, text):
+        self.name = name
+        self.text = text
+
 
 class QuasrJobSpec(object):
     def __init__(self, name, template_alias):
@@ -111,6 +118,12 @@ class QuasrJobSpec(object):
         self.executor_function = None
         self.builder_function = None
         self.analyzer_function = None
+
+    def add_input_slot(self, name, datatype):
+        self.inputs.append(QuasrJobIOSlot(name, datatype))
+
+    def add_output_slot(self, name, datatype):
+        self.outputs.append(QuasrJobIOSlot(name, datatype))
 
     def data(self):
         return {

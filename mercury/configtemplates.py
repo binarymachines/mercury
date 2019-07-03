@@ -164,8 +164,10 @@ service_objects:
       {% endfor %}
 {% endfor %}
 templates:
-  sample: |
-    SELECT * FROM <TABLENAME>
+  {% for t in project['templates'] %}
+  {{t.name}}: |
+    {{t.text}}
+  {% endfor %}
 
 jobs:
   {% for job in project['jobs'] %}
