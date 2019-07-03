@@ -92,6 +92,42 @@ class DatasourceSpec(object):
             'classname': self.classname
         }
 
+
+class NgstDatastore(object):
+    def __init__(self, name, classname):
+        self.name = name
+        self.classname = classname
+        self.channel_selector_function = None
+        self.channels = []
+        self.init_params = []
+
+    def add_init_param(self, name, value):
+        self.init_params.append(Parameter(name=name, value=value))
+
+    def add_paramspec(self, parameter):
+        self.init_params.append(parameter)
+
+    def data(self):
+        return {
+            'name': self.name,
+            'init_params': [
+                {'name': p.name, 'value': p.value} for p in self.init_params
+            ]
+        }
+    
+class NgstTarget(object):
+    def __init__(self, name, datastore_name, checkpoint_interval):
+        self.name = name
+        self.datastore = datastore_name
+        self.checkpoint_interval = checkpoint_interval
+
+    def data(self):
+        return {
+            'name': self.name,
+            'datastore': self.datastore,
+            'checkpoint_interval': self.checkpoint_interval
+        }
+
 class QuasrJobIOSlot(object):
     def __init__(self, name, datatype):
         self.name = name

@@ -346,8 +346,6 @@ quasr_globals_create_sequence = {
   ]
 }
 
-
-
 QUASR_SLOT_TYPES = [
   {'label': 'integer', 'value': 'int'},
   {'label': 'floating-point', 'value': 'float'},

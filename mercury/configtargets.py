@@ -45,6 +45,43 @@ def load_xfile_config(yaml_config):
   return live_config
 
 
+def load_ngst_config(yaml_config):
+  live_config = {}
+  live_config['globals'] = []
+  for key, value in yaml_config['globals'].items():
+    param = meta.Parameter(name=key, value=value)
+    live_config['globals'].append(param)
+
+  live_config['service_objects'] = []
+  yaml_svcs = yaml_config.get('service_objects') or []
+  for so_name in yaml_svcs:
+    service = meta.ServiceObjectSpec(so_name, yaml_config['service_objects'][so_name]['class'])
+
+    for param in yaml_config['service_objects'][so_name]['init_params']:
+      service.add_init_param(param['name'], param['value'])
+  
+    live_config['service_objects'].append(service)
+
+  live_config['datastores'] = []
+  for ds_name in yaml_config['datastores']:
+    datastore = meta.NgstDatastore(ds_name, yaml_config['datastores'][ds_name]['class'])
+
+    for param in yaml_config['datastores'][ds_name].get('init_params') or []:      
+      datastore.add_init_param(param['name'], param['value'])
+
+    live_config['datastores'].append(datastore)
+  
+  live_config['ingest_targets'] = []
+  for target_name in yaml_config['ingest_targets']:
+    ds_name = yaml_config['ingest_targets'][target_name]['datastore']
+    interval = yaml_config['ingest_targets'][target_name]['checkpoint_interval']
+    target = meta.NgstTarget(target_name, ds_name, int(interval))
+
+    live_config['ingest_targets'].append(target)
+  
+  return live_config
+
+
 def load_quasr_config(yaml_config):
   live_config = {}
   live_config['globals'] = []
@@ -101,7 +138,7 @@ def find_xfile_map():
 def find_xfile_datasource():
   pass
 
-def find_ngst_datastore_by_name():
+def find_ngst_datastore(name):
   pass
 
 def find_ngst_target_by_name():
@@ -374,11 +411,32 @@ def list_xfile_maps(maps):
         print('%s%s: %s' % (tab(3), param.name, param.value))
 
 
-def list_ngst_datastores():
-  pass
+def list_ngst_datastores(datastores):
+  if not len(datastores):
+    print('No datastores registered.')
+    return
 
-def list_ngst_targets():
-  pass
+  print('datastores:')
+  for ds in datastores:
+    print('%s%s:' % (tab(1), ds.name))
+    print('%sclass: %s' % (tab(2), ds.classname))
+    print(tab(2) + 'init_params:')
+    for param in ds.init_params:
+      print('%s- name: %s' % (tab(3), param.name))
+      print('%s  value: %s' % (tab(3), param.value))
+  
+
+def list_ngst_targets(targets):
+  if not len(targets):
+    print('No targets registered.')
+    return
+
+  print('ingest_targets:')
+  for t in targets:
+    print('%s%s:' % (tab(1), t.name))
+    print('%sdatastore: %s' % (tab(2), t.datastore))
+    print('%scheckpoint_interval: %s' % (tab(2), t.checkpoint_interval))
+
 
 def list_cyclops_triggers():
   pass
@@ -549,10 +607,13 @@ targets = {
   'ngst': {
     'description': 'Send CSV or JSON records to a designated target',
     'template': templates.NGST_TEMPLATE,
+    'loader': load_ngst_config,
     'config_object_types': [
       {
         'name': 'globals',
-        'singular_label': 'global',
+        'singular_label': 'globals',
+        'plural_label': 'globals',
+        'index_attribute': 'name',
         'find_func': find_global,
         'create_func': create_ngst_globals,
         'update_func': edit_globals,
@@ -570,15 +631,19 @@ targets = {
       },
       {
         'name': 'datastores',
-        'singular_label': 'ngst datastore',
-        'find_func': find_ngst_datastore_by_name,
+        'singular_label': 'datastore',
+        'plural_label': 'datastores',
+        'index_attribute': 'name',
+        'find_func': find_ngst_datastore,
         'create_func': create_ngst_datastore,
         'update_func': edit_ngst_datastore,
         'list_func': list_ngst_datastores
       },
       {
         'name': 'ingest_targets',
-        'singular_label': 'ingest target',
+        'singular_label': 'target',
+        'plural_label': 'targets',
+        'index_attribute': 'name',
         'find_func': find_ngst_target_by_name,
         'create_func': create_ngst_target,
         'update_func': edit_ngst_target,
