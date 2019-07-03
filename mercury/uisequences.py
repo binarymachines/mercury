@@ -218,6 +218,7 @@ parameter_edit_sequence = {
   ''',
   'steps': [
     {
+      'type': 'direct',
       'label': 'name',
       'field_name': 'value',
       'prompt_type': cli.InputPrompt,
@@ -577,7 +578,7 @@ class UISequenceRunner(object):
       context['current_value'] = getattr(config_object, step['field_name'])
       label = step.get('label', step['field_name'])
       context['current_name'] = getattr(config_object, label)
-      prompt = step['prompt_type']
+      
       '''
       args = []
       for a in step['prompt_args']:
@@ -611,6 +612,7 @@ class UISequenceRunner(object):
         if not 'selector_func' in step.keys():
           raise Exception('a step of type "dyn_sequence_trigger" must specify a selector_func field.')
         
+        prompt = step['prompt_type']
         selector_func = step['selector_func']
         menudata = step.get('menu_data') or self.edit_menus.get(step['field_name'])
         if not menudata:
@@ -644,6 +646,7 @@ class UISequenceRunner(object):
         continue
 
       if step_type == 'direct':
+        prompt = step['prompt_type']
         args = []
         for a in step['prompt_args']:
           args.append(a.format(**context))

@@ -398,8 +398,17 @@ def list_profilers():
 def list_profilr_datasets():
   pass
 
-def list_quasr_templates():
-  pass
+def list_quasr_templates(templates):
+  if not len(templates):
+    print('No templates registered.')
+    return
+
+  print('templates:')
+  for t in templates:
+    print('%s%s:' % (tab(1), t.name))
+    for line in t.text.split('\n'):
+      print(tab(2) + line)
+    #print('\n')
 
 def list_quasr_jobs(jobs):
   if not len(jobs):
@@ -411,12 +420,12 @@ def list_quasr_jobs(jobs):
     print('%s%s:' % (tab(1), job.name))
     print(tab(2) + 'input slots:')
     for slot in job.inputs:
-      print('%s%s(%s)' % (tab(2), slot.name, slot.datatype))
+      print('%s%s (%s)' % (tab(3), slot.name, slot.datatype))
     print('\n')
     print(tab(2) + 'output slots:')
     for slot in job.outputs:
-      print('%s%s(%s)' % (tab(2), slot.name, slot.datatype))
-
+      print('%s%s (%s)' % (tab(3), slot.name, slot.datatype))
+    print('\n')
 
 def validate_xfile_config(yaml_string, live_config):
   errors = []

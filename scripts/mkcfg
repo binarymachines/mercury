@@ -297,6 +297,7 @@ class ConfigCLI(Cmd):
             object_name = cli.MenuPrompt('object to edit', object_menudata).show()
             config_object = self.find_config_object(object_name, config_obj_array, pkg)
 
+            
             pkg['update_func']([config_object])
             #else:
             #  pkg['update_func'](config_obj_array)
