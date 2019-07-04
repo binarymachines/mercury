@@ -95,7 +95,7 @@ class DatasourceSpec(object):
 
 class NgstDatastore(object):
     def __init__(self, name, classname):
-        self.name = name
+        self.alias = name
         self.classname = classname
         self.channel_selector_function = None
         self.channels = []
@@ -109,7 +109,7 @@ class NgstDatastore(object):
 
     def data(self):
         return {
-            'name': self.name,
+            'alias': self.alias,
             'init_params': [
                 {'name': p.name, 'value': p.value} for p in self.init_params
             ]
@@ -118,13 +118,13 @@ class NgstDatastore(object):
 class NgstTarget(object):
     def __init__(self, name, datastore_name, checkpoint_interval):
         self.name = name
-        self.datastore = datastore_name
+        self.datastore_alias = datastore_name
         self.checkpoint_interval = checkpoint_interval
 
     def data(self):
         return {
             'name': self.name,
-            'datastore': self.datastore,
+            'datastore': self.datastore_alias,
             'checkpoint_interval': self.checkpoint_interval
         }
 

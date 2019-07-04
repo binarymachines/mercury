@@ -229,7 +229,7 @@ def create_xfile_map(live_config, target_package):
     'lookup_source': cli.MenuPrompt('lookup datasource', datasource_select_menudata)
   }
 
-  mapspec = UISequenceRunner(override_create_prompts=prompts).create(**xfile_map_create_sequence)
+  mapspec = UISequenceRunner(create_prompts=prompts).create(**xfile_map_create_sequence)
   while True:
     fieldspec = UISequenceRunner().create(**xfile_field_create_sequence)
     if not fieldspec:
@@ -244,13 +244,50 @@ def create_xfile_map(live_config, target_package):
 
 
 def create_ngst_globals(live_config, target_package):
-  pass
+  # this will return a dictionary containing all global parameters for an xfile project
+  result =  UISequenceRunner().create(**ngst_globals_create_sequence)
+
+  # return all Parameter specs
+  for key, value in result.items():
+    yield meta.Parameter(name=key, value=value)
+  
 
 def create_ngst_target(live_config, target_package):
-  pass
+
+  prompts = {}
+  menudata = []
+  for dstore in live_config['datastores']:
+    menudata.append({'label': dstore.alias, 'value': dstore.alias})
+  
+  prompts['datastore_alias'] = cli.MenuPrompt('select a datastore', menudata)
+
+  while True:
+    data = UISequenceRunner(create_prompts=prompts).create(**ngst_target_create_sequence)    
+    if not data:
+      break
+
+    target = meta.NgstTarget(data['name'], data['datastore_alias'], int(data['checkpoint_interval']))
+    yield target
+    answer = cli.InputPrompt('create another target (Y/n)?').show()
+    should_continue = answer.lower()
+    if should_continue == 'n':
+      break
+
 
 def create_ngst_datastore(live_config, target_package):
-  pass
+  while True:
+    data = UISequenceRunner().create(**ngst_datastore_create_sequence)
+    if not data:
+      break
+    dstore = meta.NgstDatastore(data['alias'], data['classname'])
+    dstore.channel_selector_function = data['channel_selector_function']
+    yield dstore
+
+    answer = cli.InputPrompt('create another datastore (Y/n)?').show()
+    should_continue = answer.lower()
+    if should_continue == 'n':
+      break
+
 
 def create_cyclops_trigger(live_config, target_package):
   pass
@@ -395,6 +432,10 @@ def list_xfile_datasources(datasources):
   if not len(datasources):
     print("No datasources registered.")
     return
+  print('datasources:')
+  for src in datasources:
+    print('%s%s:' % (tab(1), src.name))
+    print('%sclass: %s' % (tab(2), src.classname))    
   
 
 def list_xfile_maps(maps):
@@ -418,7 +459,7 @@ def list_ngst_datastores(datastores):
 
   print('datastores:')
   for ds in datastores:
-    print('%s%s:' % (tab(1), ds.name))
+    print('%s%s:' % (tab(1), ds.alias))
     print('%sclass: %s' % (tab(2), ds.classname))
     print(tab(2) + 'init_params:')
     for param in ds.init_params:
@@ -434,7 +475,7 @@ def list_ngst_targets(targets):
   print('ingest_targets:')
   for t in targets:
     print('%s%s:' % (tab(1), t.name))
-    print('%sdatastore: %s' % (tab(2), t.datastore))
+    print('%sdatastore: %s' % (tab(2), t.datastore_alias))
     print('%scheckpoint_interval: %s' % (tab(2), t.checkpoint_interval))
 
 
@@ -633,7 +674,7 @@ targets = {
         'name': 'datastores',
         'singular_label': 'datastore',
         'plural_label': 'datastores',
-        'index_attribute': 'name',
+        'index_attribute': 'alias',
         'find_func': find_ngst_datastore,
         'create_func': create_ngst_datastore,
         'update_func': edit_ngst_datastore,

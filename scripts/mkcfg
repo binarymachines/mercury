@@ -187,6 +187,7 @@ class ConfigCLI(Cmd):
     def do_list(self, *cmd_args):
       with self.docopt_parse(self.usage_string_for_list(), *cmd_args) as (args, error):
         if not error:
+          print('\n')
           selection = self.get_selected_option(args, self.config_object_plural_labels())
           pkg = self.find_config_package_by_plural_label(selection)
           if not pkg:
@@ -197,6 +198,7 @@ class ConfigCLI(Cmd):
             self.configuration[pkg['name']] = []
           objects_to_list = self.configuration[pkg['name']]
           list_function(objects_to_list)
+          print('\n')      
         else:
           print(error)
 
@@ -297,7 +299,7 @@ class ConfigCLI(Cmd):
             object_name = cli.MenuPrompt('object to edit', object_menudata).show()
             config_object = self.find_config_object(object_name, config_obj_array, pkg)
 
-            
+
             pkg['update_func']([config_object])
             #else:
             #  pkg['update_func'](config_obj_array)
@@ -308,8 +310,11 @@ class ConfigCLI(Cmd):
 
 
     def do_preview(self, *cmd_args):
+      print('\n__________________________________________________________________\n')
       yconf = self.generate_yaml_config()
       print(yconf)
+      print('\n__________________________________________________________________\n')
+
 
     do_pre = do_preview
 

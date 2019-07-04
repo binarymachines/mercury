@@ -57,20 +57,20 @@ service_objects:
 datastores:
   {% for datastore in project.datastores %}
   {{ datastore.alias }}:
-      channel_select_function: {{ datastore.channel_detect_func }}
-      channels:
-        {% for channel in datastore.channels %}
-        - {{ channel }} {% endfor %} 
-        
       class: {{ datastore.classname }}
       init_params:
         {% for param in datastore.params %}
         - name: {{ param.name }}
           value: {{ param.value }} {% endfor %}
+      channel_select_function: {{ datastore.channel_detect_func }}
+      channels:
+        {% for channel in datastore.channels %}
+        - {{ channel }} {% endfor %}
+  {% endfor %}
 
 ingest_targets:
   {% for target in project.ingest_targets %}
-  {{ target.alias }}:
+  {{ target.name }}:
       datastore: {{ target.datastore_alias }}
       checkpoint_interval: {{ target.checkpoint_interval }} {% endfor %}
 '''
