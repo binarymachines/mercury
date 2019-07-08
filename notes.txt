@@ -1,0 +1,53 @@
+mkcfg checklist
+
+To enable a new configuration target:
+
+(1)
+- look up the named target-package dictionary in configtargets.py:targets{}
+
+- it should have the same name as the target utility
+
+- top-level fields are "description", "template", "loader", "config_object_types"
+
+- "loader" must be a valid function in configtargets.py which takes a yaml_config (text-based dictionary from a loaded YAML file) 
+  and returns a live config (a dictionary of metaobjects).
+
+- "template" must be a valid jinja2 template string (defined in configtemplates.py)
+
+- "config_object_types" is an array of dictionaries, one per relevant metaobject (or metaobject collection, in the case of globals).
+
+(2)
+
+# Each dictionary must have:
+
+'name': the name of the configuration section as it appears in the YAML config
+
+'singular_label': how we refer to a single instance of the config object in the app
+
+'plural_label': how we refer to a single instance of the config object
+
+'index_attribute': the config object attribute we use to select one from a list
+
+'find_func': the function we use to find a config object by its index attribute
+
+'create_func': the function used to create a config object
+
+'update_func': the function used to edit a config object
+
+'list_func': the function used to generate a list of this config object for in-app display 
+
+(3) 
+
+# Make sure there are "spec" objects in metaobjects.py which match the internal structure of the configuration
+
+
+(4) 
+
+# Write the functions (in configtargets.py) referred to by the relevant config target(s)
+
+(5)
+
+# For each new function in configtargets, create the correct sequence dictionary in uisequences.py
+  AND
+  verify that the jinja2 template in configtemplates.py is correct
+

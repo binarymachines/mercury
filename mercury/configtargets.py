@@ -337,46 +337,78 @@ def create_quasr_globals(live_config, target_package):
     yield meta.Parameter(name=key, value=value)
 
 
-def edit_globals(config_objects):
-  for obj in config_objects:
-    UISequenceRunner().process_edit_sequence(obj, **parameter_edit_sequence)
+def edit_globals(live_config, setting):
+  UISequenceRunner().process_edit_sequence(setting, **parameter_edit_sequence)
              
 
-def edit_service_object(config_objects):
-  for obj in config_objects:
-    UISequenceRunner().process_edit_sequence(obj, **service_object_edit_sequence)
+def edit_service_object(live_config, service_object):
+  UISequenceRunner().process_edit_sequence(service_object, **service_object_edit_sequence)
 
 
-def edit_dfproc_processor():
+def edit_dfproc_processor(live_config, processor):
   pass
 
 
-def edit_xfile_datasource(config_objects):
-  for obj in config_objects:
-    UISequenceRunner().process_edit_sequence(obj, **xfile_datasource_edit_sequence)
+def edit_xfile_datasource(live_config, config_object):  
+  UISequenceRunner().process_edit_sequence(config_object, **xfile_datasource_edit_sequence)
 
 
-def edit_xfile_map(config_objects):
-  for obj in config_objects:
-    UISequenceRunner().process_edit_sequence(obj, **xfile_map_edit_sequence)
+def edit_xfile_map(live_config, mapspec):  
+  UISequenceRunner().process_edit_sequence(mapspec, **xfile_map_edit_sequence)
 
 
-def edit_quasr_job(config_objects):
-  for obj in config_objects:
-    input_slot_menu = [{'label': slot.name, 'value': slot.name} for slot in obj.inputs]
-    output_slot_menu = [{'label': slot.name, 'value': slot.name} for slot in obj.outputs]
+def edit_quasr_job(live_config, job):
+  #for obj in config_objects:
+  input_slot_menu = [{'label': slot.name, 'value': slot.name} for slot in job.inputs]
+  output_slot_menu = [{'label': slot.name, 'value': slot.name} for slot in job.outputs]
+  menus = {
+    'inputs': input_slot_menu,
+    'outputs': output_slot_menu
+  }
+  UISequenceRunner(edit_menus=menus).edit(job, **quasr_job_edit_sequence)
+
+
+def edit_ngst_datastore(live_config, datastore):
+  '''
+  menudata = []
+  for d in datastores:
+    menudata.append({'label': d.alias, 'value': d})
+
+  edit_target = cli.MenuPrompt('Select a datastore to edit', menudata).show()
+  if edit_target:
+  '''
+  # load menu data with this target's init params, for editing
+  iparam_menudata = []
+  for param in datastore.init_params:
+    iparam_menudata.append({'label': param.name, 'value': param.name}) 
+
+  menus = {
+    'init_params': iparam_menudata
+  }
+  
+  UISequenceRunner(edit_menus=menus).edit(datastore, **ngst_datastore_edit_sequence)
+
+
+def edit_ngst_target(live_config, edit_target):
+  '''
+  menudata = []
+  for t in targets:
+    menudata.append({'label': t.name, 'value': t})
+  
+  edit_target = cli.MenuPrompt('Select a target to edit', menudata).show()
+  '''
+  if edit_target:
+
+    datastore_menudata = []
+    for dstore in live_config['datastores']:
+      datastore_menudata.append({'label': dstore.alias, 'value': dstore.alias})
+    
     menus = {
-      'inputs': input_slot_menu,
-      'outputs': output_slot_menu
+      
+      'datastore_alias': datastore_menudata
     }
-    UISequenceRunner(edit_menus=menus).edit(obj, **quasr_job_edit_sequence)
+    UISequenceRunner(edit_menus=menus).edit(edit_target, **ngst_target_edit_sequence)
 
-
-def edit_ngst_datastore():
-  pass
-
-def edit_ngst_target():
-  pass
 
 def edit_cyclops_trigger():
   pass
@@ -427,6 +459,7 @@ def list_service_objects(service_objects):
 
 def list_dfproc_processors():
   pass
+
 
 def list_xfile_datasources(datasources):
   if not len(datasources):
@@ -497,6 +530,7 @@ def list_profilers():
 def list_profilr_datasets():
   pass
 
+
 def list_quasr_templates(templates):
   if not len(templates):
     print('No templates registered.')
@@ -508,6 +542,7 @@ def list_quasr_templates(templates):
     for line in t.text.split('\n'):
       print(tab(2) + line)
     #print('\n')
+
 
 def list_quasr_jobs(jobs):
   if not len(jobs):
@@ -525,6 +560,7 @@ def list_quasr_jobs(jobs):
     for slot in job.outputs:
       print('%s%s (%s)' % (tab(3), slot.name, slot.datatype))
     print('\n')
+
 
 def validate_xfile_config(yaml_string, live_config):
   errors = []

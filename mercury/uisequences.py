@@ -5,6 +5,45 @@ from snap import cli_tools as cli
 from snap import common
 from mercury import metaobjects as meta
 
+'''
+types of UI sequence steps (for editing):
+
+direct: This type prompts the user for input and populates an object or field with the result
+
+static_sequence_trigger: launches a named UI sequence and assigns the result to the named field
+    (in the case of an array-type field, the named sequence will run once per element)
+
+dyn_sequence_trigger: this type is designed to handle collection-type object fields in situations
+    where the user wants to edit only one member of the collection. It prompts the user to 
+    choose from an array of options, then passes the result to a function which returns
+    the target UISequence.
+
+gate: this type prompts the user for input, evaluates that input as true or false, and triggers
+    a named sequence if the result evaluated to True.
+
+
+'''
+
+parameter_create_sequence = {
+  'marquee': '''
+  +++ Add init parameter
+  ''',
+  'steps': [    
+    {
+      'type': 'gate',
+      'prompt': cli.InputPrompt('add an init parameter (Y/n)?', 'y'),
+      'evaluator': lambda response: True if response.lower() == 'y' else False,
+
+     },
+    {
+      'type': 'direct',
+      'field_name': 'value',
+      'prompt': cli.InputPrompt('parameter value'),
+      'required': True
+    }
+  ]
+}
+
 
 service_object_param_sequence = {
   'marquee': '''
@@ -402,9 +441,9 @@ ngst_target_create_sequence = {
       'required': True
     },
     {
-      'type': 'dyn_prompt',
+      'type': 'direct',
       'field_name': 'datastore_alias',
-      'prompt': cli.InputPrompt('datastore'),   
+      'prompt_creator': create_ngst_datastore_prompt,
       'required': True
     },
     {
@@ -416,6 +455,69 @@ ngst_target_create_sequence = {
   ]
 }
 
+
+def select_datastore_init_param(param_name, config_object):
+  index = 0
+  for param in config_object.init_params:
+    if param.name == param_name:
+      return (param, index, parameter_edit_sequence)
+    index += 1
+
+
+ngst_datastore_edit_sequence = {
+  'marquee': '''
+  ::: Editing ngst datastore
+  ''',
+  'steps': [
+    {
+      'type': 'direct',
+      'field_name': 'alias',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update datastore alias', '{current_value}']
+    },
+    {
+      'type': 'direct',
+      'field_name': 'classname',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update datastore class', '{current_value}']
+    },
+    {
+      'type': 'direct',
+      'field_name': 'channel_selector_function',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update channel selector', '{current_value}']
+    },
+    {
+      'type': 'sequence_selector',
+      'field_name': 'init_params',
+      'prompt_type': cli.MenuPrompt,
+      'prompt_text': 'update init param',
+      'selector_func': select_datastore_init_param,
+      'default': parameter_create_sequence
+    }
+  ]
+}
+
+
+ngst_target_edit_sequence = {
+  'marquee': '''
+  ::: Edit ngst target
+  ''',
+  'steps': [
+    {
+      'type': 'direct', 
+      'field_name': 'name',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update target name', '{current_value}']
+    },
+    {
+      'type': 'direct',
+      'field_name': 'datastore_alias',
+      'prompt_type': cli.MenuPrompt,
+      'prompt_text': 'update datastore alias',      
+    }
+  ]
+}
 
 service_object_edit_sequence = {
   'marquee': '''
@@ -712,7 +814,6 @@ class UISequenceRunner(object):
     for step in sequence['steps']:
 
       step_type = step.get('type')
-
       current_target = getattr(config_object, step['field_name'])
       context['current_value'] = getattr(config_object, step['field_name'])
       label = step.get('label', step['field_name'])
@@ -722,6 +823,8 @@ class UISequenceRunner(object):
       #if isinstance(current_target, list) and step.get('sequence'):
       if not step_type in self.allowed_edit_step_types:
         raise Exception('The step with field name "%s" is of an unsupported type "%s".' % (step['field_name'], step_type))
+
+      #prompt = self.edit_prompts.get(step['field_name']) or step['prompt']
 
       if step_type == 'static_sequence_trigger':
         if isinstance(current_target, list):
@@ -747,20 +850,27 @@ class UISequenceRunner(object):
         
         prompt = step['prompt_type']
         selector_func = step['selector_func']
-        menudata = step.get('menu_data') or self.edit_menus.get(step['field_name'])
-        if not menudata:
-          raise Exception('a step of type "dyn_sequence_trigger" must have a menu_data field OR provide it in the context.')
+        menudata = self.edit_menus.get(step['field_name'])
+        if menudata is None:
+          menudata = step.get('menu_data')
+        if menudata is None:        
+          raise Exception('a step of type "dyn_sequence_trigger" must have a menu_data field OR pass it in the UISequence constructor.')
+
+        # skip if there are no entries to select
+        if not len(menudata):
+          continue
 
         prompt_text = step['prompt_text'].format(**context)
         args = [prompt_text, menudata]
         
         # retrieve user input
         selection = prompt(*args).show()
-        # dynamic dispatch; use user input to determine the next sequence
-        # (selector_func() MUST return a live UISequence dictionary)
+        
         if not selection:
           continue
   
+        # dynamic dispatch; use user input to determine the next sequence
+        # (selector_func() MUST return a live UISequence dictionary)
         target_object, object_index, next_sequence = selector_func(selection, config_object)
         if not target_object:
           continue
@@ -779,9 +889,19 @@ class UISequenceRunner(object):
 
       if step_type == 'direct':
         prompt = step['prompt_type']
+
         args = []
-        for a in step['prompt_args']:
-          args.append(a.format(**context))
+        if step.get('prompt_args'):          
+          for a in step['prompt_args']:
+            args.append(a.format(**context))
+
+        elif step.get('prompt_text'):          
+          args.append(step['prompt_text'])
+          menudata = self.edit_menus.get(step['field_name']) or step.get('menu_data')
+          if not menudata:
+            raise Exception('A "direct" type ui step must provide its own menu data or retrieve it from the UISequenceRunner.')
+          args.append(menudata)
+
         # just execute this step
         response = prompt(*args).show()
         if response is not None:
@@ -805,6 +925,7 @@ class UISequenceRunner(object):
           # hard error
           raise Exception('step "%s" in this UI sequence has no prompt and does not branch to a child sequence') 
 
+      step_type = step['type']
       '''
       if step['type'] == 'dyn_prompt':
         prompt_create_func = step['prompt']
@@ -812,7 +933,18 @@ class UISequenceRunner(object):
         context[step['field_name']] = answer
         continue
       '''
+      if step_type == 'direct':
+        pass
 
+      elif step_type == 'static_sequence_trigger':
+        pass
+
+      elif step_type == 'dyn_sequence_trigger':
+        pass
+
+      elif step_type == 'gate':
+        pass
+        
       
       prompt = self.create_prompts.get(step['field_name']) or step['prompt']
       # this is an input-dependent branch 
