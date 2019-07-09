@@ -1,8 +1,23 @@
 #!/usr/bin/env python
 
 import json
+import copy
 from collections import namedtuple
 from snap import common
+
+REQUIRED_ED_CHANNEL_FIELDS = ['handler_function',
+                           'table_name',
+                           'operation',
+                           'primary_key_field',
+                           'primary_key_type',
+                           'payload_fields']
+
+
+REQUIRED_ED_GLOBAL_FIELDS = ['project_directory',
+                          'database_host',
+                          'database_name',
+                          'debug',
+                          'handler_module']
 
 
 class Parameter(object):
@@ -37,6 +52,109 @@ class ServiceObjectSpec(object):
                 {'name': p.name, 'value': p.value} for p in self.init_params
             ]
         }
+
+
+class EavesdropprChannelSpec(object):
+    def __init__(self, name, **kwargs):
+        kwreader = common.KeywordArgReader(*REQUIRED_ED_CHANNEL_FIELDS)
+        kwreader.read(**kwargs)
+        self.name = name
+        self._data = {}
+        for key, value in kwargs.items():
+            if key == 'payload_fields':
+                self._data[key] = set()
+                # here we know that value is actually a collection
+                for field in value:
+                    self._data[key].add(field)
+            else:
+                self._data[key] = value
+
+
+    def rename(self, new_name):
+        new_data = copy.deepcopy(self._data)
+        return EavesdropprChannelSpec(new_name, **new_data)
+
+
+    def set_property(self, name, value):
+        new_data = copy.deepcopy(self._data)
+        new_data[name] = value
+        return EavesdropprChannelSpec(self.name, **new_data)
+
+
+    def property_names(self):
+        return self._data.keys()
+
+
+    @property
+    def handler_function(self):
+        return self._data['handler_function']
+
+
+    @property
+    def schema(self):
+        return self._data.get('schema', 'public')
+
+
+    @property
+    def table_name(self):
+        return self._data['table_name']
+
+
+    @property
+    def operation(self):
+        return self._data['operation']
+
+    @property
+    def primary_key_field(self):
+        return self._data['primary_key_field']
+
+
+    @property
+    def primary_key_type(self):
+        return self._data['primary_key_type']
+
+
+    @property
+    def procedure_name(self):
+        return self._data['procedure_name']
+
+
+    @property
+    def trigger_name(self):
+        return self._data.get('trigger_name')
+
+
+    @property
+    def payload_fields(self):
+        return self._data['payload_fields']
+
+
+    def add_payload_fields(self, *fields):
+        new_data = copy.deepcopy(self._data)
+        for field in fields:
+            new_data['payload_fields'].add(field)
+        return EavesdropprChannelSpec(self.name, **new_data)
+
+
+    def delete_payload_field(self, field):
+        new_data = copy.deepcopy(self._data)
+        new_data['payload_fields'].discard(field)
+        return EavesdropprChannelSpec(self.name, **new_data)
+
+
+    def data(self):
+        result = {}
+        for key, value in self._data.items():
+            if key == 'payload_fields':
+                result[key] = []
+                for f in value:
+                    result[key].append(f)
+            else:
+                result[key] = value
+
+        return result
+
+
 
 class XfileFieldSpec(object):
     def __init__(self, name, **params):

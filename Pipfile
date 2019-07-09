@@ -36,6 +36,7 @@ SQLAlchemy-Utils = "==0.32.14"
 sh = "*"
 snap-micro = ">=0.9.98"
 watchdog = "*"
+pgpubsub = "*"
 
 [dev-packages]
 
