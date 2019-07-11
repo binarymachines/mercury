@@ -120,23 +120,28 @@ def generate_code(event_channel, channel_config, **kwargs):
                                       db_op=operation))
 
 
-def default_event_handler(event, svc_object_registry):
+def default_event_handler(event, svc_registry):
     print(common.jsonpretty(json.loads(event.payload)))
 
 
-def listen(channel_id, yaml_config, **kwargs):
-    local_env = common.LocalEnvironment('PGSQL_USER', 'PGSQL_PASSWORD')
-    local_env.init()
+def listen(channel_id, handler_func, pubsub_connector_func, svc_registry, **kwargs):
+    #local_env = common.LocalEnvironment('PGSQL_USER', 'PGSQL_PASSWORD')
+    #local_env.init()
 
-    pgsql_user = local_env.get_variable('PGSQL_USER')
-    pgsql_password = local_env.get_variable('PGSQL_PASSWORD')
-    db_host = yaml_config['globals']['database_host']
-    db_name = yaml_config['globals']['database_name']
+    #pgsql_user = local_env.get_variable('PGSQL_USER')
+    #pgsql_password = local_env.get_variable('PGSQL_PASSWORD')
+    #db_host = yaml_config['globals']['database_host']
+    #db_name = yaml_config['globals']['database_name']
 
+    '''
     pubsub = pgpubsub.connect(host=db_host,
                               user=pgsql_user,
                               password=pgsql_password,
                               database=db_name)
+    '''
+
+    '''
+    pubsub = pubsub_connector.init()                              
     handler_module_name = yaml_config['globals']['handler_module']
 
     project_dir = common.load_config_var(yaml_config['globals']['project_directory'])
@@ -153,9 +158,11 @@ def listen(channel_id, yaml_config, **kwargs):
         handler_function = default_event_handler
 
     service_objects = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
+    '''
 
+    pubsub = pubsub_connector_func(svc_registry)
     pubsub.listen(channel_id)
     print('### listening on channel "%s"...' % channel_id, file=sys.stderr)
     for event in pubsub.events():
-        handler_function(event, service_objects)
+        handler_func(event, svc_registry)
 

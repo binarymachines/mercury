@@ -2,13 +2,12 @@
 
 '''Usage:
           eavesdrop
-          eavesdrop -i <initfile> channels
-          eavesdrop -i <initfile> -c <event_channel>
-          eavesdrop -i <initfile> -c <event_channel> -g (trigger | procedure)
+          eavesdrop --config <configfile> channels
+          eavesdrop --config <configfile> -c <event_channel>
+          eavesdrop --config <configfile> -c <event_channel> -g (trigger | procedure)
 
    Options:
-          -g --generate    generate SQL LISTEN/NOTIFY code
-          -i --initfile    YAML initialization file
+          -g --generate    generate SQL LISTEN/NOTIFY code          
           -c --channel     target event channel
 '''
 
@@ -34,19 +33,21 @@ logger = logging.getLogger(__name__)
 
 def main(args):
 
-    if not args.get('--initfile') and not args.get('--channel'):
+    if not args.get('--config') and not args.get('--channel'):
         print('placeholder for starting eavesdrop in CLI interactive mode...')
         #eavesdrop_cli = edcore.EavesdropCLI()
         #eavesdrop_cli.cmdloop()
         return 0
 
     yaml_config = None
-    if args.get('--initfile'):
-        yaml_config = common.read_config_file(args['<initfile>'])
+    if args.get('--config'):
+        yaml_config = common.read_config_file(args['<configfile>'])
 
     if args.get('channels'):
         print('\n'.join(yaml_config['channels'].keys()))
         return 0
+
+    service_registry = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
 
     channel_id = args['<event_channel>']
     if not yaml_config['channels'].get(channel_id):
@@ -54,10 +55,28 @@ def main(args):
 
     channel_config = yaml_config['channels'][channel_id]
 
+    project_dir = common.load_config_var(yaml_config['globals']['project_directory'])
+    sys.path.append(project_dir)
+
+    handler_module_name = yaml_config['globals']['handler_module']
+    handler_function_name = yaml_config['channels'][channel_id].get('handler_function') or 'default_handler'
+    handler_module = common.load_class(handler_function_name, handler_module_name)
+
+    handler_function = edcore.default_event_handler
+    if hasattr(handler_module, handler_function_name):
+        handler_function = getattr(handler_module, handler_function_name)
+
+    connect_function_name = yaml_config['globals']['pubsub_connect_func']
+    connect_function = common.load_class(connect_function_name, handler_module_name)
+
+
     if args['--generate']:
         edcore.generate_code(channel_id, channel_config, **args)
     else:
-        edcore.listen(channel_id, yaml_config, **args)
+        edcore.listen(channel_id,
+                      handler_function,
+                      connect_function,
+                      service_registry)
 
 
 if __name__ == '__main__':
