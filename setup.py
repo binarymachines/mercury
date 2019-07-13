@@ -35,7 +35,8 @@ DEPENDENCIES=['snap-micro',
               'botocore',
               'raven',
               'redis',
-              'sh']
+              'sh',
+              'pgpubsub']
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
@@ -65,7 +66,8 @@ setup(
              'scripts/pgexec',
              'scripts/pgmeta',
              'scripts/mkcfg',
-	     'scripts/eavesdroppr'],
+	         'scripts/eavesdroppr',
+             'scripts/mercury-version'],
     packages=find_packages(),
     install_requires=DEPENDENCIES,
     test_suite='tests',

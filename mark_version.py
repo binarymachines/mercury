@@ -4,7 +4,7 @@ import os
 import sh
 from sh import git
 
-VERSION_NUM = '0.9.36'
+VERSION_NUM = '0.9.37'
 VERSION_MODULE_TEMPLATE = '''#!/usr/bin/env python
 VERSION_STRING = "{version_string}"
 
@@ -12,7 +12,7 @@ def show():
     return VERSION_STRING
 
 def main():
-    print(show())
+    print(VERSION_STRING)
 
 if __name__ == '__main__':
     main()

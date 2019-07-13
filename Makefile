@@ -36,16 +36,14 @@ test_env:
 test:	test_env
 	PYTHONPATH=./tests $(VIRTUALENV_ROOT)/$(VIRTUALENV_NAME)/bin/python -m unittest discover -t . ./tests -v
 
-
 test_teamcity:	test_env
 	PYTHONPATH=./tests $(VIRTUALENV_ROOT)/$(VIRTUALENV_NAME)/bin/python -m teamcity.unittestpy discover -t . ./tests -v
 
 version:
-	python mark_version.py > version.py && chmod u+x version.py
+	python mark_version.py > version.py && cp version.py scripts/mercury-version && chmod u+x scripts/mercury-version
 
 build-dist:
 	python setup.py sdist bdist_wheel
-
 
 build-testdist:
 	python test_setup.py sdist bdist_wheel
