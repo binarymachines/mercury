@@ -41,6 +41,14 @@ class RecordIngest(unittest.TestCase):
                                                      map_name=VALID_MAP_NAME)
         self.transformer = self.builder.build()
 
+    def test_ingesting_n_records_triggers_n_datastore_writethroughs(self):
+        pass
+
+    def test_respect_limit_switch(self):
+        pass
+
+    def test_flush_records_on_checkpoint_interval(self):
+        pass
 
     def tearDown(self):
         pass

@@ -151,6 +151,9 @@ def main(args):
         print(json.dumps(trigger_data))
         return
     
+    project_dir = common.load_config_var(yaml_config['globals']['project_home'])
+    sys.path.append(project_dir)
+
     if replay_mode:
         trigger_name = args['<trigger_name>']
         if not yaml_config.get('triggers'):

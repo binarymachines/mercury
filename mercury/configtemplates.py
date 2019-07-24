@@ -199,15 +199,15 @@ globals:{% for gspec in project['globals'] %}
   {{ gspec.name }}: {{ gspec.value }}{% endfor %}
 
 service_objects:
-{% for service in project['services'] %}
+{% for service in project['service_objects'] %}
   {{service.alias}}:
       class: {{service.classname}}
       init_params:
-      {% for param in service.params %}
-          - name: param.name
-            value: param.value
-      {% endfor %}
-{% endfor %}
+      {% for param in service.init_params %}
+          - name: {{ param.name }}
+            value: {{ param.value }}
+      {% endfor %}{% endfor %}
+
 templates:
   {% for t in project['templates'] %}
   {{t.name}}: |

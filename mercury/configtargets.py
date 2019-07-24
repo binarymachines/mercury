@@ -317,7 +317,16 @@ def create_profilr_dataset(live_config, target_package):
   pass
 
 def create_quasr_template(live_config, target_package):
-  pass
+  while True:
+    template_spec = UISequenceRunner().create(**quasr_template_create_sequence)
+    if not template_spec:
+      break
+
+    yield template_spec
+    answer = cli.InputPrompt('create another template (Y/n)?').show()
+    should_continue = answer.lower()
+    if should_continue == 'n':
+      break
 
 
 def create_quasr_job(live_config, target_package):

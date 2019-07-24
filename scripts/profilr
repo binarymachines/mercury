@@ -10,7 +10,7 @@ import os, sys
 from snap import snap, common
 from mercury import datamap as dmap
 from mercury import journaling as jrnl
-import profiling as prf
+from mercury import profiling as prf
 import docopt
 
 
@@ -59,7 +59,7 @@ def main(args):
     else: # read input from file        
         if intake_format == Format.CSV:
             rec_source = dmap.RecordSource(dmap.csvstream_record_generator,
-                                           filename=datafile,                           
+                                           filename=datafile,                
                                            delimiter=field_delimiter,
                                            limit=limit)
         elif intake_format == Format.JSON: 
@@ -69,8 +69,10 @@ def main(args):
 
     target_dataset = args['<dataset_name>']
     yaml_config = common.read_config_file(configfile)
+    project_dir = common.load_config_var(yaml_config['globals']['project_home'])
+    sys.path.append(project_dir)
     service_registry = snap.initialize_services(yaml_config)
-    
+
     profiler = prf.ProfilerFactory.create(target_dataset, yaml_config)
     profile_dict, record_count = profiler.profile(rec_source.records(), service_registry)
 

@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-'''Usage:
-            null_byte_filter.py (-n | -d | -l) <datafile>
+'''
+Usage:
+    null_byte_filter.py (-n | -d | -l) <datafile>
 
-    Options:
-            -n --null         Retrieve the line numbers of the lines with null bytes ('\0') and the first field in that line containing a null byte
-            -d --readable_dict     Retrieve the lines that can be read by a csv reader (do not contain null bytes) and return lines as dictionaries
-            -l --readable_line     Retrieve readable lines and just return line
-
+Options:
+    -n --null         Retrieve the line numbers of the lines with null bytes ('\0') and the first field in that line containing a null byte
+    -d --readable_dict     Retrieve the lines that can be read by a csv reader (do not contain null bytes) and return lines as dictionaries
+    -l --readable_line     Retrieve readable lines and just return line
 '''
 
 import docopt

@@ -143,6 +143,8 @@ def main(args):
 
     transform_config_file = args.get('<configfile>')
     yaml_config = common.read_config_file(transform_config_file)
+    project_dir = common.load_config_var(yaml_config['globals']['project_home'])
+    sys.path.append(project_dir)
 
     if transform_mode:
         transform_map = args.get('<map_name>')

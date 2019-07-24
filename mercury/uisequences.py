@@ -21,14 +21,30 @@ dyn_sequence_trigger: this type is designed to handle collection-type object fie
 gate: this type prompts the user for input, evaluates that input as true or false, and triggers
     a named sequence if the result evaluated to True.
 
-
 '''
+
+class MultilineInputPrompt(object):
+    def __init__(self, prompt_string):  
+      self.prompt = '>> %s: ' % prompt_string
+        
+    def show(self):
+      input_lines = []
+      print('%s (hit <enter> on an empty line to finish):\n' % self.prompt)
+      while True: 
+        result = input().strip()
+        if not len(result):
+          break
+        input_lines.append(result)
+      if len(input_lines):
+        return '\n'.join(input_lines)
+      return None
+
 
 parameter_create_sequence = {
   'marquee': '''
   +++ Add init parameter
   ''',
-  'steps': [    
+  'steps': [
     {
       'type': 'gate',
       'prompt': cli.InputPrompt('add an init parameter (Y/n)?', 'y'),
@@ -580,6 +596,29 @@ quasr_globals_create_sequence = {
   ]
 }
 
+quasr_template_create_sequence = {
+  'marquee': '''
+  +++
+  +++ Create QUASR template
+  +++
+  ''',
+  'builder_func': lambda **kwargs: meta.QuasrTemplateSpec(kwargs['name'], kwargs['text']),
+  'steps': [
+    {
+      'type': 'direct',
+      'field_name': 'name',
+      'prompt': cli.InputPrompt('template_name'),
+      'required': True
+    },
+    {
+      'type': 'direct',
+      'field_name': 'text',
+      'prompt': MultilineInputPrompt('template text'),
+      'required': True
+    }
+  ]
+}
+
 QUASR_SLOT_TYPES = [
   {'label': 'integer', 'value': 'int'},
   {'label': 'floating-point', 'value': 'float'},
@@ -920,21 +959,34 @@ class UISequenceRunner(object):
       context.update(sequence['inputs'])
 
     for step in sequence['steps']:
+      '''
       if not step.get('prompt'):
         if not step.get('conditions') and not step.get('sequence'):
           # hard error
           raise Exception('step "%s" in this UI sequence has no prompt and does not branch to a child sequence') 
-
-      step_type = step['type']
       '''
-      if step['type'] == 'dyn_prompt':
+      step_type = step['type']
+      if step_type not in UISEQUENCE_STEP_TYPES:
+        raise Exception('found a UISequence step of an unsupported type [%s].' % step_type)
+      
+      if step_type == 'dyn_prompt':
         prompt_create_func = step['prompt']
         answer = prompt_create_func().show()
         context[step['field_name']] = answer
         continue
-      '''
+      
       if step_type == 'direct':
-        pass
+        # follow the prompt -- but override the one in the UI sequence if one was passed to us
+        # in our constructor
+        prompt =  self.create_prompts.get(step['field_name'], step['prompt'])         
+        answer = prompt.show()
+        if not answer and step['required'] == True:
+          return None
+        if not answer and hasattr(step, 'default'):
+          answer = step['default']
+        
+        context[step['field_name']] = answer
+        continue
 
       elif step_type == 'static_sequence_trigger':
         pass

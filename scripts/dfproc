@@ -157,6 +157,8 @@ def main(args):
         return
 
     service_registry = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
+    project_dir = common.load_config_var(yaml_config['globals']['project_home'])
+    sys.path.append(project_dir)
 
     streaming_input_mode = True
     if args.get('--file') is not None:        

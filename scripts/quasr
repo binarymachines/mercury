@@ -318,6 +318,8 @@ def main(args):
         print(json.dumps(jobs))
         return
 
+    project_dir = common.load_config_var(yaml_config['globals']['project_home'])
+    sys.path.append(project_dir)
     job_runner = QaJobRunner(yaml_config)
 
     if args['--job']:
