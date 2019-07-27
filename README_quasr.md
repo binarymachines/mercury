@@ -1,4 +1,4 @@
-##### QUASR (Quality Assurance SQL Runner)
+# QUASR (Quality Assurance SQL Runner)
 
 **quasr** is a Python tool for writing automated data QA routines against relational databases. A quasr stack comprises one or more **jobs**, each of which consists of:
 
@@ -23,7 +23,7 @@ or
 
 after which you can issue `quasr` to generate a usage string.
 
-###### Config File Structure
+## Config File Structure
 The configuration file for quasr consists of the following sections:
 
 * globals
@@ -51,7 +51,7 @@ then `<jobname>` must match one of the top-level entries in the `jobs` section. 
 * `analyzer_function` (the name of the optional user-defined Python function which will analyze our outputs 
 and return a list of error-conditions and flag-conditions)
 
-###### Creating a new QA stack
+## Creating a new QA stack
 At the terminal, issue the command `mkcfg quasr`.
 
 You will be greeted with the quasr command-line prompt from the mkcfg utility. You can type ? to explore the available commands, which allow you
