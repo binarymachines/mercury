@@ -165,8 +165,13 @@ def find_profilr_dataset_by_name():
 def find_quasr_template():
   pass
 
-def find_quasr_job():
-  pass
+
+def find_quasr_job(name, live_config, config_target):
+  for job in live_config['jobs']:
+    if getattr(job, config_target['index_attribute']) == name:
+      return job
+  
+  return None
 
 
 def create_xfile_globals(live_config, target_package):
@@ -347,10 +352,14 @@ def create_quasr_globals(live_config, target_package):
 
 
 def edit_globals(live_config, setting):
+  if not setting:
+    return
   UISequenceRunner().process_edit_sequence(setting, **parameter_edit_sequence)
              
 
 def edit_service_object(live_config, service_object):
+  if not service_object:
+    return
   UISequenceRunner().process_edit_sequence(service_object, **service_object_edit_sequence)
 
 
@@ -358,16 +367,21 @@ def edit_dfproc_processor(live_config, processor):
   pass
 
 
-def edit_xfile_datasource(live_config, config_object):  
+def edit_xfile_datasource(live_config, config_object):
+  if not config_object:
+    return
   UISequenceRunner().process_edit_sequence(config_object, **xfile_datasource_edit_sequence)
 
 
-def edit_xfile_map(live_config, mapspec):  
+def edit_xfile_map(live_config, mapspec):
+  if not mapspec:
+    return
   UISequenceRunner().process_edit_sequence(mapspec, **xfile_map_edit_sequence)
 
 
 def edit_quasr_job(live_config, job):
-  #for obj in config_objects:
+  if not job:
+    return
   input_slot_menu = [{'label': slot.name, 'value': slot.name} for slot in job.inputs]
   output_slot_menu = [{'label': slot.name, 'value': slot.name} for slot in job.outputs]
   menus = {
@@ -378,14 +392,8 @@ def edit_quasr_job(live_config, job):
 
 
 def edit_ngst_datastore(live_config, datastore):
-  '''
-  menudata = []
-  for d in datastores:
-    menudata.append({'label': d.alias, 'value': d})
-
-  edit_target = cli.MenuPrompt('Select a datastore to edit', menudata).show()
-  if edit_target:
-  '''
+  if not datastore:
+    return
   # load menu data with this target's init params, for editing
   iparam_menudata = []
   for param in datastore.init_params:
@@ -399,24 +407,16 @@ def edit_ngst_datastore(live_config, datastore):
 
 
 def edit_ngst_target(live_config, edit_target):
-  '''
-  menudata = []
-  for t in targets:
-    menudata.append({'label': t.name, 'value': t})
-  
-  edit_target = cli.MenuPrompt('Select a target to edit', menudata).show()
-  '''
-  if edit_target:
+  if not edit_target:
+    return
 
-    datastore_menudata = []
-    for dstore in live_config['datastores']:
-      datastore_menudata.append({'label': dstore.alias, 'value': dstore.alias})
-    
-    menus = {
-      
-      'datastore_alias': datastore_menudata
-    }
-    UISequenceRunner(edit_menus=menus).edit(edit_target, **ngst_target_edit_sequence)
+  datastore_menudata = []
+  for dstore in live_config['datastores']:
+    datastore_menudata.append({'label': dstore.alias, 'value': dstore.alias})
+  menus = {
+    'datastore_alias': datastore_menudata
+  }
+  UISequenceRunner(edit_menus=menus).edit(edit_target, **ngst_target_edit_sequence)
 
 
 def edit_cyclops_trigger():
@@ -437,8 +437,10 @@ def edit_profiler():
 def edit_profilr_dataset():
   pass
 
-def edit_quasr_template():
-  pass
+def edit_quasr_template(live_config, template_spec):
+  if not template_spec:
+    return
+  UISequenceRunner().process_edit_sequence(template_spec, **quasr_template_edit_sequence)
 
 
 def list_globals(global_settings):
@@ -600,7 +602,6 @@ def validate_xfile_config(yaml_string, live_config):
     return (False, errors)
   else:
     return (True, [])
-
 
 
 targets = {
@@ -886,12 +887,12 @@ targets = {
         'update_func': edit_globals,
         'list_func': list_globals,
         'unit_size': 4,
-        'singleton': True
+        'singleton': True      
       },
       {
           'name': 'service_objects',
           'singular_label': 'service',
-          'plural_label': 'services',
+          'plural_label': 'service_objects',
           'index_attribute': 'alias',
           'find_func': find_service_object,
           'create_func': create_service_object,

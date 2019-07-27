@@ -5,23 +5,6 @@ from snap import cli_tools as cli
 from snap import common
 from mercury import metaobjects as meta
 
-'''
-types of UI sequence steps (for editing):
-
-direct: This type prompts the user for input and populates an object or field with the result
-
-static_sequence_trigger: launches a named UI sequence and assigns the result to the named field
-    (in the case of an array-type field, the named sequence will run once per element)
-
-dyn_sequence_trigger: this type is designed to handle collection-type object fields in situations
-    where the user wants to edit only one member of the collection. It prompts the user to 
-    choose from an array of options, then passes the result to a function which returns
-    the target UISequence.
-
-gate: this type prompts the user for input, evaluates that input as true or false, and triggers
-    a named sequence if the result evaluated to True.
-
-'''
 
 class MultilineInputPrompt(object):
     def __init__(self, prompt_string):  
@@ -457,7 +440,7 @@ ngst_target_create_sequence = {
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'dyn_prompt',
       'field_name': 'datastore_alias',
       'prompt_creator': create_ngst_datastore_prompt,
       'required': True
@@ -802,6 +785,9 @@ def select_target_output_slot(slot_name, config_object):
 
 quasr_job_edit_sequence = {
   'marquee': '''
+  :::
+  ::: Editing quasr job
+  :::
   ''',
   'steps': [
     {
@@ -828,7 +814,54 @@ quasr_job_edit_sequence = {
 }
 
 
+quasr_template_edit_sequence = {
+  'marquee': '''
+  :::
+  ::: Editing job template
+  :::
+  ''',
+  'steps': [
+    {
+      'type': 'direct',
+      'field_name': 'name',
+      'prompt_type': cli.InputPrompt,
+      'prompt_args': ['update template name', '{current_value}'] 
+    },
+    {
+      'type': 'direct',
+      'field_name': 'text',
+      'prompt_type': MultilineInputPrompt,
+      'prompt_args': ['update SQL template']      
+    }
+  ]
+
+}
+
+
+UISEQUENCE_STEP_TYPES = [
+  'direct',
+  'static_sequence_trigger',
+  'dyn_sequence_trigger'
+]
+
 class UISequenceRunner(object):
+  '''
+    Types of UI sequence steps (for editing):
+
+    direct: This type prompts the user for input and populates an object or field with the result
+
+    static_sequence_trigger: launches a named UI sequence and assigns the result to the named field
+        (in the case of an array-type field, the named sequence will run once per element)
+
+    dyn_sequence_trigger: this type is designed to handle collection-type object fields in situations
+        where the user wants to edit only one member of the collection. It prompts the user to 
+        choose from an array of options, then passes the result to a function which returns
+        the target UISequence.
+
+    gate: this type prompts the user for input, evaluates that input as true or false, and triggers
+        a named sequence if the result evaluated to True.
+  '''
+
   def __init__(self, **kwargs):
     #
     # keyword args:
@@ -842,12 +875,12 @@ class UISequenceRunner(object):
     
     self.create_prompts = kwargs.get('create_prompts') or {}
     self.edit_menus = kwargs.get('edit_menus', {})
-    self.allowed_edit_step_types = set(['direct',
-                                       'dyn_sequence_trigger',
-                                       'static_sequence_trigger'])
+    
 
   def process_edit_sequence(self, config_object, **sequence):
     
+    if not config_object:
+      return
     print(sequence['marquee'])
     context = {}
     for step in sequence['steps']:
@@ -857,13 +890,9 @@ class UISequenceRunner(object):
       context['current_value'] = getattr(config_object, step['field_name'])
       label = step.get('label', step['field_name'])
       context['current_name'] = getattr(config_object, label)
-      
-      # fanout: execute a child sequence once for each element in a list
-      #if isinstance(current_target, list) and step.get('sequence'):
-      if not step_type in self.allowed_edit_step_types:
+            
+      if not step_type in UISEQUENCE_STEP_TYPES:
         raise Exception('The step with field name "%s" is of an unsupported type "%s".' % (step['field_name'], step_type))
-
-      #prompt = self.edit_prompts.get(step['field_name']) or step['prompt']
 
       if step_type == 'static_sequence_trigger':
         if isinstance(current_target, list):
@@ -879,11 +908,10 @@ class UISequenceRunner(object):
         else:
           output = self.process_edit_sequence(**step['sequence'])
           if output is not None:
-            setattr(config_object, step['field_name'], output)
-        continue
+            setattr(config_object, step['field_name'], output)        
 
       # execute one of N sequences depending on user input
-      if step_type == 'dyn_sequence_trigger':
+      elif step_type == 'dyn_sequence_trigger':
         if not 'selector_func' in step.keys():
           raise Exception('a step of type "dyn_sequence_trigger" must specify a selector_func field.')
         
@@ -915,7 +943,6 @@ class UISequenceRunner(object):
           continue
         updated_object = self.edit(target_object, **next_sequence)
         if updated_object:
-
           if isinstance(getattr(config_object, step['field_name']), list):
             # replace the list element
             obj_list = getattr(config_object, step['field_name'])
@@ -924,16 +951,16 @@ class UISequenceRunner(object):
           else:
             # just replace the object
             setattr(config_object, step['field_name'], updated_object)
-        continue
+        
 
-      if step_type == 'direct':
+      elif step_type == 'direct':
         prompt = step['prompt_type']
 
         args = []
-        if step.get('prompt_args'):          
+        if step.get('prompt_args'):
           for a in step['prompt_args']:
             args.append(a.format(**context))
-
+        
         elif step.get('prompt_text'):          
           args.append(step['prompt_text'])
           menudata = self.edit_menus.get(step['field_name']) or step.get('menu_data')
@@ -952,30 +979,28 @@ class UISequenceRunner(object):
   def process_create_sequence(self, init_context=None, **sequence):
     print(sequence['marquee'])
     context = {}
+
     if init_context:
       context.update(init_context)
     
     if sequence.get('inputs'):
       context.update(sequence['inputs'])
 
-    for step in sequence['steps']:
-      '''
-      if not step.get('prompt'):
-        if not step.get('conditions') and not step.get('sequence'):
-          # hard error
-          raise Exception('step "%s" in this UI sequence has no prompt and does not branch to a child sequence') 
-      '''
+    for step in sequence['steps']:     
       step_type = step['type']
       if step_type not in UISEQUENCE_STEP_TYPES:
         raise Exception('found a UISequence step of an unsupported type [%s].' % step_type)
       
-      if step_type == 'dyn_prompt':
-        prompt_create_func = step['prompt']
+      if step_type == 'gate_create':
+        'fields: type, prompt, evaluator'
+        print('placeholder for gate-type sequence step')
+
+      elif step_type == 'dyn_prompt_create':
+        prompt_create_func = step['prompt_creator']
         answer = prompt_create_func().show()
-        context[step['field_name']] = answer
-        continue
+        context[step['field_name']] = answer        
       
-      if step_type == 'direct':
+      elif step_type == 'direct_create':        
         # follow the prompt -- but override the one in the UI sequence if one was passed to us
         # in our constructor
         prompt =  self.create_prompts.get(step['field_name'], step['prompt'])         
@@ -985,35 +1010,10 @@ class UISequenceRunner(object):
         if not answer and hasattr(step, 'default'):
           answer = step['default']
         
-        context[step['field_name']] = answer
-        continue
+        context[step['field_name']] = answer        
 
-      elif step_type == 'static_sequence_trigger':
-        pass
-
-      elif step_type == 'dyn_sequence_trigger':
-        pass
-
-      elif step_type == 'gate':
-        pass
-        
-      
-      prompt = self.create_prompts.get(step['field_name']) or step['prompt']
-      # this is an input-dependent branch 
-      if step.get('conditions'):
-        answer = prompt.show()
-        if not step['conditions'].get(answer):
-          raise Exception('a step "%s" in the UI sequence returned an answer "%s" for which there is no condition.'
-                          % (step['field_name'], answer))
-
-        next_sequence = step['conditions'][answer]['sequence']
-        outgoing_context = copy.deepcopy(context)
-        context[step['field_name']] = self.create(**next_sequence)
-         
-      # unconditional branch
-      elif step.get('sequence'):
-        next_sequence = step['sequence']
-        outgoing_context = copy.deepcopy(context)
+      elif step_type == 'static_sequence_trigger_create':
+        next_sequence = step['sequence']        
         is_repeating_step =  step.get('repeat', False)
 
         while True:                 
@@ -1036,18 +1036,40 @@ class UISequenceRunner(object):
           else:
             break
 
-      else:
-        # follow the prompt -- but override the one in the UI sequence if one was passed to us
-        # in our constructor
-        #prompt =  self.create_prompts.get(step['field_name'], step['prompt'])         
-        answer = prompt.show()
-        if not answer and step['required'] == True:
-          return None
-        if not answer and hasattr(step, 'default'):
-          answer = step['default']
-        else:        
-          context[step['field_name']] = answer
+      elif step_type == 'dyn_sequence_trigger_create':
+        if not 'selector_func' in step.keys():
+          raise Exception('a step of type "dyn_sequence_trigger" must specify a selector_func field.')
+
+        prompt = step['prompt_type']
+        selector_func = step['selector_func']
+        menudata = self.edit_menus.get(step['field_name']) or step.get('menu_data')
+
+        if menudata is None:        
+          raise Exception('a step of type "dyn_sequence_trigger" must have a menu_data field OR pass it in the UISequence constructor.')
+
+        # skip if there are no entries to select
+        if not len(menudata):
+          continue
+
+        prompt_text = step['prompt_text'].format(**context)
+        args = [prompt_text, menudata]
+        
+        # retrieve user input
+        selection = prompt(*args).show()
+        
+        if not selection:
+          continue
   
+        # dynamic dispatch; use user input to determine the next sequence
+        # (selector_func() MUST return a live UISequence dictionary)
+        next_sequence = selector_func(selection)
+        if not next_sequence:
+          continue
+
+        sequence_output = self.create(**next_sequence)
+        if sequence_output:
+          context[step['field_name']] = sequence_output
+        
     return context
 
 
@@ -1062,26 +1084,3 @@ class UISequenceRunner(object):
   def edit(self, config_object, **edit_sequence):
     self.process_edit_sequence(config_object, **edit_sequence)
     return config_object
-
-    '''
-    {
-      'field_name': 'template_alias',
-      'prompt_type': cli.InputPrompt,
-      'prompt_args': ['update template alias', '{current_value}']
-    },
-    {
-      'field_name': 'executor_function',
-      'prompt_type': cli.InputPrompt,
-      'prompt_args': ['update executor funcname', '{current_value}']
-    },
-    {
-      'field_name': 'builder_function',
-      'prompt_type': cli.InputPrompt,
-      'prompt_args': ['update builder funcname', '{current_value}']
-    },
-    {
-      'field_name': 'analyzer_function',
-      'prompt_type': cli.InputPrompt,
-      'prompt_args': ['update analyzer funcname', '{current_value}']
-    },
-    '''

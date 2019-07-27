@@ -105,8 +105,7 @@ class ConfigCLI(Cmd):
           self.configuration = self.target_package['loader'](yaml_config)
 
 
-    def generate_yaml_config(self):
-      #print(common.jsonpretty(self.configuration))
+    def generate_yaml_config(self):      
       config_template = self.target_package['template']
       j2template = jinja2.Environment(loader=jinja2.BaseLoader).from_string(config_template)
       yaml_conf = j2template.render(project=self.configuration)
@@ -157,6 +156,11 @@ class ConfigCLI(Cmd):
       '''
       return template.format(options=' | '.join(self.config_object_plural_labels()))
 
+    def usage_string_for_rm(self):
+      template = '''Usage:
+        rm ({options})
+      '''
+      return template.format(options=' | '.join(self.config_object_singular_labels()))
 
     def get_selected_option(self, arg_dict, option_list):
       for item in option_list:
@@ -197,8 +201,7 @@ class ConfigCLI(Cmd):
           if not self.configuration.get(pkg['name']):
             self.configuration[pkg['name']] = []
           objects_to_list = self.configuration[pkg['name']]
-          list_function(objects_to_list)
-          print('\n')      
+          list_function(objects_to_list)          
         else:
           print(error)
 
@@ -220,15 +223,12 @@ class ConfigCLI(Cmd):
 
           # create func should always be a generator
           config_objects = pkg['create_func'](self.configuration, pkg) 
-          #print(common.jsonpretty([obj.data() for obj in config_objects]))
-
           if not self.configuration.get(pkg['name']):
             self.configuration[pkg['name']] = []
 
           for obj in config_objects:
             self.configuration[pkg['name']].append(obj)
           
-          #print(common.jsonpretty(self.configuration))
           self.do_pre()
         else:
           print(error)
@@ -278,6 +278,44 @@ class ConfigCLI(Cmd):
         })
       return menudata
 
+
+    def do_rm(self, *cmd_args):
+      with self.docopt_parse(self.usage_string_for_rm(), *cmd_args) as (args, error):
+        if not error:
+          selection = self.get_selected_option(args, self.config_object_singular_labels())
+          target_pkg = self.find_config_package_by_singular_label(selection)
+          if not target_pkg:
+            print('!!! ERROR: No configuration package found with label "%s".' % selection)
+            return
+          if not self.configuration.get(target_pkg['name']):
+            print('No %s configured.' % target_pkg['name'])
+            return
+          else:
+            menudata = []            
+            key = target_pkg['plural_label']
+            for config_object in self.configuration[key]:
+              object_label = getattr(config_object, target_pkg['index_attribute'])
+              menudata.append({'label': object_label, 'value': object_label})
+            
+            item_label = target_pkg['singular_label']
+            selected_item_name = cli.MenuPrompt('select %s to remove' % item_label, menudata).show()
+            if not selected_item_name:
+              return
+
+            selected_object = self.find_config_object(selected_item_name,
+                                                      self.configuration[key],
+                                                      target_pkg)
+
+            should_remove = cli.InputPrompt('Remove job "%s"? (y/N)' % selected_item_name, 'n').show()
+            if should_remove.lower() == 'y':
+              self.configuration[key].remove(selected_object)
+            
+            self.do_list(target_pkg['plural_label'])
+            
+        else:
+          print(error)
+
+
     def do_edit(self, *cmd_args):
       with self.docopt_parse(self.usage_string_for_edit(), *cmd_args) as (args, error):
         if not error:
@@ -290,20 +328,12 @@ class ConfigCLI(Cmd):
           if not self.configuration.get(pkg['name']):
             print('No %s yet configured.' % pkg['name'])
           else:
-
             config_obj_array = self.configuration[pkg['name']]
-            #print('::: Edit %s' % selection)
-
-            #if selection != 'globals' and len(config_obj_array) > 1:
             object_menudata = self.generate_menu_data(config_obj_array, pkg)
             object_name = cli.MenuPrompt('object to edit', object_menudata).show()
             config_object = self.find_config_object(object_name, config_obj_array, pkg)
 
-
-            pkg['update_func'](self.configuration, config_object)
-            #else:
-            #  pkg['update_func'](config_obj_array)
-
+            pkg['update_func'](self.configuration, config_object)            
             self.do_list(pkg['plural_label'])      
         else:
           print(error)
@@ -396,9 +426,6 @@ def main(args):
       start_params['config'] = yaml_config
     
     config_cli = ConfigCLI('mkcfg', config_target_name, target_pkg, **start_params)
-    #else:
-    #  config_cli = ConfigCLI('mkcfg', config_target_name, target_pkg)
-
     config_cli.cmdloop()
 
 if __name__ == '__main__':
