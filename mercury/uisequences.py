@@ -659,9 +659,9 @@ def create_quasr_job_spec(**kwargs):
   jobspec.executor_function = kwargs['executor_function']
   jobspec.builder_function = kwargs['builder_function']
   jobspec.analyzer_function = kwargs['analyzer_function']
-  for slot in kwargs['inputs']:
+  for slot in kwargs.get('inputs', []):
     jobspec.inputs.append(slot)
-  for slot in kwargs['outputs']:
+  for slot in kwargs.get('outputs', []):
     jobspec.outputs.append(slot)
 
   return jobspec
@@ -841,7 +841,8 @@ quasr_template_edit_sequence = {
 UISEQUENCE_STEP_TYPES = [
   'direct',
   'static_sequence_trigger',
-  'dyn_sequence_trigger'
+  'dyn_sequence_trigger',
+  'sequence_select'
 ]
 
 class UISequenceRunner(object):
@@ -952,7 +953,6 @@ class UISequenceRunner(object):
             # just replace the object
             setattr(config_object, step['field_name'], updated_object)
         
-
       elif step_type == 'direct':
         prompt = step['prompt_type']
 
@@ -967,7 +967,7 @@ class UISequenceRunner(object):
           if not menudata:
             raise Exception('A "direct" type ui step must provide its own menu data or retrieve it from the UISequenceRunner.')
           args.append(menudata)
-
+        
         # just execute this step
         response = prompt(*args).show()
         if response is not None:
@@ -991,16 +991,30 @@ class UISequenceRunner(object):
       if step_type not in UISEQUENCE_STEP_TYPES:
         raise Exception('found a UISequence step of an unsupported type [%s].' % step_type)
       
-      if step_type == 'gate_create':
+      if step_type == 'gate':
         'fields: type, prompt, evaluator'
         print('placeholder for gate-type sequence step')
 
-      elif step_type == 'dyn_prompt_create':
+      elif step_type == 'sequence_select':
+        prompt = step['prompt']
+        user_choice = prompt.show()
+        if not user_choice:
+          return None
+
+        if not step['conditions'].get(user_choice):
+          raise Exception('No sequence registered in this step for user selection "%s".' % user_choice)
+        
+        next_sequence = step['conditions'][user_choice]['sequence']        
+        sequence_output = self.create(**next_sequence)
+        if sequence_output:
+          context[step['field_name']] = sequence_output
+
+      elif step_type == 'dyn_prompt':
         prompt_create_func = step['prompt_creator']
         answer = prompt_create_func().show()
         context[step['field_name']] = answer        
       
-      elif step_type == 'direct_create':        
+      elif step_type == 'direct':        
         # follow the prompt -- but override the one in the UI sequence if one was passed to us
         # in our constructor
         prompt =  self.create_prompts.get(step['field_name'], step['prompt'])         
@@ -1012,7 +1026,7 @@ class UISequenceRunner(object):
         
         context[step['field_name']] = answer        
 
-      elif step_type == 'static_sequence_trigger_create':
+      elif step_type == 'static_sequence_trigger':
         next_sequence = step['sequence']        
         is_repeating_step =  step.get('repeat', False)
 
@@ -1036,7 +1050,7 @@ class UISequenceRunner(object):
           else:
             break
 
-      elif step_type == 'dyn_sequence_trigger_create':
+      elif step_type == 'dyn_sequence_trigger':
         if not 'selector_func' in step.keys():
           raise Exception('a step of type "dyn_sequence_trigger" must specify a selector_func field.')
 
@@ -1074,9 +1088,10 @@ class UISequenceRunner(object):
 
 
   def create(self, **create_sequence):
+    #print(create_sequence)
     context = self.process_create_sequence(**create_sequence)
     output_builder = create_sequence.get('builder_func')
-    if output_builder:
+    if context and output_builder:
       return output_builder(**context)
     return context
 

@@ -23,6 +23,20 @@ or
 
 after which you can issue `quasr` to generate a usage string.
 
+## Application workflow
+To run a QA job, start quasr with the name of a config file and one of the registered jobs:
+
+`quasr --config <configfile> --job <jobname>`
+
+quasr will initialize any ServiceObjects specified in the config, then execute the SQL template referenced by `<jobname>`. 
+Next, the builder function referenced by the job will walk through the generated recordset and build the specified outputs: that is,
+it must return a dictionary containing the fields specified in the `outputs` section of the job configuration. The dictionary will be 
+printed to stdout as JSON.
+
+If the job has the (optional) analyzer function specified, quasr will call that function, passing it the output dictionary, and return the 
+result as part of the JSON document.
+
+
 ## Config File Structure
 The configuration file for quasr consists of the following sections:
 
@@ -33,11 +47,38 @@ The configuration file for quasr consists of the following sections:
 
 The `globals` section contains the top-level settings `project_home` (from which quasr will load user-defined code modules); `qa_logic_module` (where user-defined Python functions are to be found); `template_module` (where SQL templates live), and `service_module` (where service object classes are defined.)
 
+### Sample config:
+
+```yaml
+globals:
+  project_home: $<home_dir_as_env_variable>
+  qa_logic_module: <module_containing_user_defined_functions>
+  template_module: <module_containing_user_defined_templates>
+  service_module: <module_containing_service_object_classes>
+```
+
 The `service_objects` config section contains references to service classes (long-running singletons loaded at application startup) in the project's specified service_module. Each entry is named dictionary under a top-level alias, by which application code can look up a live service object instance at runtime. The entry must contain a valid class name in the class parameter, and an array of name-value pairs under the init_params parameter.
+
+### Sample config:
+
+```yaml
+service_objects:
+  db:
+      class: DatabaseWrapper
+      init_params:
+          - name: host
+            value: $DB_HOST
+
+          - name: username
+            value: $DB_USER
+
+          - name: password
+            value: $DB_PASSWORD
+```
 
 The `templates` section contains named SQL template strings residing in the config file itself. Quasr templates may also reside in the `template_module` defined in the `globals` section.
 
-The `jobs` section contains named QA jobs, any of which can be specified upon invocation of the `quasr` command. So if we issue
+The `jobs` section contains named QA jobs, any of which can be specified upon invocation of the `quasr` command. So if we issue:
 
 `quasr --config <configfile> --job <jobname>`
 
@@ -50,6 +91,29 @@ then `<jobname>` must match one of the top-level entries in the `jobs` section. 
 * `builder_function` (the name of the user-defined Python function which will build the `outputs` dictionary from the query result)
 * `analyzer_function` (the name of the optional user-defined Python function which will analyze our outputs 
 and return a list of error-conditions and flag-conditions)
+
+### Sample config:
+
+```yaml
+jobs:
+  sample_job:
+    # Because (sample_query) is in parens, that alias refers to a template in the templates section of this file. 
+    # To refer to a template in the templates module, remove the parentheses. 
+    sql_template: (sample_query) 
+    inputs:
+      - name: source_schema
+        type: str
+
+    outputs:
+      - name: record_count
+        type: int
+
+    executor_function: run_sql
+    builder_function: build_outputs
+    analyzer_function: analyze_outputs
+
+```
+
 
 ## Creating a new QA stack
 At the terminal, issue the command `mkcfg quasr`.
