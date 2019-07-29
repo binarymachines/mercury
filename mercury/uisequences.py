@@ -861,6 +861,9 @@ class UISequenceRunner(object):
 
     gate: this type prompts the user for input, evaluates that input as true or false, and triggers
         a named sequence if the result evaluated to True.
+
+    sequence_select: Displays a MenuPrompt and, based on the response, triggers one of N sequences
+        defined in the step's "conditions" attribute. 
   '''
 
   def __init__(self, **kwargs):

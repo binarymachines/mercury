@@ -212,12 +212,9 @@ def create_dfproc_processor(live_config, target_package):
 
 
 def create_xfile_datasource(live_config, target_package):
-  data = UISequenceRunner().create(**xfile_datasource_create_sequence)
-  if data:
-    yield meta.DatasourceSpec(data['alias'], data['class'])
-  return None
+  yield UISequenceRunner().create(**xfile_datasource_create_sequence)
   
-
+  
 def create_xfile_map(live_config, target_package):
 
   if not live_config.get('sources'):
