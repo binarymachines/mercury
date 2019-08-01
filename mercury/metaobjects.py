@@ -289,3 +289,22 @@ class QuasrJobSpec(object):
             'inputs': [ i.data() for i in self.inputs ],
             'outputs': [ o.data() for o in self.outputs ]
         }
+
+
+class CyclopsTrigger(object):
+    def __init__(self, name, event_type, parent_dir, file_filter, function):        
+        # valid event_types: created | updated
+        self.name = name
+        self.event_type = event_type
+        self.parent_directory = parent_dir
+        self.filename_filter = file_filter
+        self.handler_func = function
+
+    def data(self):
+        return {
+            'name': self.name,
+            'event_type': self.event_type,
+            'parent_dir': self.parent_directory,
+            'filename_filter': self.filename_filter,
+            'function': self.handler_func
+        }

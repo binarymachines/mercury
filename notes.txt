@@ -24,9 +24,9 @@ To enable a new configuration target:
 
 'singular_label': how we refer to a single instance of the config object in the app
 
-'plural_label': how we refer to a single instance of the config object
+'plural_label': how we refer to multiple instances of the config object in the app
 
-'index_attribute': the config object attribute we use to select one from a list
+'index_attribute': the config object attribute we use to find one in a list
 
 'find_func': the function we use to find a config object by its index attribute
 
@@ -39,7 +39,7 @@ To enable a new configuration target:
 (3) 
 
 # Make sure there are "spec" objects in metaobjects.py which match the internal structure of the configuration
-
+# Each spec object should have a data() method which returns a dictionary of attributes
 
 (4) 
 
@@ -50,4 +50,7 @@ To enable a new configuration target:
 # For each new function in configtargets, create the correct sequence dictionary in uisequences.py
   AND
   verify that the jinja2 template in configtemplates.py is correct
+
+
+
 

@@ -1,45 +1,45 @@
 version: "2.1"
 services:
 
-        kafka:
-                image: spotify/kafka
-                environment:
-                        - ADVERTISED_HOST=kafka
-                        - ADVERTISED_PORT=9092
+    kafka:
+        image: spotify/kafka
+        environment:
+            - ADVERTISED_HOST=kafka
+            - ADVERTISED_PORT=9092
 
-                volumes:
-                        - /tmp
-                networks:
-                        - default
+        volumes:
+            - /tmp
+        networks:
+            - default
 
-        postgres:
-                image: postgres
-                environment:
-                        - POSTGRES_PASSWORD=notobvious
-                        - POSTGRES_USER=ndcadmin
+    postgres:
+        image: postgres
+        environment:
+            - POSTGRES_PASSWORD=notobvious
+            - POSTGRES_USER=ndcadmin
 
-                networks:
-                        - default
+        networks:
+            - default
 
-        couchbase:
-                image: couchbase
-                environment:
-                        - COUCHBASE_PASSWORD=
-                        - COUCHBASE_USER=
+    couchbase:
+        image: couchbase
+        environment:
+            - COUCHBASE_PASSWORD=
+            - COUCHBASE_USER=
 
 
-        
-                depends_on:
-                        - postgres
-                        - kafka
-                        - mysql
-                networks:
-                        - default
-                command:
-                        python src/extract.py --config src/staging_transform.yaml --limit 10 --offset 10
+    de_stack:
+        depends_on:
+                - postgres
+                - kafka
+                - mysql
+        networks:
+                - default
+        command:
+                python src/extract.py --config src/staging_transform.yaml --limit 10 --offset 10
 
-                environment:
-                        - CONVEYOR_HOME=/opt/bamx/src
-                        - BAMX_ENV=local
+        environment:
+                - CONVEYOR_HOME=/opt/bamx/src
+                - BAMX_ENV=local
 
 

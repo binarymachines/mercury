@@ -89,17 +89,17 @@ then `<jobname>` must match one of the top-level entries in the `jobs` section. 
 * `outputs` (an array of entries which together represent a dictionary that we'll generate from our QA job)
 * `executor_function` (the name of the user-defined Python function which will execute the SQL query)
 * `builder_function` (the name of the user-defined Python function which will build the `outputs` dictionary from the query result)
-* `analyzer_function` (the name of the optional user-defined Python function which will analyze our outputs 
+* `analyzer_function` (the name of the optional user-defined Python function which will analyze our outputs)
 
-and return a list of error-conditions and flag-conditions)
+and return a list of error-conditions and flag-conditions.
 
 ### Sample config:
 
 ```yaml
 jobs:
   sample_job:
-    # Because (sample_query) is in parens, that alias refers to a template in the templates section of this file. 
-    # To refer to a template in the templates module, remove the parentheses. 
+    # Because (sample_query) is in parens, that alias refers to a template in the templates section 
+    # of this config file. To refer to a template in the templates module, remove the parentheses. 
     sql_template: (sample_query) 
     inputs:
       - name: source_schema
@@ -132,8 +132,8 @@ The wizard will guide you through the creation of all the required configuration
 the preview (or pre) command, then issue save to write it to a YAML file. 
 
 Once you've generated a config file, you must verify that the references in that file (for example, to user-defined Python modules) are correct. Modules defined in the globals section, for example, must reside in the project_home directory (or somewhere on the PYTHONPATH). Functions defined in
-a given job must actually exist in the designated global `qa_logic_module`. Template aliases referenced in a job must either be defined in the config file (surround the template alias with parentheses to refer to a template defined in the YAML file) or in the global template_module; service objects in the `service_module`, and so on. The mkcfg utility will not automatically check these conditions for you, as we expect that you may wish to create
-a skeleton config first, then fill in the blanks later. In any case, given a valid config file, the quasr program will inform you of any references to modules or functions that cannot be resolved.
+a given job must actually exist in the designated global `qa_logic_module`. Template aliases referenced in a job must either be defined in the config file (surround the template alias with parentheses to refer to a template defined in the YAML file) or in the global template_module; service objects in the `service_module`, and so on. The `mkcfg` utility will not automatically check these conditions for you, as we expect that you may wish to create
+a skeleton config first, then fill in the blanks later. In any case, given a valid config file, the `quasr` program will inform you of any references to modules or functions that cannot be resolved.
 
 Issue quasr by itself at the terminal to generate a usage string.
 

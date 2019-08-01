@@ -14,6 +14,7 @@ def load_xfile_config(yaml_config):
     param = meta.Parameter(name=key, value=value)
     live_config['globals'].append(param)
 
+  live_config['service_objects'] = []
   yaml_svcs = yaml_config.get('service_objects') or []
   for so_name in yaml_svcs:  
     service = meta.ServiceObjectSpec(so_name, yaml_config['service_objects'][so_name]['class'])
@@ -23,12 +24,14 @@ def load_xfile_config(yaml_config):
     live_config['service_objects'].append(service)
 
   live_config['sources'] = []
-  for src_name in yaml_config['sources']:
+  sources = yaml_config.get('sources') or []
+  for src_name in sources: 
     datasource = meta.DatasourceSpec(src_name, yaml_config['sources'][src_name]['class'])
     live_config['sources'].append(datasource)
 
   live_config['maps'] = []
-  for map_name in yaml_config['maps']:
+  maps = yaml_config.get('maps') or []
+  for map_name in maps: 
     xmap = meta.XfileMapSpec(map_name, yaml_config['maps'][map_name]['lookup_source'])
 
     for setting in yaml_config['maps'][map_name]['settings']:
@@ -71,13 +74,13 @@ def load_ngst_config(yaml_config):
 
     live_config['datastores'].append(datastore)
   
-  live_config['ingest_targets'] = []
+  live_config['targets'] = []
   for target_name in yaml_config['ingest_targets']:
     ds_name = yaml_config['ingest_targets'][target_name]['datastore']
     interval = yaml_config['ingest_targets'][target_name]['checkpoint_interval']
     target = meta.NgstTarget(target_name, ds_name, int(interval))
 
-    live_config['ingest_targets'].append(target)
+    live_config['targets'].append(target)
   
   return live_config
 
@@ -604,7 +607,8 @@ def validate_xfile_config(yaml_string, live_config):
 targets = {
   'dfproc': {
     'description': 'Create and transform Pandas dataframes',
-    'template': templates.DFPROC_TEMPLATE,    
+    'template': templates.DFPROC_TEMPLATE,
+    'loader': load_dfproc_config, 
     'config_object_types': [
       {
         'name': 'globals',
@@ -724,7 +728,7 @@ targets = {
         'list_func': list_ngst_datastores
       },
       {
-        'name': 'ingest_targets',
+        'name': 'targets',
         'singular_label': 'target',
         'plural_label': 'targets',
         'index_attribute': 'name',
@@ -737,7 +741,8 @@ targets = {
   },
   'cyclops': {
     'description': 'Run custom code in response to filesystem events',
-    'template': templates.CYCLOPS_TEMPLATE,
+    'template': templates.CYCLOPS_TEMPLATE,    
+    'loader': load_cyclops_config,
     'config_object_types': [
       {
         'name': 'globals',
@@ -761,7 +766,9 @@ targets = {
       },
       {
         'name': 'triggers',
-        'singular_label': 'filesystem event trigger',
+        'singular_label': 'trigger',
+        'plural_label': 'triggers',
+        'index_attribute': 'name',
         'find_func': find_cyclops_trigger_by_name,
         'create_func': create_cyclops_trigger,
         'update_func': edit_cyclops_trigger,
@@ -772,6 +779,7 @@ targets = {
   'j2sqlgen': {
     'description': 'Generate CREATE TABLE sql statements from JSON metadata',
     'template': templates.J2SQLGEN_TEMPLATE,
+    'loader': load_j2sqlgen_config,
     'config_object_types': [
       {
         'name': 'globals',
@@ -804,6 +812,7 @@ targets = {
   'pgexec': {
     'description': 'Execute SQL commands against a PostgreSQL database',
     'template': templates.PGEXEC_TEMPLATE,
+    'loader': load_pgexec_config,
     'config_object_types': [
         {
           'name': 'targets',
@@ -818,6 +827,7 @@ targets = {
   'pgmeta': {
     'description': 'Extract table metadata as JSON from a PostgreSQL database',
     'template': templates.PGMETA_TEMPLATE,
+    'loader': load_pgmeta_config,
     'config_object_types': [
         {
           'name': 'targets',
@@ -832,6 +842,7 @@ targets = {
   'profilr': {
     'description': 'Run custom data profiling logic against a file-based dataset',
     'template': templates.PROFILR_TEMPLATE,
+    'loader': load_profilr_config,
     'config_object_types': [
         {
         'name': 'globals',

@@ -114,7 +114,7 @@ datastores:
   {% endfor %}
 
 ingest_targets:
-  {% for target in project.ingest_targets %}
+  {% for target in project.targets %}
   {{ target.name }}:
       datastore: {{ target.datastore_alias }}
       checkpoint_interval: {{ target.checkpoint_interval }} {% endfor %}
