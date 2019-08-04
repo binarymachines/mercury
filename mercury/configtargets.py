@@ -112,14 +112,14 @@ def load_dfproc_config(yaml_config):
     live_config['processors'] = []
 
     for processor_name in yaml_config.get('processors', []):
-    proc_config = yaml_config['processors'][processor_name]
-    read_func = proc_config['read_function']
-    transform_func = proc_config['transform_function']
-    write_func = proc_config['write_function']
-    live_config['processors'].append(meta.ProcessorSpec(processor_name,
-                                                        read_func,
-                                                        transform_func,
-                                                        write_func))
+        proc_config = yaml_config['processors'][processor_name]
+        read_func = proc_config['read_function']
+        transform_func = proc_config['transform_function']
+        write_func = proc_config['write_function']
+        live_config['processors'].append(meta.DFProcessorSpec(processor_name,
+                                                            read_func,
+                                                            transform_func,
+                                                            write_func))
     return live_config                                                        
   
 
@@ -131,7 +131,7 @@ def load_j2sqlgen_config(yaml_config):
     live_config['defaults'] = []
     defaults_spec = meta.J2SqlGenDefaultsSpec()
     for key, value in yaml_config['defaults'].items():
-        param = meta.Parameter(name=key, value=value)
+        
         defaults_spec.add_setting(param)
 
     live_config['tables'] = []
@@ -154,9 +154,6 @@ def load_j2sqlgen_config(yaml_config):
 
         live_config['tables'].append(table_map_spec)
     return live_config
-
-
-
 
 
 def load_quasr_config(yaml_config):
@@ -202,12 +199,69 @@ def load_cyclops_config(yaml_config):
         handler_func = trigger_config['function']
         filename_filter = trigger_config.get('filename_filter')
 
-        trigger = meta.CyclopsTriggerSpec(trigger_name,
+        trigger = meta.CyclopsTrigger(trigger_name,
                                             event_type,
                                             directory,
                                             handler_func,
                                             filename_filter)
         live_config['triggers'].append(trigger)
+
+    return live_config
+
+
+def load_pgexec_config(yaml_config):
+    live_config = {}
+    live_config['targets'] = []
+
+    for target_name in yaml_config['targets']:        
+        target_config = yaml_config['targets'][target_name]
+        name = target_config['name']
+        host = yaml_config['host']
+        port = int(yaml_config.get('port', 5432))
+        username = yaml_config['user']
+        password = yaml_config['password']
+
+        settings = {}
+        for item in target_config.get('settings', []):
+            settings[item['name']] = item['value']
+    
+        target = meta.PGExecTargetSpec(target_name,
+                                       host,
+                                       port,
+                                       username,
+                                       password,
+                                       **settings)
+        live_config[targets].append(target)
+
+    return live_config
+
+def load_profilr_config(yaml_config):
+    live_config = {}
+    live_config['globals'] = read_globals_array(yaml_config)
+    live_config['service_objects'] = read_services_array(yaml_config)
+
+    live_config['profilers'] = []
+    for pname in yaml_config['profilers']:
+        profiler_class = yaml_config['profilers'][pname]['class']
+        pspec = meta.ProfilerSpec(pname, profiler_class)
+        live_config['profilers'].append(pspec)
+
+    live_config['datasets'] = []
+    for dataset_name in yaml_config['datasets']:
+        dataset_config = yaml_config['datasets'][dataset_name]
+        profiler_name = dataset_config['profiler']
+        settings = dataset_config.get('settings', {})
+    
+        dataset_spec = meta.ProfilerDatasetSpec(dataset_name, profiler_name, **settings)
+
+        for field in dataset_config['fields']:
+            dataset_spec.add_field(field)
+        
+        for fieldname in dataset_config.get('null_equivalents', []):
+            values = dataset_config['null_equivalents'][fieldname]
+            dataset_spec.add_null_equivalents(field_name, *values)
+
+        live_config['datasets'].append(dataset_spec)
 
     return live_config
 
@@ -908,21 +962,6 @@ targets = {
           'update_func': edit_pgexec_target,
           'list_func': list_pgexec_targets
         },
-      ]
-  },
-  'pgmeta': {
-    'description': 'Extract table metadata as JSON from a PostgreSQL database',
-    'template': templates.PGMETA_TEMPLATE,
-    'loader': load_pgmeta_config,
-    'config_object_types': [
-        {
-          'name': 'targets',
-          'singular_label': 'target',
-          'find_func': find_pgexec_target_by_name, # pgmeta and pgexec use the same target
-          'create_func': create_pgexec_target,
-          'update_func': edit_pgexec_target,
-          'list_func': list_pgexec_targets
-        }
       ]
   },
   'profilr': {

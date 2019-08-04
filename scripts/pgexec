@@ -41,13 +41,14 @@ class NoSuchAlias(Exception):
 
 TargetConfig = namedtuple('TargetConfig', 'host port user password')
 
+
 def load_targets():
     targets = {}
     config_dir = os.getenv('PGX_CFG') or os.path.join(str(Path.home()), '.pgx')
     if not os.path.isdir(config_dir):
         raise ConfigDirNotFound()
     
-    configfile = os.path.join(config_dir, 'config.yaml')
+    configfile = os.path.join(config_dir, 'pgx_config.yaml')
     yaml_config = common.read_config_file(configfile)
     
     for name in yaml_config['targets']:            

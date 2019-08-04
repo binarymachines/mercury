@@ -3,6 +3,7 @@
 import json
 import copy
 from collections import namedtuple
+from collections import OrderedDict
 from snap import common
 
 REQUIRED_ED_CHANNEL_FIELDS = ['handler_function',
@@ -308,3 +309,74 @@ class CyclopsTrigger(object):
             'filename_filter': self.filename_filter,
             'function': self.handler_func
         }
+
+class DFProcessorSpec(object):
+    def __init__(self, name, read_func, transform_func, write_func):
+        self.name = name
+        self.read_func = read_func
+        self.transform_func = transform_func
+        self.write_func = write_func
+
+    def data(self):
+        return {
+            'name': self.name,
+            'read_function': self.read_func,
+            'transform_function': self.transform_func,
+            'write_function': self.write_func
+        }
+
+
+class J2SqlGenDefaultsSpec(object):
+    def __init__(self, **kwargs):
+        self.defaults = set()
+        for key, value in kwargs.items():
+            param = meta.Parameter(name=key, value=value)
+            self.defaults.add(param)
+
+    def add_settings(self, name, value):
+        self.defaults.add(meta.Parameter(name=name, value=value))
+
+
+class J2SqlGenTableMapSpec(object):
+    def __init__(self, tablename):
+        self.table_name = tablename
+        self.rename_to = None
+
+        # {old_name: new_name} for every column to be renamed
+        self.column_rename_map = {}
+
+        # key is column name, value is {setting_name: setting_value}
+        self.column_settings = {}
+
+
+    def set_rename_target(self, name):
+        self.rename_to = name
+
+
+    def remap_column(self, old_colname, new_colname):
+        self.column_rename_map[old_colname] = new_colname
+
+
+    def add_column_settings(self, column_name, **kwargs):
+        settings = self.column_settings.get(column_name, {})
+        settings.update(kwargs)
+        self.column_settings[column_name] = settings
+
+
+class PGExecTargetSpec(object):
+    def __init__(self, name, host, port, user, password, **kwargs):
+        self.name = name
+        self.host = host
+        self.port = port
+        self.username = user
+        self.password = password
+        self.settings = OrderedDict()
+
+        for key, value in kwargs.items():
+            self.settings[key] = meta.Parameter(name=key, value=value)            
+
+
+    def update_settings(self, name, value):
+        self.settings[key] = meta.Parameter(name=name, value=value)
+
+

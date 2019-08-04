@@ -1,4 +1,12 @@
-mkcfg checklist
+
+
+Testing checklist:
+- run wizard
+- create config from scratch to preview
+- load and edit config: add, rm, edit, preview
+
+
+Adding new utils to mkcfg
 
 To enable a new configuration target:
 
