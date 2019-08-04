@@ -293,6 +293,7 @@ class ConfigCLI(Cmd):
           else:
             menudata = []            
             key = target_pkg['plural_label']
+            
             for config_object in self.configuration[key]:
               object_label = getattr(config_object, target_pkg['index_attribute'])
               menudata.append({'label': object_label, 'value': object_label})

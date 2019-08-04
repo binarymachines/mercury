@@ -85,45 +85,131 @@ def load_ngst_config(yaml_config):
   return live_config
 
 
-def load_quasr_config(yaml_config):
-  live_config = {}
-  live_config['globals'] = []
+def read_globals_array(yaml_config):
+  data = []
   for key, value in yaml_config['globals'].items():
     param = meta.Parameter(name=key, value=value)
-    live_config['globals'].append(param)
+    data.append(param)
+  return data
 
-  live_config['service_objects'] = []
-  yaml_svcs = yaml_config.get('service_objects') or []
-  for so_name in yaml_svcs:
-    service = meta.ServiceObjectSpec(so_name, yaml_config['service_objects'][so_name]['class'])
 
-    for param in yaml_config['service_objects'][so_name]['init_params']:
-      service.add_init_param(param['name'], param['value'])
+def read_services_array(yaml_config):
+    data = []
+    yaml_svcs = yaml_config.get('service_objects') or []
+    for so_name in yaml_svcs:
+        service = meta.ServiceObjectSpec(so_name, yaml_config['service_objects'][so_name]['class'])
+        for param in yaml_config['service_objects'][so_name]['init_params']:
+            service.add_init_param(param['name'], param['value'])
+        
+        data.append(service)
+    return data
+
+
+def load_dfproc_config(yaml_config):
+    live_config = {}
+    live_config['globals'] = read_globals_array(yaml_config)
+    live_config['service_objects'] = read_services_array(yaml_config)
+    live_config['processors'] = []
+
+    for processor_name in yaml_config.get('processors', []):
+    proc_config = yaml_config['processors'][processor_name]
+    read_func = proc_config['read_function']
+    transform_func = proc_config['transform_function']
+    write_func = proc_config['write_function']
+    live_config['processors'].append(meta.ProcessorSpec(processor_name,
+                                                        read_func,
+                                                        transform_func,
+                                                        write_func))
+    return live_config                                                        
   
-    live_config['service_objects'].append(service)
-  
-  live_config['templates'] = []
-  for template_name in yaml_config.get('templates', []):
-    live_config['templates'].append(meta.QuasrTemplateSpec(template_name,
-                                                           yaml_config['templates'][template_name]))                                                           
-  
-  live_config['jobs'] = []
-  for job_name in yaml_config['jobs']:
-    job = meta.QuasrJobSpec(job_name, yaml_config['jobs'][job_name]['sql_template'])
-    yaml_input_slots = yaml_config['jobs'][job_name].get('inputs') or []
-    for slot in yaml_input_slots:
-      job.add_input_slot(slot['name'], slot['type'])
 
-    yaml_output_slots = yaml_config['jobs'][job_name].get('outputs') or []
-    for slot in yaml_output_slots:
-      job.add_output_slot(slot['name'], slot['type'])
-    
-    job.executor_function = yaml_config['jobs'][job_name]['executor_function']
-    job.builder_function = yaml_config['jobs'][job_name]['builder_function']
-    job.analyzer_function = yaml_config['jobs'][job_name].get('analyzer_function') or  ''
-    live_config['jobs'].append(job)
+def load_j2sqlgen_config(yaml_config):
+    live_config = {}
+    live_config['globals'] = read_globals_array(yaml_config)
+    live_config['service_objects'] = read_services_array(yaml_config)
 
-  return live_config
+    live_config['defaults'] = []
+    defaults_spec = meta.J2SqlGenDefaultsSpec()
+    for key, value in yaml_config['defaults'].items():
+        param = meta.Parameter(name=key, value=value)
+        defaults_spec.add_setting(param)
+
+    live_config['tables'] = []
+    for tablename in yaml_config.get('tables', []):
+
+        table_map_spec = meta.J2SqlGenTableMapSpec(tablename)
+
+        table_config = yaml_config['tables'][tablename]
+        rename_target = table_config.get('rename_to')
+        if rename_target:
+            table_map_spec.set_rename_target(rename_target)
+
+        for old_name, new_name in table_config['column_name_map'].items():
+            table_map_spec.remap_column(old_name, new_name)
+
+        column_settings = {}
+        for colname in table_config.get('column_settings'):
+            columm_settings = table_config['column_settings'][colname]
+            table_map_spec.add_column_settings(colname, **column_settings)
+
+        live_config['tables'].append(table_map_spec)
+    return live_config
+
+
+
+
+
+def load_quasr_config(yaml_config):
+    live_config = {}
+    live_config['globals'] = read_globals_array(yaml_config)
+    live_config['service_objects'] = read_services_array(yaml_config)
+
+    live_config['templates'] = []
+    for template_name in yaml_config.get('templates', []):
+        live_config['templates'].append(meta.QuasrTemplateSpec(template_name,
+                                                            yaml_config['templates'][template_name]))                                                           
+  
+    live_config['jobs'] = []
+    for job_name in yaml_config['jobs']:
+        job = meta.QuasrJobSpec(job_name, yaml_config['jobs'][job_name]['sql_template'])
+        yaml_input_slots = yaml_config['jobs'][job_name].get('inputs') or []
+        for slot in yaml_input_slots:
+            job.add_input_slot(slot['name'], slot['type'])
+
+        yaml_output_slots = yaml_config['jobs'][job_name].get('outputs') or []
+        for slot in yaml_output_slots:
+            job.add_output_slot(slot['name'], slot['type'])
+        
+        job.executor_function = yaml_config['jobs'][job_name]['executor_function']
+        job.builder_function = yaml_config['jobs'][job_name]['builder_function']
+        job.analyzer_function = yaml_config['jobs'][job_name].get('analyzer_function') or  ''
+        live_config['jobs'].append(job)
+
+    return live_config
+
+
+def load_cyclops_config(yaml_config):
+    live_config = {}
+    live_config['globals'] = read_globals_array(yaml_config)
+    live_config['service_objects'] = read_services_array(yaml_config)
+    live_config['triggers'] = []
+
+    for trigger_name in yaml_config.get('triggers', []):
+        trigger_config = yaml_config['triggers'][trigger_name]
+
+        event_type = trigger_config['event_type']
+        directory = trigger_config['parent_dir']
+        handler_func = trigger_config['function']
+        filename_filter = trigger_config.get('filename_filter')
+
+        trigger = meta.CyclopsTriggerSpec(trigger_name,
+                                            event_type,
+                                            directory,
+                                            handler_func,
+                                            filename_filter)
+        live_config['triggers'].append(trigger)
+
+    return live_config
 
 
 def find_global():
