@@ -328,18 +328,23 @@ class DFProcessorSpec(object):
 
 class J2SqlGenDefaultsSpec(object):
     def __init__(self, **kwargs):
-        self.required_defaults = [
+        self.required_settings = [
             'autocreate_pk_if_missing',
             'pk_name',
             'pk_type',
             'varchar_length',
             'column_type_map'
         ]
-        kwreader = common.KeywordArgReader(*self.required_defaults)
+        self.optional_settings = [
+            'table_suffix',
+            'column_suffix'
+        ]
+
+        kwreader = common.KeywordArgReader(*self.required_settings)
         kwreader.read(**kwargs)
         self.settings = OrderedDict()
         self.column_type_map = {}
-        for name in self.required_defaults:
+        for name in self.required_settings:
             if name == 'column_type_map':
                 for k,v in kwargs['column_type_map'].items():
                     self.column_type_map[k] = v
@@ -357,7 +362,6 @@ class J2SqlGenDefaultsSpec(object):
                                                   value=kwargs.get('column_suffix', ''))
 
 
-
     def add_setting(self, name, value):
         self.settings[name] = Parameter(name=name, value=value)
 
@@ -373,10 +377,10 @@ class J2SqlGenTableMapSpec(object):
         self.table_name = tablename
         self.rename_to = None
 
-        # {old_name: new_name} for every column to be renamed
+        # this is {old_name: new_name} for every column to be renamed
         self.column_rename_map = {}
 
-        # key is column name, value is {setting_name: setting_value}
+        # the key is column name, value is {setting_name: setting_value}
         self.column_settings = {}
 
 

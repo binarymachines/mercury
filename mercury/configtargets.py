@@ -149,13 +149,14 @@ def load_j2sqlgen_config(yaml_config):
             for old_name, new_name in table_config['column_name_map'].items():
                 table_map_spec.remap_column(old_name, new_name)
 
-          column_settings = {}
+         
           if table_config.get('column_settings') is not None:
-            for colname in table_config['column_settings']:
-                columm_settings = table_config['column_settings'][colname]
+            for colname in table_config['column_settings']:                
+                column_settings = table_config['column_settings'][colname]                
                 table_map_spec.add_column_settings(colname, **column_settings)
 
           live_config['tables'].append(table_map_spec)
+          
     return live_config
 
 
@@ -293,7 +294,7 @@ def find_ngst_target_by_name():
 def find_cyclops_trigger_by_name():
   pass
 
-def find_j2sqlgen_target_by_name():
+def find_j2sqlgen_table_by_name():
   pass
 
 def find_j2sqlgen_default_by_name():
@@ -451,7 +452,7 @@ def create_j2sqlgen_globals(live_config, target_package):
 def create_j2sqlgen_default(live_config, target_package):
   pass
 
-def create_j2sqlgen_target(live_config, target_package):
+def create_j2sqlgen_table(live_config, target_package):
   pass
 
 def create_pgexec_target(live_config, target_package):
@@ -570,7 +571,7 @@ def edit_cyclops_trigger():
 def edit_j2sqlgen_default():
   pass
 
-def edit_j2sqlgen_target():
+def edit_j2sqlgen_table():
   pass
 
 def edit_pgexec_target():
@@ -671,11 +672,45 @@ def list_ngst_targets(targets):
 def list_cyclops_triggers():
   pass
 
-def list_j2sqlgen_defaults():
-  pass
 
-def list_j2sqlgen_targets():
-  pass
+def list_j2sqlgen_defaults(defaults_spec):
+  if not len(defaults_spec.settings):
+    print('No settings registered.')
+    return
+  
+  print('defaults:')
+  for key in defaults_spec.settings:
+    param = defaults_spec.settings[key]
+    print('%s%s: %s' % (tab(1), key, param.value))
+
+  print('\n')  
+  print(tab(1) + 'column_type_map:')
+  for k,v in defaults_spec.column_type_map.items(): # this is a dictionary
+    print('%s%s: %s' % (tab(2), k, v))
+
+
+def list_j2sqlgen_tables(tablemap_specs):
+  print('tables:')
+  for spec in tablemap_specs:
+    print('%s%s:' % (tab(1), spec.table_name))
+    if spec.rename_to:
+      print(tab(2) + 'rename_to: ' + spec.rename_to)
+
+    if len(spec.column_settings.keys()):
+      print(tab(2) + 'column_settings:')
+      for key, settings in spec.column_settings.items():
+        print(tab(3) + key + ':')
+        # the value of <settings> is a dictionary
+        for name, value in settings.items():
+          print('%s%s: %s' % (tab(4), name, value))
+
+    if len(spec.column_rename_map.keys()):
+      print(tab(2) + 'column_name_map:')
+      for key, value in spec.column_rename_map.items():
+        print('%s%s: %s' % (tab(3), key, str(value)))
+
+    print('\n')
+
 
 def list_pgexec_targets():
   pass
@@ -939,6 +974,7 @@ targets = {
       {
         'name': 'defaults',
         'singular_label': 'SQL generation default',
+        'plural_label': 'defaults',
         'find_func': find_j2sqlgen_default_by_name,
         'create_func': create_j2sqlgen_default,
         'update_func': edit_j2sqlgen_default,
@@ -946,11 +982,12 @@ targets = {
       },
       {
         'name': 'tables',
-        'singular_label': 'j2sql target table',
-        'find_func': find_j2sqlgen_target_by_name,
-        'create_func': create_j2sqlgen_target,
-        'update_func': edit_j2sqlgen_target,
-        'list_func': list_j2sqlgen_targets
+        'singular_label': 'table',
+        'plural_label': 'tables',
+        'find_func': find_j2sqlgen_table_by_name,
+        'create_func': create_j2sqlgen_table,
+        'update_func': edit_j2sqlgen_table,
+        'list_func': list_j2sqlgen_tables
       }
     ]
   },

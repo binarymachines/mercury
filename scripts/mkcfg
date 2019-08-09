@@ -200,8 +200,12 @@ class ConfigCLI(Cmd):
           list_function = pkg['list_func']
           if not self.configuration.get(pkg['name']):
             self.configuration[pkg['name']] = []
+
+          # usually, this is a list of metaobjects, but in some cases it
+          # is a single metaobject wrapping a collection of Parameters
           objects_to_list = self.configuration[pkg['name']]
-          list_function(objects_to_list)          
+          list_function(objects_to_list)
+          print('\n')        
         else:
           print(error)
 
