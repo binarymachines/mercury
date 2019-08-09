@@ -100,7 +100,7 @@ service_objects:
 {% endfor %}
 
 datastores:
-  {% for datastore in project.datastores %}
+  {% for datastore in project['datastores'] %}
   {{ datastore.alias }}:
       class: {{ datastore.classname }}
       init_params:
@@ -114,7 +114,7 @@ datastores:
   {% endfor %}
 
 ingest_targets:
-  {% for target in project.targets %}
+  {% for target in project['targets'] %}
   {{ target.name }}:
       datastore: {{ target.datastore_alias }}
       checkpoint_interval: {{ target.checkpoint_interval }} {% endfor %}
@@ -129,28 +129,36 @@ globals:{% for gspec in project['globals'] %}
   {{ gspec.name }}: {{ gspec.value }}{% endfor %}
 
 defaults:
-    autocreate_pk_if_missing: {{ project.defaults.autocreate_pk }}
-    pk_name: {{ project.defaults.pk_name }}
-    pk_type: {{ project.defaults.pk_type }}
-    varchar_length: {{ project.defaults.varchar_length }}
+    {%- for key, param in project['defaults'].settings.items() %}
+    {%- if param.value %}
+    {{ key }}: {{ param.value }}
+    {%- endif %}
+    {%- endfor %}
 
     column_type_map:
-
-{% for mapping in project.column_type_map %}
-    {{ mapping.source_type }}: {{ mapping.target_type }}    
-{% endfor %}
+      {%- for k, v in project['defaults'].column_type_map.items() %}
+      {{ k }}: {{ v }} 
+      {%- endfor %}
 
 tables:
-    {% for table_map in project.table_maps %}
+    {%- for table_map in project['tables'] %}
     {{ table_map.table_name }}:
-        rename_to: {{ table_map.new_name }}
+        {%- if table_map.rename_to %}
+        rename_to: {{ table_map.rename_to }}
+        {%- endif %}
+        {%- if table_map.column_settings %}
         column_settings:
-            {% for %}
-            {% endfor %}
+            {%- for colname, settings in table_map.column_settings.items() %}
+            {{ colname }}:
+              {%- for key, value in settings.items() %}
+              {{ key }}: {{ value }} 
+              {%- endfor %}
+            {%- endfor %}
+        {%- endif %}
         column_name_map:
-            {% for column in table_map.renamed_columns %}
-            {{ column.source_name }}: {{ column.target_name }}
-            {% endfor %}
+            {%- for old_name, new_name in table_map.column_rename_map.items() %}
+            {{ old_name }}: {{ new_name }}
+            {%- endfor %}
     {% endfor %}
 '''
 

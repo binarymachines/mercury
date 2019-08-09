@@ -328,13 +328,44 @@ class DFProcessorSpec(object):
 
 class J2SqlGenDefaultsSpec(object):
     def __init__(self, **kwargs):
-        self.defaults = set()
+        self.required_defaults = [
+            'autocreate_pk_if_missing',
+            'pk_name',
+            'pk_type',
+            'varchar_length',
+            'column_type_map'
+        ]
+        kwreader = common.KeywordArgReader(*self.required_defaults)
+        kwreader.read(**kwargs)
+        self.settings = OrderedDict()
+        self.column_type_map = {}
+        for name in self.required_defaults:
+            if name == 'column_type_map':
+                for k,v in kwargs['column_type_map'].items():
+                    self.column_type_map[k] = v
+            else:
+                self.settings[name] = Parameter(name=name, value=kwreader.get_value(name))
+            kwargs.pop(name)
+        
         for key, value in kwargs.items():
-            param = meta.Parameter(name=key, value=value)
-            self.defaults.add(param)
+            param = Parameter(name=key, value=value)
+            self.settings[key] = param
 
-    def add_settings(self, name, value):
-        self.defaults.add(meta.Parameter(name=name, value=value))
+        self.settings['table_suffix'] = Parameter(name='table_suffix',
+                                                  value=kwargs.get('table_suffix', ''))
+        self.settings['column_suffix'] = Parameter(name='column_suffix',
+                                                  value=kwargs.get('column_suffix', ''))
+
+
+
+    def add_setting(self, name, value):
+        self.settings[name] = Parameter(name=name, value=value)
+
+    def set_table_suffix(self, value):
+        self.table_suffix = value
+
+    def set_column_suffix(self, value):
+        self.column_suffix = value
 
 
 class J2SqlGenTableMapSpec(object):

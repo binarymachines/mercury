@@ -840,6 +840,7 @@ quasr_template_edit_sequence = {
 
 UISEQUENCE_STEP_TYPES = [
   'direct',
+  'dyn_prompt',
   'static_sequence_trigger',
   'dyn_sequence_trigger',
   'sequence_select'
@@ -879,6 +880,7 @@ class UISequenceRunner(object):
     
     self.create_prompts = kwargs.get('create_prompts') or {}
     self.edit_menus = kwargs.get('edit_menus', {})
+    self.configuration = kwargs.get('configuration', {})
     
 
   def process_edit_sequence(self, config_object, **sequence):
@@ -1014,7 +1016,7 @@ class UISequenceRunner(object):
 
       elif step_type == 'dyn_prompt':
         prompt_create_func = step['prompt_creator']
-        answer = prompt_create_func().show()
+        answer = prompt_create_func(self.configuration).show()
         context[step['field_name']] = answer        
       
       elif step_type == 'direct':        

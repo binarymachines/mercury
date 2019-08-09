@@ -128,31 +128,34 @@ def load_j2sqlgen_config(yaml_config):
     live_config['globals'] = read_globals_array(yaml_config)
     live_config['service_objects'] = read_services_array(yaml_config)
 
-    live_config['defaults'] = []
-    defaults_spec = meta.J2SqlGenDefaultsSpec()
-    for key, value in yaml_config['defaults'].items():
-        
-        defaults_spec.add_setting(param)
+    defaults_spec = meta.J2SqlGenDefaultsSpec(**yaml_config['defaults'])
+    
+    #defaults_spec.set_table_suffix(yaml_config['defaults'].get('table_suffix'))
+    #defaults_spec.set_column_suffix(yaml_config['defaults'].get('column_suffix'))
 
+    live_config['defaults'] = defaults_spec
     live_config['tables'] = []
-    for tablename in yaml_config.get('tables', []):
+    if yaml_config['tables'] is not None:
+      for tablename in yaml_config['tables']:
 
-        table_map_spec = meta.J2SqlGenTableMapSpec(tablename)
+          table_map_spec = meta.J2SqlGenTableMapSpec(tablename)
 
-        table_config = yaml_config['tables'][tablename]
-        rename_target = table_config.get('rename_to')
-        if rename_target:
-            table_map_spec.set_rename_target(rename_target)
+          table_config = yaml_config['tables'][tablename]
+          rename_target = table_config.get('rename_to')
+          if rename_target:
+              table_map_spec.set_rename_target(rename_target)
 
-        for old_name, new_name in table_config['column_name_map'].items():
-            table_map_spec.remap_column(old_name, new_name)
+          if table_config.get('column_name_map') is not None:
+            for old_name, new_name in table_config['column_name_map'].items():
+                table_map_spec.remap_column(old_name, new_name)
 
-        column_settings = {}
-        for colname in table_config.get('column_settings'):
-            columm_settings = table_config['column_settings'][colname]
-            table_map_spec.add_column_settings(colname, **column_settings)
+          column_settings = {}
+          if table_config.get('column_settings') is not None:
+            for colname in table_config['column_settings']:
+                columm_settings = table_config['column_settings'][colname]
+                table_map_spec.add_column_settings(colname, **column_settings)
 
-        live_config['tables'].append(table_map_spec)
+          live_config['tables'].append(table_map_spec)
     return live_config
 
 
@@ -319,7 +322,7 @@ def find_quasr_job(name, live_config, config_target):
 
 def create_xfile_globals(live_config, target_package):
   # this will return a dictionary containing all global parameters for an xfile project
-  result =  UISequenceRunner().create(**xfile_globals_create_sequence)
+  result =  UISequenceRunner(configuration=live_config).create(**xfile_globals_create_sequence)
 
   # return all Parameter specs
   for key, value in result.items():
@@ -327,13 +330,13 @@ def create_xfile_globals(live_config, target_package):
 
 
 def create_service_object(live_config, target_package):
-  data = UISequenceRunner().create(**service_object_create_sequence)
+  data = UISequenceRunner(configuration=live_config).create(**service_object_create_sequence)
   if data:
     so_spec = meta.ServiceObjectSpec(data['alias'], data['class'])
     add_params = cli.InputPrompt('Add one or more init params (Y/n)?', 'y').show()
     if add_params.lower() == 'y':
       while True:
-        param_data = UISequenceRunner().create(**service_object_param_sequence)
+        param_data = UISequenceRunner(configuration=live_config).create(**service_object_param_sequence)
         if param_data:
           so_spec.add_init_param(param_data['name'], param_data.get('value', ''))
           answer = cli.InputPrompt('add another parameter (Y/n)?', 'y').show()
@@ -355,7 +358,7 @@ def create_dfproc_processor(live_config, target_package):
 
 
 def create_xfile_datasource(live_config, target_package):
-  yield UISequenceRunner().create(**xfile_datasource_create_sequence)
+  yield UISequenceRunner(configuration=live_config).create(**xfile_datasource_create_sequence)
   
   
 def create_xfile_map(live_config, target_package):
@@ -374,9 +377,10 @@ def create_xfile_map(live_config, target_package):
     'lookup_source': cli.MenuPrompt('lookup datasource', datasource_select_menudata)
   }
 
-  mapspec = UISequenceRunner(create_prompts=prompts).create(**xfile_map_create_sequence)
+  mapspec = UISequenceRunner(create_prompts=prompts,
+                             configuration=live_config).create(**xfile_map_create_sequence)
   while True:
-    fieldspec = UISequenceRunner().create(**xfile_field_create_sequence)
+    fieldspec = UISequenceRunner(configuration=live_config).create(**xfile_field_create_sequence)
     if not fieldspec:
       break
     mapspec.add_field_spec(fieldspec)
@@ -390,7 +394,7 @@ def create_xfile_map(live_config, target_package):
 
 def create_ngst_globals(live_config, target_package):
   # this will return a dictionary containing all global parameters for an xfile project
-  result =  UISequenceRunner().create(**ngst_globals_create_sequence)
+  result =  UISequenceRunner(configuration=live_config).create(**ngst_globals_create_sequence)
 
   # return all Parameter specs
   for key, value in result.items():
@@ -407,7 +411,8 @@ def create_ngst_target(live_config, target_package):
   prompts['datastore_alias'] = cli.MenuPrompt('select a datastore', menudata)
 
   while True:
-    data = UISequenceRunner(create_prompts=prompts).create(**ngst_target_create_sequence)    
+    data = UISequenceRunner(create_prompts=prompts,
+                            configuration=live_config).create(**ngst_target_create_sequence)    
     if not data:
       break
 
@@ -421,7 +426,7 @@ def create_ngst_target(live_config, target_package):
 
 def create_ngst_datastore(live_config, target_package):
   while True:
-    data = UISequenceRunner().create(**ngst_datastore_create_sequence)
+    data = UISequenceRunner(configuration=live_config).create(**ngst_datastore_create_sequence)
     if not data:
       break
     dstore = meta.NgstDatastore(data['alias'], data['classname'])
