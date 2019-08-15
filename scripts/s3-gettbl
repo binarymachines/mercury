@@ -142,7 +142,9 @@ def main(args):
 
     manifest_data = s3_service.download_json(bucket_name, s3_key_string)
     print(common.jsonpretty(manifest_data))
-    keys = list_s3_keys_for_tablename()
+
+    tablename = args['<tablename>']
+    keys = list_s3_keys_for_tablename(tablename, bucket_name, s3_key_string, manifest_data)
     print('\n'.join(keys))
 
 if __name__ == '__main__':
