@@ -13,6 +13,7 @@ from snap import common
 import docopt
 import sh
 from sh import aws  # AWS CLI must already be installed
+from mercury import services as svcs
 
 
 
