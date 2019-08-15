@@ -106,9 +106,16 @@ def stream_file_contents(file_uri, xfile_configfile, delimiter, xfile_map, mode)
             print('[%s:%s (child_proc_%s)]: %s' % (module, parent, pid, line), file=sys.stderr)
 
 
-def list_s3_keys_for_tablename(tablename, manifest_uri):
-    return []
-    
+def list_s3_keys_for_tablename(tablename, bucket_name, bucket_path, manifest_data):
+    keys = []
+    for manifest_entry in manifest_data['entries']:
+        url = manifest_entry['url']
+        filename = url.split('/')[-1]
+        if filename.startswith(tablename):
+            keys.append(url)
+
+    return keys
+
 
 def main(args):
     configfile = args['<configfile>']
@@ -120,7 +127,6 @@ def main(args):
         raise Exception('No S3 source "%s" registered in config file.' % source_name)
 
     s3_init_params = yaml_config['s3_sources'][source_name]
-
     s3_service = svcs.S3Service(**s3_init_params)
 
     if not manifest_uri.startswith('s3://'):
@@ -131,12 +137,13 @@ def main(args):
     bucket_name = uri_tokens[0]
     s3_key_string = '/'.join(uri_tokens[1:])
 
-    print('Bucket name: ' + bucket_name)
-    print('Path: ' + s3_key_string)
+    #print('Bucket name: ' + bucket_name)
+    #print('Path: ' + s3_key_string)
 
     manifest_data = s3_service.download_json(bucket_name, s3_key_string)
     print(common.jsonpretty(manifest_data))
-
+    keys = list_s3_keys_for_tablename()
+    print('\n'.join(keys))
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)
