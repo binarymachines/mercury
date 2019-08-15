@@ -134,7 +134,7 @@ def main(args):
     print('Bucket name: ' + bucket_name)
     print('Path: ' + s3_key_string)
 
-    manifest_data = s3_service.download_json(self, bucket_name, s3_key_string)
+    manifest_data = s3_service.download_json(bucket_name, s3_key_string)
     print(common.jsonpretty(manifest_data))
 
 
