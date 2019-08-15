@@ -13,9 +13,7 @@ from snap import common
 import docopt
 import sh
 from sh import aws  # AWS CLI must already be installed
-from sh import gsutil
-from sh import xfile  # Mercury ETL toolkit must already be installed
-from sh import ngst
+
 
 
 class DATA_FORMAT(object):
