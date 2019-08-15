@@ -122,7 +122,19 @@ def main(args):
     s3_init_params = yaml_config['s3_sources'][source_name]
 
     s3_service = svcs.S3Service(**s3_init_params)
-    manifest_data = download_json(self, bucket_name, s3_key_string)
+
+    if not manifest_uri.startswith('s3://'):
+        raise Exception('Badly formatted S3 URI: %s' % manifest_uri)
+
+    uri_body = manifest_uri.split('s3://')[1]
+    uri_tokens = uri_body.split('/')
+    bucket_name = uri_tokens[0]
+    s3_key_string = '/'.join(uri_tokens[1:])
+
+    print('Bucket name: ' + bucket_name)
+    print('Path: ' + s3_key_string)
+
+    manifest_data = s3_service.download_json(self, bucket_name, s3_key_string)
     print(common.jsonpretty(manifest_data))
 
 
