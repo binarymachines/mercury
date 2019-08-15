@@ -3,7 +3,8 @@
 '''
 Usage:  
     s3-gettbl --config <configfile> --source <srcname> --manifest_uri <s3_uri> --table <tablename> --delimiter=<delimiter>
-    s3-gettbl --config <configfile> --source <srcname> --manifest_uri <s3_uri> --table <tablename> --list-keys      
+    s3-gettbl --config <configfile> --source <srcname> --manifest_uri <s3_uri> --table <tablename> --list-keys
+    s3-gettbl --config <configfile> --list-sources
 '''
 
 import os, sys
@@ -110,7 +111,7 @@ def list_s3_keys_for_tablename(tablename, bucket_name, bucket_path, manifest_dat
     keys = []
     for manifest_entry in manifest_data['entries']:
         url = manifest_entry['url']
-        filename = url.split('/')[-1]
+        filename = url.split('/')[-1]        
         if filename.startswith(tablename):
             keys.append(url)
 
@@ -119,7 +120,7 @@ def list_s3_keys_for_tablename(tablename, bucket_name, bucket_path, manifest_dat
 
 def main(args):
     configfile = args['<configfile>']
-    manifest_uri = args['<s3_uri>']    
+    manifest_uri = args['<s3_uri>']
     source_name = args['<srcname>']
     yaml_config = common.read_config_file(configfile)
 
@@ -137,15 +138,17 @@ def main(args):
     bucket_name = uri_tokens[0]
     s3_key_string = '/'.join(uri_tokens[1:])
 
-    #print('Bucket name: ' + bucket_name)
-    #print('Path: ' + s3_key_string)
-
     manifest_data = s3_service.download_json(bucket_name, s3_key_string)
-    print(common.jsonpretty(manifest_data))
-
     tablename = args['<tablename>']
-    keys = list_s3_keys_for_tablename(tablename, bucket_name, s3_key_string, manifest_data)
-    print('\n'.join(keys))
+
+    if args['--list-keys']:
+        keys = list_s3_keys_for_tablename(tablename, bucket_name, s3_key_string, manifest_data)
+        print('\n'.join(keys))
+
+    elif args['--list-sources']:
+        for source in yaml_config['s3_sources'].keys():
+            print(source)
+
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)
