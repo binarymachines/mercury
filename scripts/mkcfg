@@ -225,10 +225,10 @@ class ConfigCLI(Cmd):
             print('Cannot create more than one "%s" config section.' % selection)
             return
 
-          # create func should always be a generator
-          config_objects = pkg['create_func'](self.configuration, pkg) 
           if not self.configuration.get(pkg['name']):
             self.configuration[pkg['name']] = []
+
+          config_objects = pkg['create_func'](self.configuration, pkg) 
 
           for obj in config_objects:
             self.configuration[pkg['name']].append(obj)
@@ -344,7 +344,7 @@ class ConfigCLI(Cmd):
           print(error)
 
 
-    def do_preview(self, *cmd_args):
+    def do_preview(self, *cmd_args):    
       print('\n__________________________________________________________________\n')
       yconf = self.generate_yaml_config()
       print(yconf)
@@ -423,13 +423,13 @@ def main(args):
     if not target_pkg:
       print('Unsupported configuration target: %s' % config_target_name)
       return
-
-    clear()
+    
     start_params = {}
     if edit_mode:
       yaml_config = common.read_config_file(args['<configfile>'])
       start_params['config'] = yaml_config
     
+    clear()
     config_cli = ConfigCLI('mkcfg', config_target_name, target_pkg, **start_params)
     config_cli.cmdloop()
 

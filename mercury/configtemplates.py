@@ -129,16 +129,18 @@ globals:{% for gspec in project['globals'] %}
   {{ gspec.name }}: {{ gspec.value }}{% endfor %}
 
 defaults:
-    {%- for key, param in project['defaults'].settings.items() %}
+    {%- for defaults_obj in project['defaults'] %}
+    {%- for key, param in defaults_obj.settings.items() %}
     {%- if param.value %}
     {{ key }}: {{ param.value }}
     {%- endif %}
     {%- endfor %}
 
     column_type_map:
-      {%- for k, v in project['defaults'].column_type_map.items() %}
+      {%- for k, v in defaults_obj.column_type_map.items() %}
       {{ k }}: {{ v }} 
       {%- endfor %}
+    {%- endfor %}
 
 tables:
     {%- for table_map in project['tables'] %}

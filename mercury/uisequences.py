@@ -518,6 +518,120 @@ ngst_target_edit_sequence = {
   ]
 }
 
+j2sqlgen_globals_create_sequence = {
+  'marquee': '''
+  +++
+  +++ Create j2sqlgen global settings
+  +++
+  ''',
+  'steps': [
+    {
+      'type': 'direct',
+      'field_name': 'project_home',
+      'prompt': cli.InputPrompt('project home'),
+      'required': True
+    },
+    {
+      'type': 'direct',
+      'field_name': 'service_module',
+      'prompt': cli.InputPrompt('service module'),
+      'required': True
+    }
+  ]
+}
+
+autocreate_pk_options = [
+  {'label': 'Yes', 'value': True},
+  {'label': 'No', 'value': False}
+]
+
+j2sqlgen_defaults_create_sequence = {
+  'marquee': '''
+  +++
+  +++ Create j2sqlgen default settings
+  +++
+  ''',
+  'steps': [
+    {
+    'type': 'direct',
+    'field_name': 'autocreate_pk_if_missing',
+    'prompt': cli.MenuPrompt('autocreate PK ?', autocreate_pk_options),
+    'required': False # this is a hack
+    },
+    {
+      'type': 'direct',
+      'field_name': 'pk_name',
+      'prompt': cli.InputPrompt('primary key name'),
+      'required': True
+    },
+    {
+      'type': 'direct',
+      'field_name': 'pk_type',
+      'prompt': cli.InputPrompt('primary key type'),
+      'required': True
+    },
+    {
+      'type': 'direct',
+      'field_name': 'varchar_length',
+      'prompt': cli.InputPrompt('VARCHAR length'),
+      'required': True
+    }
+  ]
+}
+
+j2sqlgen_colmap_create_sequence = {
+  'marquee': '''
+  +++
+  +++ Create j2sqlgen column type map
+  +++
+  ''',
+  'steps': [
+    {
+    'type': 'direct',
+    'field_name': 'source_type',
+    'prompt': cli.InputPrompt('source column type'),
+    'required': True
+    },
+    {
+      'type': 'direct',
+      'field_name': 'target_type',
+      'prompt': cli.InputPrompt('target column type'),
+      'required': True
+    }
+  ]
+}
+
+j2sqlgen_table_create_sequence = {
+  'marquee': '''
+  +++
+  +++ Create j2sqlgen table mapping
+  +++
+  ''',
+  'steps': [
+    {
+      'type': 'direct',
+      'field_name': 'table_name',
+      'prompt': cli.InputPrompt('table name'),
+      'required': True
+    },
+    {
+      'type': 'direct',
+      'field_name': 'new_table_name',
+      'prompt': cli.InputPrompt('rename table to'),
+      'required': False
+    }
+  ]
+}
+
+
+j2sqlgen_column_setting_sequence = {
+  'marquee': '''
+  +++
+  +++ 
+  +++
+  '''
+}
+
 service_object_edit_sequence = {
   'marquee': '''
   ::: Editing service object

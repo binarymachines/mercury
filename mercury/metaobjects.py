@@ -373,9 +373,9 @@ class J2SqlGenDefaultsSpec(object):
 
 
 class J2SqlGenTableMapSpec(object):
-    def __init__(self, tablename):
+    def __init__(self, tablename, rename_to=None):
         self.table_name = tablename
-        self.rename_to = None
+        self.rename_to = rename_to
 
         # this is {old_name: new_name} for every column to be renamed
         self.column_rename_map = {}

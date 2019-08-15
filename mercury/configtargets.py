@@ -7,7 +7,7 @@ from mercury.uisequences import UISequenceRunner
 from mercury.utils import tab
 
 
-def load_xfile_config(yaml_config):
+def load_xfile_config(yaml_config):  
   live_config = {}
   live_config['globals'] = []
   for key, value in yaml_config['globals'].items():
@@ -133,7 +133,7 @@ def load_j2sqlgen_config(yaml_config):
     #defaults_spec.set_table_suffix(yaml_config['defaults'].get('table_suffix'))
     #defaults_spec.set_column_suffix(yaml_config['defaults'].get('column_suffix'))
 
-    live_config['defaults'] = defaults_spec
+    live_config['defaults'] = [defaults_spec]
     live_config['tables'] = []
     if yaml_config['tables'] is not None:
       for tablename in yaml_config['tables']:
@@ -447,13 +447,36 @@ def create_cyclops_globals(live_config, target_package):
   pass
 
 def create_j2sqlgen_globals(live_config, target_package):
-  pass
+  # this will return a dictionary containing all global parameters for a j2sqlgen project
+  result =  UISequenceRunner(configuration=live_config).create(**j2sqlgen_globals_create_sequence)
+  # return all Parameter specs
+  for key, value in result.items():
+    yield meta.Parameter(name=key, value=value)  
+  
 
-def create_j2sqlgen_default(live_config, target_package):
-  pass
+def create_j2sqlgen_defaults(live_config, target_package):
+  settings = UISequenceRunner(configuration=live_config).create(**j2sqlgen_defaults_create_sequence)
+  column_map = {}
+  while True:
+    mapping = UISequenceRunner(configuration=live_config).create(**j2sqlgen_colmap_create_sequence)
+    if not mapping:
+      break
+    
+    column_map[mapping['source_type']] = mapping['target_type']
+
+    answer = cli.InputPrompt('create another column mapping (Y/n)?').show()
+    should_continue = answer.lower()
+    if should_continue == 'n':
+      break
+
+  settings['column_type_map'] = column_map
+  yield meta.J2SqlGenDefaultsSpec(**settings)
+  
 
 def create_j2sqlgen_table(live_config, target_package):
-  pass
+  tablespec = UISequenceRunner(configuration=live_config).create(**j2sqlgen_table_create_sequence)
+  yield tablespec
+
 
 def create_pgexec_target(live_config, target_package):
   pass
@@ -568,7 +591,7 @@ def edit_ngst_target(live_config, edit_target):
 def edit_cyclops_trigger():
   pass
 
-def edit_j2sqlgen_default():
+def edit_j2sqlgen_defaults():
   pass
 
 def edit_j2sqlgen_table():
@@ -973,12 +996,14 @@ targets = {
       },
       {
         'name': 'defaults',
-        'singular_label': 'SQL generation default',
+        'singular_label': 'defaults',
         'plural_label': 'defaults',
         'find_func': find_j2sqlgen_default_by_name,
-        'create_func': create_j2sqlgen_default,
-        'update_func': edit_j2sqlgen_default,
-        'list_func': list_j2sqlgen_defaults
+        'create_func': create_j2sqlgen_defaults,
+        'update_func': edit_j2sqlgen_defaults,
+        'list_func': list_j2sqlgen_defaults,
+        'unit_size': 1,
+        'singleton': True
       },
       {
         'name': 'tables',
