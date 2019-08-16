@@ -135,6 +135,11 @@ def main(args):
     if not manifest_uri.startswith('s3://'):
         raise Exception('Badly formatted S3 URI: %s' % manifest_uri)
 
+    if args['--list-sources']:
+        for source in yaml_config['s3_sources'].keys():
+            print(source)
+        return
+
     uri_body = manifest_uri.split('s3://')[1]
     uri_tokens = uri_body.split('/')
     bucket_name = uri_tokens[0]
@@ -146,11 +151,9 @@ def main(args):
     if args['--list-keys']:
         keys = list_s3_keys_for_tablename(tablename, bucket_name, s3_key_string, manifest_data)
         print('\n'.join(keys))
+        return
 
-    elif args['--list-sources']:
-        for source in yaml_config['s3_sources'].keys():
-            print(source)
-
+    
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)
