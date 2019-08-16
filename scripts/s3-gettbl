@@ -123,12 +123,14 @@ def main(args):
     manifest_uri = args['<s3_uri>']
     source_name = args['<srcname>']
     yaml_config = common.read_config_file(configfile)
+    s3_service = None
 
-    if yaml_config['s3_sources'].get(source_name) is None:
-        raise Exception('No S3 source "%s" registered in config file.' % source_name)
+    if args['--source']:
+        if yaml_config['s3_sources'].get(source_name) is None:
+            raise Exception('No S3 source "%s" registered in config file.' % source_name)
 
-    s3_init_params = yaml_config['s3_sources'][source_name]
-    s3_service = svcs.S3Service(**s3_init_params)
+        s3_init_params = yaml_config['s3_sources'][source_name]
+        s3_service = svcs.S3Service(**s3_init_params)
 
     if not manifest_uri.startswith('s3://'):
         raise Exception('Badly formatted S3 URI: %s' % manifest_uri)
