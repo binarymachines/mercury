@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 '''
-Usage:  
-    s3-gettbl --config <configfile> --source <srcname> --manifest_uri <s3_uri> --table <tablename> --delimiter=<delimiter>
-    s3-gettbl --config <configfile> --source <srcname> --manifest_uri <s3_uri> --table <tablename> --list-keys
+Usage:
+    s3-gettbl --config <configfile> --source <srcname> --manifest-uri <s3_uri> --list-keys
+    s3-gettbl --config <configfile> --source <srcname> --manifest-uri <s3_uri>
     s3-gettbl --config <configfile> --list-sources
 '''
 
@@ -107,20 +107,19 @@ def stream_file_contents(file_uri, xfile_configfile, delimiter, xfile_map, mode)
             print('[%s:%s (child_proc_%s)]: %s' % (module, parent, pid, line), file=sys.stderr)
 
 
-def list_s3_keys_for_tablename(tablename, bucket_name, bucket_path, manifest_data):
+def list_s3_keys_from_manifest(bucket_name, bucket_path, manifest_data):
     keys = []
     for manifest_entry in manifest_data['entries']:
         url = manifest_entry['url']
-        filename = url.split('/')[-1]        
-        if filename.startswith(tablename):
-            keys.append(url)
+        #filename = url.split('/')[-1]        
+        #if filename.startswith(tablename):
+        keys.append(url)
 
     return keys
 
 
 def main(args):
     configfile = args['<configfile>']
-    
     source_name = args['<srcname>']
     yaml_config = common.read_config_file(configfile)
     s3_service = None
@@ -133,8 +132,6 @@ def main(args):
     if args['--list-keys']:
         list_keys_mode = True
 
-    
-    
     if args['--source']:
         if yaml_config['s3_sources'].get(source_name) is None:
             raise Exception('No S3 source "%s" registered in config file.' % source_name)
@@ -157,12 +154,12 @@ def main(args):
     s3_key_string = '/'.join(uri_tokens[1:])
 
     manifest_data = s3_service.download_json(bucket_name, s3_key_string)
-    tablename = args['<tablename>']
-
+    
     if args['--list-keys']:
-        keys = list_s3_keys_for_tablename(tablename, bucket_name, s3_key_string, manifest_data)
+        keys = list_s3_keys_from_manifest(bucket_name, s3_key_string, manifest_data)
         print('\n'.join(keys))
         return
+    
 
 
 if __name__ == '__main__':

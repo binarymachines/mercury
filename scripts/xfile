@@ -8,10 +8,8 @@
             xfile --config <configfile> --list (sources | maps | globals)
             xfile -p --delimiter <delimiter> <datafile> [--limit <max_records>]
             xfile -p --json <datafile> [--limit <max_records>]
-            xfile -i
 
    Options:
-            -i, --interactive   :interactive mode
             -s, --stream        :streaming mode (read fron stdin)
             -p, --passthrough   :passthrough mode (do not transform records)
 '''
