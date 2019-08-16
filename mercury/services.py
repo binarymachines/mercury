@@ -10,15 +10,6 @@ from collections import namedtuple
 
 import requests
 import boto3
-import sqlalchemy as sqla
-from sqlalchemy.ext.automap import automap_base
-from sqlalchemy import Column, ForeignKey, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
-from sqlalchemy.orm.session import sessionmaker
-from sqlalchemy import create_engine
-from sqlalchemy import MetaData
-from sqlalchemy_utils import UUIDType
 
 from snap import common
 
@@ -29,6 +20,114 @@ parameters if the "auth_via_iam" init param is not set (or is False).'''
 kinesis_auth_error_mesage = '''
 KinesisServiceObject must pe passed the "aws_key_id" and "aws_secret_key"
 parameters if the "auth_via_iam" init param is not set (or is False).'''
+
+
+class S3Key(object):
+    def __init__(self, bucket_name, s3_object_path):
+        self.bucket = bucket_name
+        self.folder_path = self.extract_folder_path(s3_object_path)
+        self.object_name = self.extract_object_name(s3_object_path)
+        self.object_path = s3_object_path
+
+    def extract_folder_path(self, s3_key_string):
+        if s3_key_string.find('/') == -1:
+            return ''
+        key_tokens = s3_key_string.split('/')
+        return '/'.join(key_tokens[0:-1])
+
+    def extract_object_name(self, s3_key_string):
+        if s3_key_string.find('/') == -1:
+            return s3_key_string
+        return s3_key_string.split('/')[-1]
+
+    def __str__(self):
+        return self.object_path
+
+    @property
+    def uri(self):
+	    return os.path.join('s3://', self.bucket, self.object_path)
+
+
+class S3Service(object):
+    def __init__(self, **kwargs):
+        kwreader = common.KeywordArgReader('local_temp_path', 'region')
+        kwreader.read(**kwargs)
+
+        self.local_tmp_path = kwreader.get_value('local_temp_path')
+        self.region = kwreader.get_value('region')
+        self.s3session = None
+        self.aws_access_key_id = None
+        self.aws_secret_access_key = None
+
+        # we set this to True if we are initializing this object from inside an AWS Lambda,
+        # because in that case we do not require the aws credential parameters to be set.
+        # The default is False, which is what we want when we are creating this object
+        # in a normal (non-AWS-Lambda) execution context: clients must pass in credentials.
+        should_authenticate_via_iam = kwargs.get('auth_via_iam', False)
+
+        if not should_authenticate_via_iam:
+            log.info("NOT authenticating via IAM. Setting credentials now.")
+            self.aws_access_key_id = kwargs.get('aws_key_id')
+            self.aws_secret_access_key = kwargs.get('aws_secret_key')
+            if not self.aws_secret_access_key or not self.aws_access_key_id:
+                raise Exception(s3_auth_error_mesage)           
+            self.s3client = boto3.client('s3',
+                                         aws_access_key_id=self.aws_access_key_id,
+                                         aws_secret_access_key=self.aws_secret_access_key)
+        else:
+            self.s3client = boto3.client('s3', region_name=self.region)
+ 
+
+    def upload_object(self, local_filename, bucket_name, bucket_path=None):
+        s3_path = None
+        with open(local_filename, 'rb') as data:
+            base_filename = os.path.basename(local_filename)
+            if bucket_path:
+                s3_path = os.path.join(bucket_path, base_filename)
+            else:
+                s3_path = base_filename
+
+            self.s3client.upload_fileobj(data, bucket_name, s3_path)
+
+        return S3Key(bucket_name, s3_path)
+
+    def upload_json(self, data_dict, bucket_name, bucket_path):
+        binary_data = bytes(json.dumps(data_dict), 'utf-8')
+        self.s3client.put_object(Body=binary_data, 
+                                 Bucket=bucket_name, 
+                                 Key=bucket_path)
+
+
+    def upload_bytes(self, bytes_obj, bucket_name, bucket_path):        
+        self.s3client.put_object(Body=bytes_obj, Bucket=bucket_name, Key=bucket_path)
+        return S3Key(bucket_name, bucket_path).uri
+    
+    
+    def download_object(self, bucket_name, s3_key_string):
+        s3_object_key = S3Key(bucket_name, s3_key_string)
+        local_filename = os.path.join(self.local_tmp_path, s3_object_key.object_name)
+        with open(local_filename, "wb") as f:
+            self.s3client.download_fileobj(bucket_name, s3_object_key.object_path, f)
+
+        return local_filename
+    
+
+    def download_json(self, bucket_name, s3_key_string):
+        #s3_object_key = S3Key(s3_key_string)
+
+        obj = self.s3client.get_object(Bucket=bucket_name, Key=s3_key_string)
+        return json.loads(obj['Body'].read().decode('utf-8'))
+
+
+import sqlalchemy as sqla
+from sqlalchemy.ext.automap import automap_base
+from sqlalchemy import Column, ForeignKey, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
+from sqlalchemy.orm.session import sessionmaker
+from sqlalchemy import create_engine
+from sqlalchemy import MetaData
+from sqlalchemy_utils import UUIDType
 
 
 class DBTask(object):
@@ -296,101 +395,6 @@ class SimpleRedshiftService(object):
             connection.close()
 
 
-class S3Key(object):
-    def __init__(self, bucket_name, s3_object_path):
-        self.bucket = bucket_name
-        self.folder_path = self.extract_folder_path(s3_object_path)
-        self.object_name = self.extract_object_name(s3_object_path)
-        self.object_path = s3_object_path
-
-    def extract_folder_path(self, s3_key_string):
-        if s3_key_string.find('/') == -1:
-            return ''
-        key_tokens = s3_key_string.split('/')
-        return '/'.join(key_tokens[0:-1])
-
-    def extract_object_name(self, s3_key_string):
-        if s3_key_string.find('/') == -1:
-            return s3_key_string
-        return s3_key_string.split('/')[-1]
-
-    def __str__(self):
-        return self.object_path
-
-    @property
-    def uri(self):
-	    return os.path.join('s3://', self.bucket, self.object_path)
-
-
-class S3Service(object):
-    def __init__(self, **kwargs):
-        kwreader = common.KeywordArgReader('local_temp_path', 'region')
-        kwreader.read(**kwargs)
-
-        self.local_tmp_path = kwreader.get_value('local_temp_path')
-        self.region = kwreader.get_value('region')
-        self.s3session = None
-        self.aws_access_key_id = None
-        self.aws_secret_access_key = None
-
-        # we set this to True if we are initializing this object from inside an AWS Lambda,
-        # because in that case we do not require the aws credential parameters to be set.
-        # The default is False, which is what we want when we are creating this object
-        # in a normal (non-AWS-Lambda) execution context: clients must pass in credentials.
-        should_authenticate_via_iam = kwargs.get('auth_via_iam', False)
-
-        if not should_authenticate_via_iam:
-            log.info("NOT authenticating via IAM. Setting credentials now.")
-            self.aws_access_key_id = kwargs.get('aws_key_id')
-            self.aws_secret_access_key = kwargs.get('aws_secret_key')
-            if not self.aws_secret_access_key or not self.aws_access_key_id:
-                raise Exception(s3_auth_error_mesage)           
-            self.s3client = boto3.client('s3',
-                                         aws_access_key_id=self.aws_access_key_id,
-                                         aws_secret_access_key=self.aws_secret_access_key)
-        else:
-            self.s3client = boto3.client('s3', region_name=self.region)
- 
-
-    def upload_object(self, local_filename, bucket_name, bucket_path=None):
-        s3_path = None
-        with open(local_filename, 'rb') as data:
-            base_filename = os.path.basename(local_filename)
-            if bucket_path:
-                s3_path = os.path.join(bucket_path, base_filename)
-            else:
-                s3_path = base_filename
-
-            self.s3client.upload_fileobj(data, bucket_name, s3_path)
-
-        return S3Key(bucket_name, s3_path)
-
-    def upload_json(self, data_dict, bucket_name, bucket_path):
-        binary_data = bytes(json.dumps(data_dict), 'utf-8')
-        self.s3client.put_object(Body=binary_data, 
-                                 Bucket=bucket_name, 
-                                 Key=bucket_path)
-
-
-    def upload_bytes(self, bytes_obj, bucket_name, bucket_path):        
-        self.s3client.put_object(Body=bytes_obj, Bucket=bucket_name, Key=bucket_path)
-        return S3Key(bucket_name, bucket_path).uri
-    
-    
-    def download_object(self, bucket_name, s3_key_string):
-        s3_object_key = S3Key(bucket_name, s3_key_string)
-        local_filename = os.path.join(self.local_tmp_path, s3_object_key.object_name)
-        with open(local_filename, "wb") as f:
-            self.s3client.download_fileobj(bucket_name, s3_object_key.object_path, f)
-
-        return local_filename
-    
-
-    def download_json(self, bucket_name, s3_key_string):
-        #s3_object_key = S3Key(s3_key_string)
-
-        obj = self.s3client.get_object(Bucket=bucket_name, Key=s3_key_string)
-        return json.loads(obj['Body'].read().decode('utf-8'))
 
 
 class KinesisServiceObject(object):

@@ -164,7 +164,6 @@ def main(args):
         print('\n'.join(keys))
         return
 
-    
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)
