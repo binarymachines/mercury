@@ -120,11 +120,21 @@ def list_s3_keys_for_tablename(tablename, bucket_name, bucket_path, manifest_dat
 
 def main(args):
     configfile = args['<configfile>']
-    manifest_uri = args['<s3_uri>']
+    
     source_name = args['<srcname>']
     yaml_config = common.read_config_file(configfile)
     s3_service = None
 
+    list_src_mode = False
+    if args['--list-sources']:
+        list_src_mode = True
+
+    list_keys_mode = False
+    if args['--list-keys']:
+        list_keys_mode = True
+
+    
+    
     if args['--source']:
         if yaml_config['s3_sources'].get(source_name) is None:
             raise Exception('No S3 source "%s" registered in config file.' % source_name)
@@ -132,13 +142,14 @@ def main(args):
         s3_init_params = yaml_config['s3_sources'][source_name]
         s3_service = svcs.S3Service(**s3_init_params)
 
-    if not manifest_uri.startswith('s3://'):
-        raise Exception('Badly formatted S3 URI: %s' % manifest_uri)
-
-    if args['--list-sources']:
+    elif args['--list-sources']:
         for source in yaml_config['s3_sources'].keys():
             print(source)
         return
+
+    manifest_uri = args['<s3_uri>']
+    if not manifest_uri.startswith('s3://'):
+        raise Exception('Badly formatted S3 URI: %s' % manifest_uri)
 
     uri_body = manifest_uri.split('s3://')[1]
     uri_tokens = uri_body.split('/')
