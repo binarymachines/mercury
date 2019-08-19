@@ -23,7 +23,7 @@ from sh import psql
 import docopt
 from snap import common
 
-
+PGX_CONFIG_DIR_ENV_VAR = 'PGX_CFG_HOME'
 CONFIGFILE_NAME = 'config.yaml'
 CONFIG_INSTRUCTIONS = '''
 pgexec requires a YAML configuration file named "config.yaml" either in the directory
@@ -44,7 +44,7 @@ TargetConfig = namedtuple('TargetConfig', 'host port user password')
 
 def load_targets():
     targets = {}
-    config_dir = os.getenv('PGX_CFG') or os.path.join(str(Path.home()), '.pgx')
+    config_dir = os.getenv(PGX_CONFIG_DIR_ENV_VAR) or os.path.join(str(Path.home()), '.pgx')
     if not os.path.isdir(config_dir):
         raise ConfigDirNotFound()
     

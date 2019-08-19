@@ -246,6 +246,7 @@ class ConfigCLI(Cmd):
 
       self.do_preview()
 
+    do_wiz = do_wizard
 
     def find_config_data(self, config_obj_array, target):
       print('names of config objects under edit:')
@@ -343,8 +344,10 @@ class ConfigCLI(Cmd):
         else:
           print(error)
 
+    do_ed = do_edit
 
-    def do_preview(self, *cmd_args):    
+    def do_preview(self, *cmd_args):
+      '''Display the current configuration'''
       print('\n__________________________________________________________________\n')
       yconf = self.generate_yaml_config()
       print(yconf)
@@ -373,7 +376,7 @@ class ConfigCLI(Cmd):
     do_val = do_validate
 
     def do_save(self, *cmd_args):
-
+      '''Save the current configuration to a YAML file'''
       # TODO: validate config first
       print('***')
       print('*** Save %s configuration file' % self.name)
@@ -404,6 +407,7 @@ class ConfigCLI(Cmd):
 
 
     def do_cls(self, *cmd_args):
+      '''clear the screen'''
       clear()
 
 

@@ -396,7 +396,9 @@ def create_xfile_map(live_config, target_package):
 def create_ngst_globals(live_config, target_package):
   # this will return a dictionary containing all global parameters for an xfile project
   result =  UISequenceRunner(configuration=live_config).create(**ngst_globals_create_sequence)
-
+  if not result:
+    return
+    
   # return all Parameter specs
   for key, value in result.items():
     yield meta.Parameter(name=key, value=value)
@@ -406,6 +408,10 @@ def create_ngst_target(live_config, target_package):
 
   prompts = {}
   menudata = []
+  if not len(live_config.get('datastores', [])):
+    print('No datastores registered. You must register at least one datastore to create a target.')
+    return
+
   for dstore in live_config['datastores']:
     menudata.append({'label': dstore.alias, 'value': dstore.alias})
   

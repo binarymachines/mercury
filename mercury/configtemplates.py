@@ -85,8 +85,10 @@ maps:
 '''
 
 NGST_TEMPLATE = '''
-globals:{% for gspec in project['globals'] %}  
-  {{ gspec.name }}: {{ gspec.value }}{% endfor %}
+globals:
+  {% for gspec in project['globals'] %}  
+  {{ gspec.name }}: {{ gspec.value }}
+  {% endfor %}
 
 service_objects:
 {% for service in project['service_objects'] %}
@@ -97,7 +99,7 @@ service_objects:
           - name: {{ param.name }}
             value: {{ param.value }}
       {% endfor %}
-{% endfor %}
+{%- endfor %}
 
 datastores:
   {% for datastore in project['datastores'] %}
@@ -111,13 +113,14 @@ datastores:
       channels:
         {% for channel in datastore.channels %}
         - {{ channel }} {% endfor %}
-  {% endfor %}
+  {%- endfor %}
 
 ingest_targets:
   {% for target in project['targets'] %}
   {{ target.name }}:
       datastore: {{ target.datastore_alias }}
-      checkpoint_interval: {{ target.checkpoint_interval }} {% endfor %}
+      checkpoint_interval: {{ target.checkpoint_interval }}
+  {%- endfor %}
 '''
 
 CYCLOPS_TEMPLATE = '''

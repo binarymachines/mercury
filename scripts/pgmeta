@@ -2,11 +2,11 @@
 
 '''
 Usage:
-    pgmeta --target <alias> --database <db> <schema> --table <table>
-    pgmeta --target <alias> --database <db> <schema> --tables <tables>...
-    pgmeta --target <alias> --database <db> <schema> --tables --match=<regex>
-    pgmeta --targets
-
+    pgmeta [--config <configfile>] --target <alias> --schema <schema> --database <db> --table <table>
+    pgmeta [--config <configfile>] --target <alias> --schema <schema> --database <db> --tables <tables>...
+    pgmeta [--config <configfile>] --target <alias> --schema <schema> --database <db> --tables --match=<regex>
+    pgmeta [--config <configfile>] --targets
+    pgmeta --at --schema <schema> --database <db> --table <table>   
 '''
 
 
@@ -20,6 +20,8 @@ import docopt
 import sqlalchemy as sqla
 from sqlalchemy.sql import text
 from snap import common
+
+PGX_CONFIG_DIR_ENV_VAR = 'PGX_CFG_HOME'
 
 URL_TEMPLATE = '{db_type}://{user}:{passwd}@{host}/{database}'
 
@@ -37,7 +39,16 @@ WHERE table_schema = '{schema}'
 AND table_type = 'BASE TABLE'
 """
 
-TargetConfig = namedtuple('TargetConfig', 'host port user password')
+
+class TargetConfig(object):
+    def __init__(self, **kwargs):
+        kwreader = common.KeywordArgReader('host', 'port', 'user', 'password')
+        kwreader.read(**kwargs)
+        self.host = kwargs['host']
+        self.port = kwargs['port']
+        self.user = kwargs['user']
+        self.password = kwargs['password']
+
 
 class ConfigDirNotFound(Exception):
     def __init__(self):
@@ -51,14 +62,19 @@ def db_connect(**kwargs):
     yield engine.connect()
 
                 
-def load_targets():
+def load_targets(config_filename=None):
     targets = {}
-    config_dir = os.getenv('PGX_CFG') or os.path.join(str(Path.home()), '.pgx')
-    if not os.path.isdir(config_dir):
-        raise ConfigDirNotFound()
+    yaml_config = None
     
-    configfile = os.path.join(config_dir, 'config.yaml')
-    yaml_config = common.read_config_file(configfile)
+    if config_filename:
+        yaml_config = common.read_config_file(config_filename)
+    else:
+        config_dir = os.getenv(PGX_CONFIG_DIR_ENV_VAR) or os.path.join(str(Path.home()), '.pgx')
+        if not os.path.isdir(config_dir):
+            raise ConfigDirNotFound()
+    
+        configfile = os.path.join(config_dir, 'config.yaml')
+        yaml_config = common.read_config_file(configfile)
     
     for name in yaml_config['targets']:
         hostname = yaml_config['targets'][name]['host']
@@ -95,28 +111,53 @@ def generate_metadata_from_query_results(results, table, schema):
     return table_metadata
 
 
+def read_stdin():
+    for line in sys.stdin:
+        if sys.hexversion < 0x03000000:
+            line = line.decode('utf-8')
+        yield line.lstrip().rstrip()
+    
+
 def main(args):
-    #print(common.jsonpretty(args))
     target_db = args['<db>']
     target_schema = args['<schema>']
+    db_targets = None
+    anonymous_target_mode = False
+    if args['--at']: # run against unnamed target, with credentials passed as JSON
+        anonymous_target_mode = True
 
-    db_targets = load_targets()
+    target = None
 
-    if args['--targets']:
-        # list targets
-        for alias, raw_target in db_targets.items():
-            target = raw_target._asdict()
-            target['password'] = '*************'
+    if anonymous_target_mode:
+        print('running in anonymous-target mode, waiting for JSON credentials...', file=sys.stderr)
+        raw_input = []
+        for line in read_stdin():
+            raw_input.append(line)
+        target_data = json.loads('\n'.join(raw_input))
+        kwreader = common.KeywordArgReader('host', 'port', 'user', 'password')
+        kwreader.read(**target_data)
+        target = TargetConfig(**target_data)
+    else:
+        if args['--config']:
+            db_targets = load_targets(args['<configfile>'])
+        else:
+            db_targets = load_targets()
 
-            record = {
-                alias: target
-            }
-            print(json.dumps(record))
-        return
+        if args['--targets']:
+            # list targets
+            for alias, raw_target in db_targets.items():
+                target = raw_target._asdict()
+                target['password'] = '*************'
 
-    target = db_targets.get(args['<alias>'])
-    if not target:
-        raise Exception('no database target registered in config.yaml under the alias %s.' % args['<alias>'])
+                record = {
+                    alias: target
+                }
+                print(json.dumps(record))
+            return
+
+        target = db_targets.get(args['<alias>'])
+        if not target:
+            raise Exception('no database target registered in config.yaml under the alias %s.' % args['<alias>'])
 
     metadata = {}
     metadata['schema_name'] = target_schema
@@ -158,6 +199,7 @@ def main(args):
                 metadata['tables'].append(generate_metadata_from_query_results(results, table, target_schema))
 
     print(json.dumps(metadata))
+
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)
