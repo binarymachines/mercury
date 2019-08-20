@@ -6,9 +6,9 @@ Usage:
     pgmeta [--config <configfile>] --target <alias> --database <db> --schema <schema> --tables <tables>...
     pgmeta [--config <configfile>] --target <alias> --database <db> --schema <schema> --tables --match=<regex>
     pgmeta [--config <configfile>] --targets
-    pgmeta --at --schema <schema> --database <db> --table <table>
-    pgmeta --at --schema <schema> --database <db> --tables
-    pgmeta --at --schema <schema> --database <db> --tables --match=<regex>
+    pgmeta --at --database <db> --schema <schema> --table <table>
+    pgmeta --at --database <db> --schema <schema> --tables
+    pgmeta --at --database <db> --schema <schema> --tables --match=<regex>
 '''
 
 
