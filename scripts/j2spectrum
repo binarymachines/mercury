@@ -63,6 +63,7 @@ class ColumnSpec(object):
         self.datatype = column_type
         self.nullable = is_nullable
         self.length = kwargs.get('length', '') # can be null; usually only applies to string types
+
         self.is_primary_key = is_pk
         self.default_value = kwargs.get('default')        
             
@@ -143,7 +144,7 @@ class TableSpec(object):
             raise DuplicateColumn(target_column_name)
 
         nullable = kwargs.get('is_nullable', True)
-        is_pk = False        
+        is_pk = False
         self.columns.append(ColumnSpec(self.name, target_column_name, target_column_type, nullable, is_pk, **kwargs))
 
 
@@ -166,7 +167,7 @@ class SpectrumTableCreationContext(object):
     def __init__(self, yaml_config):
 
         self.defaults = yaml_config['spectrum_defaults']        
-        #self.default_varchar_length = self.defaults['varchar_length']                
+        self.default_varchar_length = self.defaults['varchar_length']                
         #self.delimiter = self.defaults.get('delimiter')
         self.s3_uri = self.defaults['s3_uri']
 
@@ -285,7 +286,8 @@ def create_tablespec_from_json_config(tablename, json_config, dbschema, creation
         source_column_type = column_config['column_type']
 
         settings = {}
-        
+        if is_string_type(column_config['column_type']):
+            settings['length'] = creation_context.get_varchar_length(source_tablename, source_column_name)
         tspec.add_column(source_column_name,
                          source_column_type,
                          creation_context,
@@ -338,8 +340,8 @@ def main(args):
     project_schema = args['<ext_schema>']
     table_creation_context = SpectrumTableCreationContext(yaml_config)   
 
-    print(common.jsonpretty(table_creation_context.defaults))
-    print(common.jsonpretty(table_creation_context.overrides))
+    #print(common.jsonpretty(table_creation_context.defaults))
+    #print(common.jsonpretty(table_creation_context.overrides))
     #return 
 
     if args.get('--table'):
@@ -375,7 +377,7 @@ def main(args):
         for table_name in tablenames:
             tablecfg = find_table_config(table_name, json_dbschema)
             if not tablecfg:
-                print('No table "%s" defined in schema file %s.' % (table_name, schema_filename), file=sys.stderr)
+                raise Exception('No table "%s" defined in schema file %s.' % (table_name, schema_filename))
                 exit(1)
             tablespec = create_tablespec_from_json_config(table_name,
                                                         tablecfg,
