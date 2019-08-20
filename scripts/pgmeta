@@ -2,11 +2,13 @@
 
 '''
 Usage:
-    pgmeta [--config <configfile>] --target <alias> --schema <schema> --database <db> --table <table>
-    pgmeta [--config <configfile>] --target <alias> --schema <schema> --database <db> --tables <tables>...
-    pgmeta [--config <configfile>] --target <alias> --schema <schema> --database <db> --tables --match=<regex>
+    pgmeta [--config <configfile>] --target <alias> --database <db> --schema <schema> --table <table>
+    pgmeta [--config <configfile>] --target <alias> --database <db> --schema <schema> --tables <tables>...
+    pgmeta [--config <configfile>] --target <alias> --database <db> --schema <schema> --tables --match=<regex>
     pgmeta [--config <configfile>] --targets
-    pgmeta --at --schema <schema> --database <db> --table <table>   
+    pgmeta --at --schema <schema> --database <db> --table <table>
+    pgmeta --at --schema <schema> --database <db> --tables
+    pgmeta --at --schema <schema> --database <db> --tables --match=<regex>
 '''
 
 
@@ -23,7 +25,7 @@ from snap import common
 
 PGX_CONFIG_DIR_ENV_VAR = 'PGX_CFG_HOME'
 
-URL_TEMPLATE = '{db_type}://{user}:{passwd}@{host}/{database}'
+URL_TEMPLATE = '{db_type}://{user}:{passwd}@{host}:{port}/{database}'
 
 METADATA_QUERY_TEMPLATE = """
 SELECT table_name, column_name, udt_name 
