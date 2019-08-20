@@ -53,6 +53,15 @@ COLUMN_LEVEL_SETTINGS = [
     'varchar_length'
 ]
 
+RS_STRING_TYPES = [
+    'varchar'
+]
+
+def is_string_type(type_name):
+    if type_name.lower() in RS_STRING_TYPES:
+        return True
+    return False
+
 class DuplicateColumn(Exception):
     def __init__(self, column_name):
         Exception.__init__(self, 'TableSpec already contains column "%s".' % column_name)
@@ -279,6 +288,7 @@ class SpectrumTableCreationContext(object):
 
 
 def create_tablespec_from_json_config(tablename, json_config, dbschema, creation_context, **kwargs):
+    print('### creating tablespec...')
     source_tablename = tablename
     target_tablename = creation_context.get_mapped_table_name(source_tablename)
     tspec = TableSpec(source_tablename, dbschema)
