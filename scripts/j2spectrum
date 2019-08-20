@@ -49,7 +49,9 @@ TABLE_LEVEL_SETTINGS = [
     'varchar_length'
 ]
 
-COLUMN_LEVEL_SETTINGS = []
+COLUMN_LEVEL_SETTINGS = [
+    'varchar_length'
+]
 
 class DuplicateColumn(Exception):
     def __init__(self, column_name):
