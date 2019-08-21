@@ -36,7 +36,7 @@ pgexec requires a YAML configuration file named "config.yaml" either in the dire
 class ConfigDirNotFound(Exception):
     def __init__(self):
         super().__init__(self, 'Configuration directory $PGX_CFG_HOME not found.')
-        
+
 
 class NoSuchAlias(Exception):
     def __init__(self, alias):
@@ -60,7 +60,7 @@ def load_targets():
     if not os.path.isdir(config_dir):
         raise ConfigDirNotFound()
     
-    configfile = os.path.join(config_dir, 'pgx_config.yaml')
+    configfile = os.path.join(config_dir, CONFIGFILE_NAME)
     yaml_config = common.read_config_file(configfile)
     
     for name in yaml_config['targets']:            
