@@ -170,6 +170,8 @@ def main(args):
         else:
             print(output.stderr.decode())
 
+        sys.stderr.close()
+
     except ConfigDirNotFound:
         print(CONFIG_INSTRUCTIONS)
         
@@ -179,8 +181,7 @@ def main(args):
     except (BrokenPipeError, IOError):
         print('BrokenPipeError caught', file=sys.stderr)
 
-    sys.stderr.close()
-
+    
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)
