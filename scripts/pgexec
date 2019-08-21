@@ -164,8 +164,8 @@ def main(args):
             psql_args.extend(['-c', query])
 
         psql_cmd = psql.bake(*psql_args)
-        output = psql_cmd(_fg=True)
-        output.wait()
+        output = psql_cmd(_fg=True, _in=sys.stdin, _out=sys.stdout, _err=sys.stderr)
+        
         
         if not output.exit_code:
             print(output.stdout.decode())
