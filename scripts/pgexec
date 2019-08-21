@@ -5,13 +5,16 @@ Usage:
     pgexec [-p] --target <alias> --db <database> -q <query>
     pgexec [-p] --target <alias> --db <database> -f <sqlfile> [--params=<n:v>...]
     pgexec [-p] --target <alias> --db <database> -s
+    pgexec -a --db <database> -q <query>
+    pgexec -a --db <database> -f <sqlfile> [--params=<n:v>...]    
     pgexec --targets
 
 Options:
-    -f --file       execute contents of SQL file
+    -a --anon-target    anonymous target; read credentials as JSON from stdin
+    -f --file           execute contents of SQL file
     -q --query
-    -s --stdin      execute SQL passed to standard input
-    -p --preview    show (but do not execute) SQL command(s)
+    -s --stdin          execute SQL passed to standard input
+    -p --preview        show (but do not execute) SQL command(s)
 '''
 
 import os, sys
@@ -84,31 +87,50 @@ def main(args):
     if args['--preview']:
         preview_mode = True
 
-    targets = load_targets()   
-    if args['--targets']:
-        for alias, raw_target in targets.items():
-            target = raw_target._asdict()
-            if target.get('password'):
-                target['password'] = '*************'
+    anonymous_target_mode = False
+    if args['--anon-target']:
+        anonymous_target_mode = True
 
-            record = {
-                alias: target
-            }
-            print(json.dumps(record))
-        return
+    target = None
 
-    target_alias = args['<alias>']
-    if not targets.get(target_alias):
-        raise NoSuchAlias(target_alias)
+    if anonymous_target_mode:
+        print('running in anonymous-target mode, waiting for JSON credentials...', file=sys.stderr)
+        raw_input = []
+        for line in read_stdin():
+            raw_input.append(line)
+        target_data = json.loads('\n'.join(raw_input))
+        kwreader = common.KeywordArgReader('host', 'port', 'user', 'password')
+        kwreader.read(**target_data)
+        target = TargetConfig(**target_data)
+                
+    else:
+        targets = load_targets()   
+        if args['--targets']:
+            for alias, raw_target in targets.items():
+                target = raw_target._asdict()
+                if target.get('password'):
+                    target['password'] = '*************'
+
+                record = {
+                    alias: target
+                }
+                print(json.dumps(record))
+            return
+
+        target_alias = args['<alias>']
+        if not targets.get(target_alias):
+            raise NoSuchAlias(target_alias)
+        
+        target = targets[target_alias]
 
     try:
         psql_args = ['-w',
-                     '-h', targets[target_alias].host,
-                     '-p', targets[target_alias].port,
-                     '-U', targets[target_alias].user,
+                     '-h', target.host,
+                     '-p', target.port,
+                     '-U', target.user,
                      '-d', args['<database>']]
         
-        if args['--file'] is True:
+        if args['--file']:
             if len(args['--params']):
                 raw_query = None
                 with open(args['<sqlfile>']) as f:
@@ -122,10 +144,10 @@ def main(args):
             else:
                 psql_args.extend(['-f', args['<sqlfile>']])
 
-        elif args['--query'] is True:
+        elif args['--query']:
             psql_args.extend(['-c', args['<query>']])
 
-        else:
+        elif args['--stdin']:
             query = ''
             for line in read_stdin():
                 query = query + line
