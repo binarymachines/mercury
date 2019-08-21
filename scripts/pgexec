@@ -177,10 +177,10 @@ def main(args):
         print(str(err))
          
     except (BrokenPipeError, IOError):
-        print ('BrokenPipeError caught', file=sys.stderr)
+        print('BrokenPipeError caught', file=sys.stderr)
 
     sys.stderr.close()
-    
+
 
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)
