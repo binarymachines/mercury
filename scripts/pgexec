@@ -170,15 +170,13 @@ def main(args):
         else:
             print(output.stderr.decode())
 
-        
-
     except ConfigDirNotFound:
         print(CONFIG_INSTRUCTIONS)
         
     except NoSuchAlias as err:
         print(str(err))
          
-    except (BrokenPipeError, IOError):
+    except:
         print('BrokenPipeError caught', file=sys.stderr)
 
     sys.stdout.close()
