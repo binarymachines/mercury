@@ -164,7 +164,8 @@ def main(args):
             psql_args.extend(['-c', query])
 
         psql_cmd = psql.bake(*psql_args)
-        output = psql_cmd()
+        output = psql_cmd(_fg=True)
+        output.wait()
         
         if not output.exit_code:
             print(output.stdout.decode())
@@ -178,11 +179,11 @@ def main(args):
     except NoSuchAlias as err:
         print(str(err))
          
-    except:
-        print('BrokenPipeError caught', file=sys.stderr)
+    #except:
+    #    print('BrokenPipeError caught', file=sys.stderr)
 
-    #sys.stdout.close()
-    #sys.stderr.close()
+    sys.stdout.close()
+    sys.stderr.close()
 
 
 if __name__ == '__main__':
