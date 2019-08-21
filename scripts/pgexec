@@ -157,6 +157,7 @@ def main(args):
             psql_args.extend(['-c', args['<query>']])
 
         elif args['--stdin']:
+            print('### reading from stdin')
             query = ''
             for line in read_stdin():
                 query = query + line
