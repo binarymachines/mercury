@@ -166,21 +166,20 @@ def main(args):
         psql_cmd = psql.bake(*psql_args)
         output = psql_cmd(_fg=True, _in=sys.stdin, _out=sys.stdout, _err=sys.stderr)
         
-        
+        '''
         if not output.exit_code:
             print(output.stdout.decode())
         else:
             print(output.stderr.decode())
-        
+        '''
 
     except ConfigDirNotFound:
         print(CONFIG_INSTRUCTIONS)
         
     except NoSuchAlias as err:
-        print(str(err))
-         
-    #except:
-    #    print('BrokenPipeError caught', file=sys.stderr)
+        print(str(err))         
+    except:
+        print('BrokenPipeError caught', file=sys.stderr)
 
     sys.stdout.close()
     sys.stderr.close()
