@@ -179,8 +179,8 @@ def main(args):
     except:
         print('BrokenPipeError caught', file=sys.stderr)
 
-    sys.stdout.close()
-    sys.stderr.close()
+    #sys.stdout.close()
+    #sys.stderr.close()
 
 
 if __name__ == '__main__':
