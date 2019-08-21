@@ -42,7 +42,15 @@ class NoSuchAlias(Exception):
         super().__init__(self, 'No alias registered under the name "%s".' % alias)
         self.alias = alias
 
-TargetConfig = namedtuple('TargetConfig', 'host port user password')
+
+class TargetConfig(object):
+    def __init__(self, **kwargs):
+        kwreader = common.KeywordArgReader('host', 'port', 'user', 'password')
+        kwreader.read(**kwargs)
+        self.host = kwargs['host']
+        self.port = kwargs['port']
+        self.user = kwargs['user']
+        self.password = kwargs['password']
 
 
 def load_targets():

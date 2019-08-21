@@ -6,9 +6,13 @@ Usage:
     pgmeta [--config <configfile>] --target <alias> --database <db> --schema <schema> --tables <tables>...
     pgmeta [--config <configfile>] --target <alias> --database <db> --schema <schema> --tables --match=<regex>
     pgmeta [--config <configfile>] --targets
-    pgmeta --at --database <db> --schema <schema> --table <table>
-    pgmeta --at --database <db> --schema <schema> --tables
-    pgmeta --at --database <db> --schema <schema> --tables --match=<regex>
+    pgmeta --a --database <db> --schema <schema> --table <table>
+    pgmeta --a --database <db> --schema <schema> --tables
+    pgmeta --a --database <db> --schema <schema> --tables --match=<regex>
+
+Options:
+    -a --anon-target    anonymous target; read credentials as JSON from stdin
+
 '''
 
 
@@ -125,7 +129,7 @@ def main(args):
     target_schema = args['<schema>']
     db_targets = None
     anonymous_target_mode = False
-    if args['--at']: # run against unnamed target, with credentials passed as JSON
+    if args['--anon-target']: # run against unnamed target, with credentials passed as JSON
         anonymous_target_mode = True
 
     target = None
