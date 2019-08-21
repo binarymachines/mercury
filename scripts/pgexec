@@ -169,6 +169,7 @@ def main(args):
             print(output.stdout.decode())
         else:
             print(output.stderr.decode())
+        
 
     except ConfigDirNotFound:
         print(CONFIG_INSTRUCTIONS)
