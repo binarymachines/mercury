@@ -115,13 +115,13 @@ def main(args):
     else:
         targets = load_targets()   
         if args['--targets']:
-            for alias, raw_target in targets.items():
-                target = raw_target._asdict()
-                if target.get('password'):
-                    target['password'] = '*************'
+            for alias, target in targets.items():
+                
+                if getattr(target, 'password'):
+                    setattr(target, 'password', '*************')
 
                 record = {
-                    alias: target
+                    alias: target.__dict__
                 }
                 print(json.dumps(record))
             return
