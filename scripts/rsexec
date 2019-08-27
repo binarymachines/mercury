@@ -1,0 +1,182 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    rsexec [-p] --target <alias> --db <database> -q <query>
+    rsexec [-p] --target <alias> --db <database> -f <sqlfile> [--params=<n:v>...]
+    rsexec [-p] --target <alias> --db <database> -s
+    rsexec -a --db <database> -q <query>
+    rsexec -a --db <database> -f <sqlfile> [--params=<n:v>...]    
+    rsexec --targets
+
+Options:
+    -a --anon-target    anonymous target; read credentials as JSON from stdin
+    -f --file           execute contents of SQL file
+    -q --query
+    -s --stdin          execute SQL passed to standard input
+    -p --preview        show (but do not execute) SQL command(s)
+'''
+
+import os, sys
+import json
+from pathlib import Path
+from collections import namedtuple
+import sh
+from sh import psql
+import docopt
+from snap import common
+
+PGX_CONFIG_DIR_ENV_VAR = 'PGX_CFG_HOME'
+CONFIGFILE_NAME = 'config.yaml'
+CONFIG_INSTRUCTIONS = '''
+rsexec requires a YAML configuration file named "config.yaml" either in the directory
+~/.pgx, or in the location specified by the environment variable PGX_CFG. 
+'''
+
+class ConfigDirNotFound(Exception):
+    def __init__(self):
+        super().__init__(self, 'Configuration directory $PGX_CFG_HOME not found.')
+
+
+class NoSuchAlias(Exception):
+    def __init__(self, alias):
+        super().__init__(self, 'No alias registered under the name "%s".' % alias)
+        self.alias = alias
+
+
+class TargetConfig(object):
+    def __init__(self, **kwargs):
+        kwreader = common.KeywordArgReader('host', 'port', 'user', 'password')
+        kwreader.read(**kwargs)
+        self.host = kwargs['host']
+        self.port = kwargs['port']
+        self.user = kwargs['user']
+        self.password = kwargs['password']
+
+
+def load_targets():
+    targets = {}
+    config_dir = os.getenv(PGX_CONFIG_DIR_ENV_VAR) or os.path.join(str(Path.home()), '.pgx')
+    if not os.path.isdir(config_dir):
+        raise ConfigDirNotFound()
+    
+    configfile = os.path.join(config_dir, CONFIGFILE_NAME)
+    yaml_config = common.read_config_file(configfile)
+    
+    for name in yaml_config['targets']:            
+        hostname = yaml_config['targets'][name]['host']
+        port = int(yaml_config['targets'][name].get('port') or '5432')
+        user = yaml_config['targets'][name]['user']
+        password = None
+        if yaml_config['targets'][name].get('password'):
+            password = common.load_config_var(yaml_config['targets'][name]['password'])
+        targets[name] = TargetConfig(host=hostname, port=port, user=user, password=password)
+    return targets
+
+
+def read_stdin():
+    for line in sys.stdin:
+        if sys.hexversion < 0x03000000:
+            line = line.decode('utf-8')
+        yield line.lstrip().rstrip()
+
+
+def parse_params(param_string):
+    params = {}
+    tokens = param_string.split(',')
+    for t in tokens:
+        subtokens=t.split(':')
+        key = subtokens[0].strip()
+        value = subtokens[1].strip()
+        params[key] = value
+    return params
+
+def main(args):
+    preview_mode = False
+    if args['--preview']:
+        preview_mode = True
+
+    anonymous_target_mode = False
+    if args['--anon-target']:
+        anonymous_target_mode = True
+
+    target = None
+    target_db = args['<database>']
+    if anonymous_target_mode:
+        print('running in anonymous-target mode, waiting for JSON credentials...', file=sys.stderr)
+        raw_input = []
+        for line in read_stdin():
+            raw_input.append(line)
+        target_data = json.loads('\n'.join(raw_input))
+        kwreader = common.KeywordArgReader('host', 'port', 'user', 'password')
+        kwreader.read(**target_data)
+        target = TargetConfig(**target_data)
+                
+    else:
+        targets = load_targets()   
+        if args['--targets']:
+            for alias, target in targets.items():
+                
+                if getattr(target, 'password'):
+                    setattr(target, 'password', '*************')
+
+                record = {
+                    alias: target.__dict__
+                }
+                print(json.dumps(record))
+            return
+
+        target_alias = args['<alias>']
+        if not targets.get(target_alias):
+            raise NoSuchAlias(target_alias)
+        
+        target = targets[target_alias]
+
+    try:
+        query = None        
+        with db_connect(db_type='redshift+psycopg2',
+                        user=target.user,
+                        passwd=target.password,
+                        host=target.host,
+                        port=target.port,
+                        database=target_db) as connection:
+        
+            if args['--file']:
+                if len(args['--params']):
+                    raw_query = None
+                    with open(args['<sqlfile>']) as f:
+                        raw_query = f.read()
+                    params = parse_params(args['--params'][0])
+                    query = raw_query.format(**params)
+                                                
+                else:
+                    with open(args['<sqlfile>']) as f:
+                        query = f.read()
+
+            elif args['--query']:
+                query = args['<query>']
+
+            elif args['--stdin']:
+                print('### reading from stdin')                
+                for line in read_stdin():
+                    query = query + line
+                
+            if preview_mode:
+                print(query)
+                return   
+            
+            statement = text(query)
+            results = connection.execute(statement)
+            for record in results:
+                print(record)
+            
+    except ConfigDirNotFound:
+        print(CONFIG_INSTRUCTIONS)
+        
+    except NoSuchAlias as err:
+        print(str(err))         
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

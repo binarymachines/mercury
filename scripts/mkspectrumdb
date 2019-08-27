@@ -1,0 +1,28 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    mkspectrumdb --schema <schema> --db <database> --role <arn>
+'''
+
+
+SCHEMA_CREATE_TEMPLATE = '''
+CREATE EXTERNAL SCHEMA IF NOT EXISTS {schema_name}
+FROM DATA CATALOG
+DATABASE '{db_name}'
+IAM_ROLE '{role_arn}'
+CREATE EXTERNAL DATABASE IF NOT EXISTS
+'''
+
+import docopt
+
+
+def main(args):
+    schema = args['<schema>']
+    db = args['<database>']
+    arn = args['<arn>']
+    print(SCHEMA_CREATE_TEMPLATE.format(schema_name=schema, db_name=db, role_arn=arn))
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

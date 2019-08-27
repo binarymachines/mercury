@@ -7,7 +7,7 @@ Usage:
     pgmeta [--config <configfile>] --target <alias> --database <db> --schema <schema> --tables --match=<regex>
     pgmeta [--config <configfile>] --targets
     pgmeta -a --database <db> --schema <schema> --table <table>
-    pgmeta -a --database <db> --schema <schema> --tables
+    pgmeta -a --database <db> --schema <schema> --tables <tables>...
     pgmeta -a --database <db> --schema <schema> --tables --match=<regex>
 
 Options:
@@ -32,10 +32,11 @@ PGX_CONFIG_DIR_ENV_VAR = 'PGX_CFG_HOME'
 URL_TEMPLATE = '{db_type}://{user}:{passwd}@{host}:{port}/{database}'
 
 METADATA_QUERY_TEMPLATE = """
-SELECT table_name, column_name, udt_name 
+SELECT table_name, column_name, udt_name, ordinal_position 
 FROM information_schema.columns
 WHERE table_schema = '{schema}'
 AND table_name  = '{table}'
+ORDER BY ordinal_position
 """
 
 TABLE_LIST_QUERY_TEMPLATE = """
@@ -108,12 +109,13 @@ def generate_metadata_from_query_results(results, table, schema):
     table_metadata = {}
     table_metadata['table_name'] = table
     table_metadata['columns'] = []
+    
     for record in results:
         table_metadata['columns'].append({
             'column_name': record['column_name'],
             'column_type': record['udt_name']
         })
-    
+
     return table_metadata
 
 

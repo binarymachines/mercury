@@ -4,7 +4,7 @@
      Usage:  
         j2sqlgen --config <configfile> --source <schemafile> [(--schema <db_schema>)] --table <tablename>
         j2sqlgen --config <configfile> --source <schemafile> [(--schema <db_schema>)] --tables <comma_delim_tbl_list>
-        j2sqlgen --config <configfile> --source <schemafile> [(--schema <db_schema>)] --all_tables
+        j2sqlgen --config <configfile> --source <schemafile> [(--schema <db_schema>)] --all-tables
         j2sqlgen --config <configfile> --source <schemafile> --list_tables
 
 '''
@@ -353,7 +353,7 @@ def main(args):
 
             print(generate_sql(tablespec, table_creation_context))
             print('\n')                
-    elif args.get('--all_tables'):
+    elif args.get('--all-tables'):
         # generate all the tables specified in the metadata file
         for table_name in tablenames:
             tablecfg = find_table_config(table_name, json_dbschema)
