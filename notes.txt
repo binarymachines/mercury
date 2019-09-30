@@ -47,7 +47,7 @@ To enable a new configuration target:
 (3) 
 
 # Make sure there are "spec" objects in metaobjects.py which match the internal structure of the configuration
-# Each spec object should have a data() method which returns a dictionary of attributes
+# Each spec object should have a data() method which returns a dictionary of attributes (NOTE: Do we really need this?)
 
 (4) 
 
@@ -59,6 +59,24 @@ To enable a new configuration target:
   AND
   verify that the jinja2 template in configtemplates.py is correct
 
+test list:
 
-
-
+xfile
+ngst
+quasr
+j2sqlgen
+j2spectrum
+profilr
+pgexec
+pgmeta
+rsexec
+rsexport
+s3-gettbl
+dfproc
+cyclops
+eavesdroppr
+bqexport
+bqexport-view
+bqstream-dl
+bqviewtblcreate
+viewtblcreate

@@ -498,7 +498,7 @@ def create_profilr_dataset(live_config, target_package):
 
 def create_quasr_template(live_config, target_package):
   while True:
-    template_spec = UISequenceRunner().create(**quasr_template_create_sequence)
+    template_spec = UISequenceRunner(configuration=live_config).create(**quasr_template_create_sequence)
     if not template_spec:
       break
 
@@ -511,7 +511,7 @@ def create_quasr_template(live_config, target_package):
 
 def create_quasr_job(live_config, target_package):
   while True:
-    jobspec = UISequenceRunner().create(**quasr_job_create_sequence)
+    jobspec = UISequenceRunner(configuration=live_config).create(**quasr_job_create_sequence)
     yield jobspec
     answer = cli.InputPrompt('create another job (Y/n)?').show()
     should_continue = answer.lower()
@@ -521,7 +521,7 @@ def create_quasr_job(live_config, target_package):
 
 def create_quasr_globals(live_config, target_package):
   # this will return a dictionary containing all global parameters for a quasr project
-  result =  UISequenceRunner().create(**quasr_globals_create_sequence)  
+  result =  UISequenceRunner(configuration=live_config).create(**quasr_globals_create_sequence)  
   for key, value in result.items():
     yield meta.Parameter(name=key, value=value)
 
@@ -529,13 +529,13 @@ def create_quasr_globals(live_config, target_package):
 def edit_globals(live_config, setting):
   if not setting:
     return
-  UISequenceRunner().process_edit_sequence(setting, **parameter_edit_sequence)
+  UISequenceRunner(configuration=live_config).process_edit_sequence(setting, **parameter_edit_sequence)
              
 
 def edit_service_object(live_config, service_object):
   if not service_object:
     return
-  UISequenceRunner().process_edit_sequence(service_object, **service_object_edit_sequence)
+  UISequenceRunner(configuration=live_config).process_edit_sequence(service_object, **service_object_edit_sequence)
 
 
 def edit_dfproc_processor(live_config, processor):
@@ -545,13 +545,21 @@ def edit_dfproc_processor(live_config, processor):
 def edit_xfile_datasource(live_config, config_object):
   if not config_object:
     return
-  UISequenceRunner().process_edit_sequence(config_object, **xfile_datasource_edit_sequence)
+  UISequenceRunner(configuration=live_config).process_edit_sequence(config_object, **xfile_datasource_edit_sequence)
 
 
 def edit_xfile_map(live_config, mapspec):
   if not mapspec:
     return
-  UISequenceRunner().process_edit_sequence(mapspec, **xfile_map_edit_sequence)
+
+  mapfield_menudata = []
+  for fieldspec in mapspec.fields:
+    mapfield_menudata.append({'label': fieldspec.name, 'value': fieldspec.name})
+
+  menus = {
+    'fields': mapfield_menudata
+  }
+  UISequenceRunner(configuration=live_config, edit_menus=menus).edit(mapspec, **xfile_map_edit_sequence)
 
 
 def edit_quasr_job(live_config, job):
@@ -563,7 +571,7 @@ def edit_quasr_job(live_config, job):
     'inputs': input_slot_menu,
     'outputs': output_slot_menu
   }
-  UISequenceRunner(edit_menus=menus).edit(job, **quasr_job_edit_sequence)
+  UISequenceRunner(configuration=live_config, edit_menus=menus).edit(job, **quasr_job_edit_sequence)
 
 
 def edit_ngst_datastore(live_config, datastore):
@@ -578,7 +586,7 @@ def edit_ngst_datastore(live_config, datastore):
     'init_params': iparam_menudata
   }
   
-  UISequenceRunner(edit_menus=menus).edit(datastore, **ngst_datastore_edit_sequence)
+  UISequenceRunner(configuration=live_config, edit_menus=menus).edit(datastore, **ngst_datastore_edit_sequence)
 
 
 def edit_ngst_target(live_config, edit_target):
@@ -591,7 +599,7 @@ def edit_ngst_target(live_config, edit_target):
   menus = {
     'datastore_alias': datastore_menudata
   }
-  UISequenceRunner(edit_menus=menus).edit(edit_target, **ngst_target_edit_sequence)
+  UISequenceRunner(configuration=live_config, edit_menus=menus).edit(edit_target, **ngst_target_edit_sequence)
 
 
 def edit_cyclops_trigger():
@@ -615,7 +623,7 @@ def edit_profilr_dataset():
 def edit_quasr_template(live_config, template_spec):
   if not template_spec:
     return
-  UISequenceRunner().process_edit_sequence(template_spec, **quasr_template_edit_sequence)
+  UISequenceRunner(configuration=live_config).process_edit_sequence(template_spec, **quasr_template_edit_sequence)
 
 
 def list_globals(global_settings):

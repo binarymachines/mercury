@@ -35,7 +35,7 @@ parameter_create_sequence = {
 
      },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'value',
       'prompt': cli.InputPrompt('parameter value'),
       'required': True
@@ -50,13 +50,13 @@ service_object_param_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'name',
       'prompt': cli.InputPrompt('parameter name'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'value',
       'prompt': cli.InputPrompt('parameter value'),
       'required': True
@@ -72,13 +72,13 @@ service_object_create_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'alias',
       'prompt': cli.InputPrompt('service object alias'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'class',
       'prompt': cli.InputPrompt('service object class'),
       'required': True
@@ -103,13 +103,13 @@ xfile_field_src_lambda = {
   },  
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'key',
       'prompt': cli.InputPrompt('field from source record'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'expression',
       'prompt': cli.InputPrompt('lambda expression'),
       'required': True
@@ -128,7 +128,7 @@ xfile_field_src_record = {
   },
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'key',
       'prompt': cli.InputPrompt('source-record field name'),
       'required': True
@@ -147,7 +147,7 @@ xfile_field_src_lookup = {
   },
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'key',
       'prompt': cli.InputPrompt('lookup function (RETURN to use default)', ''),
       'required': True
@@ -169,7 +169,7 @@ xfile_field_create_sequence = {
   'builder_func': new_xfile_fieldspec,
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'field_name',
       'prompt': cli.InputPrompt('output field name'),
       'required': True
@@ -203,13 +203,13 @@ xfile_map_create_sequence = {
   'builder_func': lambda **kwargs: meta.XfileMapSpec(kwargs['map_name'], kwargs['lookup_source']),
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'map_name',
       'prompt': cli.InputPrompt('map name'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'lookup_source',
       'prompt': cli.InputPrompt('lookup datasource'),
       'required': True
@@ -225,19 +225,19 @@ xfile_globals_create_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'project_home',
       'prompt': cli.InputPrompt('project home'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'datasource_module',
       'prompt': cli.InputPrompt('datasource module'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'service_module',
       'prompt': cli.InputPrompt('service module'),
       'required': True
@@ -254,13 +254,13 @@ xfile_datasource_create_sequence = {
   'builder_func': lambda **kwargs: meta.DatasourceSpec(kwargs['alias'], kwargs['class']),
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'alias',
       'prompt': cli.InputPrompt('datasource alias'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'class',
       'prompt': cli.InputPrompt('datasource class'),
       'required': True 
@@ -274,7 +274,7 @@ parameter_edit_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'label': 'name',
       'field_name': 'value',
       'prompt_type': cli.InputPrompt,
@@ -290,13 +290,13 @@ xfile_datasource_edit_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'name',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update name', '{current_value}']
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'classname',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update datasource class', '{current_value}']
@@ -310,18 +310,46 @@ xfile_field_edit_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'name',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update output field name', '{current_value}']      
     },
     {
-      'type': 'static_sequence_trigger',
+      'type': 'sequence_select',
       'field_name': 'parameters',
-      'sequence': parameter_edit_sequence
+      'prompt': cli.MenuPrompt('field source:', XFILE_FIELD_SOURCE_TYPES),
+      'required': True,
+      'conditions': {
+        'lambda': {  
+          'sequence': xfile_field_src_lambda
+        },
+        'record': {
+          'sequence': xfile_field_src_record
+        },
+        'lookup': {
+          'sequence': xfile_field_src_lookup
+        }
+      } 
     }
   ]
 }
+
+
+def create_map_editor_prompt(live_config):
+  menudata = []  
+  for datasource in live_config.get('sources'):
+    menudata.append({ 'label': datasource.name, 'value': datasource.name })  
+  return cli.MenuPrompt('select lookup source', menudata)
+
+
+def select_target_xfile_map_field(field_name, config_object):
+  index = 0
+  for fieldspec in config_object.fields:
+    if fieldspec.name == field_name:
+      return (fieldspec, index, xfile_field_edit_sequence)
+    index += 1
+
 
 xfile_map_edit_sequence = {
   'marquee': '''
@@ -329,21 +357,22 @@ xfile_map_edit_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'name',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update name', '{current_value}']
     },
     {
-      'type': 'direct',
-      'field_name': 'lookup_source',
-      'prompt_type': cli.InputPrompt,
-      'prompt_args': ['update lookup source', '{current_value}']
+      'type': 'dyn_prompt',
+      'prompt_creator': create_map_editor_prompt,
+      'field_name': 'lookup_source'      
     },
     {
-      'type': 'static_sequence_trigger',
+      'type': 'dyn_sequence_trigger',
       'field_name': 'fields',
-      'sequence': xfile_field_edit_sequence
+      'prompt_type': cli.MenuPrompt,
+      'prompt_text': 'update map field',
+      'selector_func': select_target_xfile_map_field
     }
   ]
 }
@@ -356,19 +385,19 @@ ngst_globals_create_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'project_home',
       'prompt': cli.InputPrompt('project home'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'service_module',
       'prompt': cli.InputPrompt('service module'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'datastore_module',
       'prompt': cli.InputPrompt('datastore module'),
       'required': True
@@ -392,19 +421,19 @@ ngst_datastore_create_sequence = {
   ''',  
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'alias',
       'prompt': cli.InputPrompt('datastore alias'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'classname',
       'prompt': cli.InputPrompt('datastore class'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'channel_selector_function',
       'prompt': cli.InputPrompt('channel-select function'),
       'required': False
@@ -434,7 +463,7 @@ ngst_target_create_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'name',
       'prompt': cli.InputPrompt('target name'),
       'required': True
@@ -446,7 +475,7 @@ ngst_target_create_sequence = {
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'checkpoint_interval',
       'prompt': cli.InputPrompt('checkpoint interval'),
       'required': True
@@ -469,19 +498,19 @@ ngst_datastore_edit_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'alias',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update datastore alias', '{current_value}']
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'classname',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update datastore class', '{current_value}']
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'channel_selector_function',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update channel selector', '{current_value}']
@@ -504,13 +533,13 @@ ngst_target_edit_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct', 
+      'type': 'static_prompt', 
       'field_name': 'name',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update target name', '{current_value}']
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'datastore_alias',
       'prompt_type': cli.MenuPrompt,
       'prompt_text': 'update datastore alias',      
@@ -526,13 +555,13 @@ j2sqlgen_globals_create_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'project_home',
       'prompt': cli.InputPrompt('project home'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'service_module',
       'prompt': cli.InputPrompt('service module'),
       'required': True
@@ -553,25 +582,25 @@ j2sqlgen_defaults_create_sequence = {
   ''',
   'steps': [
     {
-    'type': 'direct',
+    'type': 'static_prompt',
     'field_name': 'autocreate_pk_if_missing',
     'prompt': cli.MenuPrompt('autocreate PK ?', autocreate_pk_options),
     'required': False # this is a hack
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'pk_name',
       'prompt': cli.InputPrompt('primary key name'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'pk_type',
       'prompt': cli.InputPrompt('primary key type'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'varchar_length',
       'prompt': cli.InputPrompt('VARCHAR length'),
       'required': True
@@ -587,13 +616,13 @@ j2sqlgen_colmap_create_sequence = {
   ''',
   'steps': [
     {
-    'type': 'direct',
+    'type': 'static_prompt',
     'field_name': 'source_type',
     'prompt': cli.InputPrompt('source column type'),
     'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'target_type',
       'prompt': cli.InputPrompt('target column type'),
       'required': True
@@ -609,13 +638,13 @@ j2sqlgen_table_create_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'table_name',
       'prompt': cli.InputPrompt('table name'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'new_table_name',
       'prompt': cli.InputPrompt('rename table to'),
       'required': False
@@ -638,13 +667,13 @@ service_object_edit_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'alias',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update alias', '{current_value}']
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'classname',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update classname', '{current_value}']
@@ -667,25 +696,25 @@ quasr_globals_create_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'project_home',
       'prompt': cli.InputPrompt('project home'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'qa_logic_module',
       'prompt': cli.InputPrompt('QA logic module'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'service_module',
       'prompt': cli.InputPrompt('service module'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'template_module',
       'prompt': cli.InputPrompt('template module'),
       'required': True
@@ -702,13 +731,13 @@ quasr_template_create_sequence = {
   'builder_func': lambda **kwargs: meta.QuasrTemplateSpec(kwargs['name'], kwargs['text']),
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'name',
       'prompt': cli.InputPrompt('template_name'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'text',
       'prompt': MultilineInputPrompt('template text'),
       'required': True
@@ -731,13 +760,13 @@ quasr_input_slot_create_sequence = {
   'builder_func': lambda **kwargs: meta.QuasrJobIOSlot(kwargs['name'], kwargs['datatype']),
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'name',
       'prompt': cli.InputPrompt('input slot name'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'datatype',
       'prompt': cli.MenuPrompt('input slot datatype', QUASR_SLOT_TYPES),
       'required': True
@@ -754,13 +783,13 @@ quasr_output_slot_create_sequence = {
   'builder_func': lambda **kwargs: meta.QuasrJobIOSlot(kwargs['name'], kwargs['datatype']),  
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'name',
       'prompt': cli.InputPrompt('output slot name'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'datatype',
       'prompt': cli.MenuPrompt('output slot datatype', QUASR_SLOT_TYPES),
       'required': True
@@ -790,31 +819,31 @@ quasr_job_create_sequence = {
   'builder_func': create_quasr_job_spec,
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'name',
       'prompt': cli.InputPrompt('job name'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'template_alias',
       'prompt': cli.InputPrompt('template alias'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'executor_function',
       'prompt': cli.InputPrompt('SQL executor function name'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'builder_function',
       'prompt': cli.InputPrompt('output builder function name'),
       'required': True
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'analyzer_function',
       'prompt': cli.InputPrompt('output analyzer function name'),
       'required': False
@@ -843,13 +872,13 @@ quasr_input_slot_edit_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'name',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['input-slot name', '{current_value}']
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'datatype',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['input-slot datatype', '{current_value}']
@@ -867,13 +896,13 @@ quasr_output_slot_edit_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'name',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['output-slot name', '{current_value}']
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'datatype',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['output-slot datatype', '{current_value}']
@@ -905,7 +934,7 @@ quasr_job_edit_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'name',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update job name', '{current_value}']
@@ -936,13 +965,13 @@ quasr_template_edit_sequence = {
   ''',
   'steps': [
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'name',
       'prompt_type': cli.InputPrompt,
       'prompt_args': ['update template name', '{current_value}'] 
     },
     {
-      'type': 'direct',
+      'type': 'static_prompt',
       'field_name': 'text',
       'prompt_type': MultilineInputPrompt,
       'prompt_args': ['update SQL template']      
@@ -953,7 +982,7 @@ quasr_template_edit_sequence = {
 
 
 UISEQUENCE_STEP_TYPES = [
-  'direct',
+  'static_prompt',
   'dyn_prompt',
   'static_sequence_trigger',
   'dyn_sequence_trigger',
@@ -964,15 +993,20 @@ class UISequenceRunner(object):
   '''
     Types of UI sequence steps (for editing):
 
-    direct: This type prompts the user for input and populates an object or field with the result
+    static_prompt: This type prompts the user for input and populates an object or field with the result
 
-    static_sequence_trigger: launches a named UI sequence and assigns the result to the named field
+    dyn_prompt: This type prompts the user for input using a prompt created on the fly
+      by a "prompt_creator" function specified in the step
+
+    static_sequence_trigger: Launches a named UI sequence and assigns the result to the named field
         (in the case of an array-type field, the named sequence will run once per element)
 
-    dyn_sequence_trigger: this type is designed to handle collection-type object fields in situations
+    dyn_sequence_trigger: This type is designed to handle collection-type object fields in situations
         where the user wants to edit only one member of the collection. It prompts the user to 
         choose from an array of options, then passes the result to a function which returns
         the target UISequence.
+
+    dyn_sequence_passthrough: 
 
     gate: this type prompts the user for input, evaluates that input as true or false, and triggers
         a named sequence if the result evaluated to True.
@@ -1030,6 +1064,18 @@ class UISequenceRunner(object):
           if output is not None:
             setattr(config_object, step['field_name'], output)        
 
+      elif step_type == 'sequence_select':
+        prompt = step['prompt']
+        selection = prompt.show()
+        if not step['conditions'].get(selection):
+          raise Exception('No condition in step conditions matching selection "%s".' % selection)
+
+        next_sequence = step['conditions'][selection]['sequence']
+        #print(next_sequence)
+        output = self.process_edit_sequence(config_object, **next_sequence)        
+        if output is not None:
+          config_object = output
+
       # execute one of N sequences depending on user input
       elif step_type == 'dyn_sequence_trigger':
         if not 'selector_func' in step.keys():
@@ -1072,7 +1118,7 @@ class UISequenceRunner(object):
             # just replace the object
             setattr(config_object, step['field_name'], updated_object)
         
-      elif step_type == 'direct':
+      elif step_type == 'static_prompt':
         prompt = step['prompt_type']
 
         args = []
@@ -1084,13 +1130,18 @@ class UISequenceRunner(object):
           args.append(step['prompt_text'])
           menudata = self.edit_menus.get(step['field_name']) or step.get('menu_data')
           if not menudata:
-            raise Exception('A "direct" type ui step must provide its own menu data or retrieve it from the UISequenceRunner.')
+            raise Exception('A "static_prompt" type ui step must provide its own menu data or retrieve it from the UISequenceRunner.')
           args.append(menudata)
         
         # just execute this step
         response = prompt(*args).show()
         if response is not None:
           setattr(config_object, step['field_name'], response)
+
+      elif step_type == 'dyn_prompt':
+        prompt_create_func = step['prompt_creator']
+        answer = prompt_create_func(self.configuration).show()
+        setattr(config_object, step['field_name'], answer) 
 
     return config_object
 
@@ -1111,7 +1162,7 @@ class UISequenceRunner(object):
         raise Exception('found a UISequence step of an unsupported type [%s].' % step_type)
       
       if step_type == 'gate':
-        'fields: type, prompt, evaluator'
+        '''fields: type, prompt, evaluator'''
         print('placeholder for gate-type sequence step')
 
       elif step_type == 'sequence_select':
@@ -1133,7 +1184,7 @@ class UISequenceRunner(object):
         answer = prompt_create_func(self.configuration).show()
         context[step['field_name']] = answer        
       
-      elif step_type == 'direct':        
+      elif step_type == 'static_prompt':        
         # follow the prompt -- but override the one in the UI sequence if one was passed to us
         # in our constructor
         prompt =  self.create_prompts.get(step['field_name'], step['prompt'])         
