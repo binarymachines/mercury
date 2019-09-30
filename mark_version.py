@@ -4,7 +4,7 @@ import os
 import sh
 from sh import git
 
-VERSION_NUM = '0.9.45'
+VERSION_NUM = '0.9.46'
 VERSION_MODULE_TEMPLATE = '''#!/usr/bin/env python
 VERSION_STRING = "{version_string}"
 
@@ -20,7 +20,7 @@ if __name__ == '__main__':
 
 def main():        
     git_hash = git.describe('--always').lstrip().rstrip()
-    version = '%s[%s]' % (VERSION_NUM, git_hash)
+    version = '%s [%s]' % (VERSION_NUM, git_hash)
     print(VERSION_MODULE_TEMPLATE.format(version_string=version))
 
 if __name__ == '__main__':
