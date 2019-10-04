@@ -35,7 +35,7 @@ CREATE EXTERNAL TABLE {schema}.{tablename} (
 {table_body}
 ) 
 {properties}
-LOCATION '{s3_uri}'
+LOCATION '{s3_uri}/{schema}/{tablename}/'
 '''
 
 # TODO: add TABLE PROPERTIES clause to template
