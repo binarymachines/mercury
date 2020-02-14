@@ -36,6 +36,7 @@ SQLAlchemy-Utils = "==0.34.0"
 sh = "*"
 watchdog = "*"
 pgpubsub = "*"
+pyyaml = "*"
 
 [dev-packages]
 
