@@ -561,7 +561,7 @@ class RecordTransformerBuilder(object):
 
         self._transform_config = {}
         with open(yaml_config_filename) as f:
-            self._transform_config = yaml.load(f)
+            self._transform_config = yaml.safe_load(f)
 
         if not self._transform_config['maps'].get(self._map_name):
             raise Exception('No transform map "%s" found in initfile %s.'
