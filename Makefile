@@ -33,8 +33,8 @@ test_env:
 	$(VIRTUALENV_ROOT)/$(VIRTUALENV_NAME)/bin/pip install -r requirements.txt
 
 
-test:	test_env
-	PYTHONPATH=./tests $(VIRTUALENV_ROOT)/$(VIRTUALENV_NAME)/bin/python -m unittest discover -t . ./tests -v
+test:
+	PYTHONPATH=./tests MERCURY_HOME=`pwd` pipenv run python -m unittest discover -t . ./tests -v
 
 test_teamcity:	test_env
 	PYTHONPATH=./tests $(VIRTUALENV_ROOT)/$(VIRTUALENV_NAME)/bin/python -m teamcity.unittestpy discover -t . ./tests -v
