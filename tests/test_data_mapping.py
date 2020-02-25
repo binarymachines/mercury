@@ -16,7 +16,6 @@ from teamcity.unittestpy import TeamcityTestRunner
 
 LOG_ID = 'test_data_mapping'
 TRANSFORM_YAML_FILE = 'tests/configfiles/sample_transform.yaml'
-SCHEMA_FILE = 'data/sample_schema.yaml'
 
 # this name must exist in the transform yaml file as a direct child of the 'sources' tag
 VALID_MAP_NAME = 'test_map'
