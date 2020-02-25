@@ -6,9 +6,9 @@
 
 
 globals:
-        project_home:                $G_HOME
-        service_module:              grailed_services 
-        datastore_module:            grailed_datastores
+        project_home:                $MERCURY_HOME
+        service_module:              testbed_services 
+        datastore_module:            testbed_datastores
 
 
 service_objects:
@@ -20,7 +20,7 @@ datastores:
       channels:
         - a
         - b
-      class: FileStore
+      class: TestDatastore
       init_params:
         - name: filename
           value: output.json

@@ -440,16 +440,31 @@ class RecordTransformer(object):
         self.value_map.add_resolver(resolver, target_field_name)
 
 
-    def map_const_to_target_field(self, target_field_name, value):
+    def map_const_to_target_field(self,  value, target_field_name):
         if not target_field_name in self.target_record_fields:
             raise NoSuchTargetField(target_field_name)
-        self.field_map[target_field_name] = ConstValueResolver(value)
+        resolver = ConstValueResolver(value)
+        self.field_map[target_field_name] = resolver
+        self.value_map.add_resolver(resolver, target_field_name)
 
 
     def map_source_to_lambda(self, source_field_name, target_field_name, lambda_string):
         if not target_field_name in self.target_record_fields:
             raise NoSuchTargetField(target_field_name)
-        self.field_map[target_field_name] = LambdaResolver(lambda_string, source_field_name)
+        resolver = LambdaResolver(lambda_string, source_field_name)
+        self.field_map[target_field_name] = resolver
+        self.value_map.add_resolver(resolver, target_field_name)
+
+
+    '''
+    def map_lookup_to_target_field(datasource, lookup_function_name, target_field_name):
+
+        if not target_field_name in self.target_record_fields:
+            raise NoSuchTargetField(target_field_name)
+        resolver = LookupResolver(datasource, lookup_function_name)
+        self.field_map[target_field_name] = resolver
+        self.value_map.add_resolver(resolver, target_field_name)
+    '''
 
 
     def register_datasource(self, target_field_name, datasource):
@@ -490,11 +505,6 @@ class RecordTransformer(object):
 
     def lookup(self, target_field_name, source_record):
         record_value = source_record.get(target_field_name)
-        '''
-        if record_value != None and record_value != '':
-            return record_value
-        '''
-
         datasource = self.datasources.get(target_field_name)
         if not datasource:
             if not source_record.has_key(target_field_name):
@@ -508,8 +518,7 @@ class RecordTransformer(object):
             lookup_function_name = 'lookup_%s' % target_field_name
 
         if not hasattr(datasource, lookup_function_name):  
-            raise NoSuchLookupMethod(datasource.__class__.__name__, lookup_function_name)          
-            #raise Exception('The datasource %s has no lookup function "%s(...)". Please check your config file.' % (datasource.__class__.__name__, lookup_function_name))
+            raise NoSuchLookupMethod(datasource.__class__.__name__, lookup_function_name)            
 
         lookup_function = getattr(datasource, lookup_function_name)
         return lookup_function(target_field_name, source_record, self.value_map)
@@ -622,15 +631,18 @@ class RecordTransformerBuilder(object):
 
                 elif field_config['source'].startswith('lookup'):
                     if field_config['source']==('lookup'): # we infer the lookup function name as lookup_<field_name>(...)
-                        transformer.register_datasource(fieldname, datasource)
+                        lookup_function_name = 'lookup_%s' % fieldname
                     else: # the source field gives an explicit function name starting with 'lookup_' 
-                        transformer.register_datasource_with_explicit_function(fieldname,
-                                                                               datasource, 
-                                                                               field_config['source'])
+                        lookup_function_name = field_config['source']
+
+                    transformer.register_datasource_with_explicit_function(fieldname,
+                                                                            datasource, 
+                                                                            lookup_function_name)
+
                 elif field_config['source'] == 'value':
                     if 'value' not in field_config:
                         raise Exception('a mapped field with source = value must set the "value" field.')
-                    transformer.map_const_to_target_field(fieldname, field_config['value'])
+                    transformer.map_const_to_target_field(field_config['value'], fieldname)
 
                 elif field_config['source'] == 'lambda':
                     source_fieldname = field_config.get('key', fieldname)

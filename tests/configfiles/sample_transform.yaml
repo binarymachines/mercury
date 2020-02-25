@@ -1,6 +1,6 @@
 globals:
   project_home: $MERCURY_HOME
-  datasource_module: datasources
+  datasource_module: testbed_datasources
   service_module: test_services
 
 

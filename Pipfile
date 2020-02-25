@@ -37,6 +37,7 @@ sh = "*"
 watchdog = "*"
 pgpubsub = "*"
 pyyaml = "*"
+snap-micro = "*"
 
 [dev-packages]
 

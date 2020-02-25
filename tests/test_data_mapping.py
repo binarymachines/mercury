@@ -3,7 +3,7 @@
 import unittest
 import context
 from mercury import datamap as dmap
-import datasources  # this module is defined in the tests directory
+import testbed_datasources  # this module is defined in the tests directory
 from snap import common
 import sys
 import os
