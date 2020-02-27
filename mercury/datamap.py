@@ -456,17 +456,6 @@ class RecordTransformer(object):
         self.value_map.add_resolver(resolver, target_field_name)
 
 
-    '''
-    def map_lookup_to_target_field(datasource, lookup_function_name, target_field_name):
-
-        if not target_field_name in self.target_record_fields:
-            raise NoSuchTargetField(target_field_name)
-        resolver = LookupResolver(datasource, lookup_function_name)
-        self.field_map[target_field_name] = resolver
-        self.value_map.add_resolver(resolver, target_field_name)
-    '''
-
-
     def register_datasource(self, target_field_name, datasource):
         if not target_field_name in self.target_record_fields:
             raise Exception('No target field "%s" has been added to the transformer.' % target_field_name)
