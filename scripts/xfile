@@ -120,7 +120,7 @@ def main(args):
     if args.get('--list') == True:
         list_mode = True
     
-    if not any([transform_mode, interactive_mode, passthrough_mode]):
+    if not any([transform_mode, interactive_mode, passthrough_mode, list_mode]):
         print('unsupported run mode. Exiting.')
         return
     

@@ -1,0 +1,69 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    tuple2json --delimiter <delimiter> --keys=<key>... [--skip <num_lines>] [--limit=<limit>]
+    tuple2json --delimiter <delimiter> --datafile <file> --keys=<key>... [--skip <num_lines>] [--limit=<limit>]
+
+'''
+
+import os, sys
+import json
+import docopt
+from snap import common
+from mercury.utils import read_stdin
+
+
+def generate_dict_from_tuple(line: str, delimiter: str, keys: list):
+    # TODO: decide what to do if key count and token count do not match
+    output_record = {}
+    tokens = line.split(delimiter)
+    index = 0
+    for key in keys:
+        output_record[key] = tokens[index]
+        index += 1
+
+    return output_record
+
+
+def main(args):
+    
+    keys = args['--keys'][0].split(',')    
+    delimiter = args['<delimiter>']
+    limit = int(args.get('--limit') or -1)
+    skip_count = int(args.get('<num_lines>') or -1)
+
+    line_count = 0
+
+    if args['--datafile']:
+        with open(args['<file>'], 'r') as f:
+            for line in f:
+                if line_count == limit:
+                    break
+
+                if line_count < skip_count:
+                    line_count += 1
+                    continue
+
+                record = generate_dict_from_tuple(line.strip(), delimiter, keys)
+                print(json.dumps(record))
+                line_count += 1
+
+    else: # read data from standard input
+
+        for line in read_stdin():
+            if line_count == limit:
+                break
+
+            if line_count < skip_count:
+                line_count += 1
+                continue
+
+            record = generate_dict_from_tuple(line.strip(), delimiter, keys)
+            print(json.dumps(record))
+            line_count += 1
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

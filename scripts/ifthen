@@ -1,0 +1,166 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    ifthen [-n] <module.if_func> --listfile <file> --csv --delimiter <delim> --then-cmd <command> [--params=<name:value>...]
+    ifthen [-n] <module.if_func> --listfile <file> --json --then-cmd <command> [--params=<name:value>...]
+    ifthen [-n] <module.if_func> -s --csv --delimiter <delim> --then-cmd <command> [--params=<name:value>...] 
+    ifthen [-n] <module.if_func> -s --json --then-cmd <command> [--params=<name:value>...] 
+
+Options:
+    -s --stdin  read data from standard input
+    -n --not    invert mode (execute the then-cmd if the if-function is NOT true)
+'''
+
+import os, sys
+import json
+from mercury.utils import parse_cli_params, read_stdin
+from snap import snap, common
+from mercury import datamap
+import docopt
+from plumbum import local
+
+JSON = 'json'
+CSV = 'csv'
+
+FILE = 'file'
+STDIN = 'standard_input'
+
+
+def json_record_generator(**kwargs):
+    limit = -1
+    if kwargs.get('limit'):
+        limit = int(kwargs['limit'])
+    
+    filename = kwargs.get('filename')
+    record_count = 0
+    if filename:
+        with open(filename) as f:
+            for line in f:
+                if record_count == limit:
+                    break
+
+                yield json.loads(line)
+                record_count += 1
+    else:
+        for line in sys.stdin:
+            if not len(line.strip()):
+                continue
+            if record_count == limit:
+                break
+
+            yield(json.loads(line))
+            record_count += 1
+
+
+def stream_input_records(data_format: str, delimiter: str):
+    if data_format == JSON:
+        rec_source = datamap.RecordSource(json_record_generator)
+
+    elif data_format == CSV:
+        rec_source = datamap.RecordSource(datamap.csvstream_record_generator, delimiter=delimiter)
+
+    for rec in rec_source.records():
+        yield rec
+
+
+def read_input_records(datafile: str, data_format: str, delimiter: str):
+    if data_format == JSON:
+        rec_source = datamap.RecordSource(datamap.jsonfile_record_generator,
+                                          filename=datafile)                                      
+    
+    elif data_format == CSV:
+        rec_source = datamap.RecordSource(datamap.csvfile_record_generator,
+                                          filename=datafile,
+                                          delimiter=delimiter)
+    
+    for rec in rec_source.records():
+        yield rec
+
+
+def main(args):
+    
+    # load the function which is the predicate of our "if"
+    #
+    predicate_name = args['<module.if_func>']
+    tokens = predicate_name.split('.')
+    if len(tokens) != 2:
+        raise Exception('The --condition parameter must be of the form "module.testfunc".')
+
+    module_name = tokens[0]
+    function_name = tokens[1]
+
+    # The predicate function is a user-defined function taking **kwargs as a parameter
+    # and returning either True or False.
+    #
+    # load_class() is poorly named. It will load any object from a module, 
+    # not just a class. My apologies. --DT
+    #
+    predicate_function = common.load_class(function_name, module_name)
+
+    # The command string is the shell command to execute if the predicate function returns True
+    #
+    command_string = args['<command>']
+    cmd_tokens = command_string.split(' ')
+
+    cmd = local[cmd_tokens[0]]
+    cmd_params = cmd_tokens[1:]
+
+    # By default, ifthen runs in loop mode; here we loop over a set of records in a datafile
+    # (or read in from standard input). The records are passed to the predicate function
+    # as a dictionary of name-value pairs, along with any parameters passed to us on the command line.
+    #
+
+    input_mode = None
+    if args['--listfile']:
+        input_mode = FILE
+
+    elif args['--stdin']:
+        input_mode = STDIN
+
+    data_format = None
+    delimiter = None
+
+    if args['--json']:
+        data_format = 'json'
+    elif args['--csv']:
+        data_format = 'csv'
+        delimiter = args['<delim>']
+
+    cli_parameters = parse_cli_params(args['--params'])    
+
+    if input_mode == FILE:
+        datafile = args['<file>']
+        
+        for record in read_input_records(datafile, data_format, delimiter):
+
+            # NOTE: the parameters passed on the command line will overwrite any values 
+            # with matching names in the input record we read from the file (or stdin).
+            #
+            if args['--params']:
+                record.update(cli_parameters)
+
+            # execute predicate, run our command if True
+            if predicate_function(**record):
+                print(f'Predicate function {function_name} returned True, executing then-command...')
+                print(cmd(*cmd_params))
+
+    elif input_mode == STDIN:
+
+        for record in stream_input_records(data_format, delimiter):
+            if args['--params']:
+                record.update(cli_parameters)
+            
+            # execute predicate, run our command if True
+            if predicate_function(**record):
+                print(f'Predicate function {function_name} returned True, executing then-command...')
+                print(cmd(*cmd_params))
+            
+
+    else:
+        raise Exception('Unsupported input mode.')
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

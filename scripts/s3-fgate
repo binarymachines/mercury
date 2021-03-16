@@ -1,0 +1,126 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    s3-fgate.py --config <configfile> --gate <gate> <s3_uri> [--limit=<limit>]
+    s3-fgate.py --gate-module <module> --gate-function <func> --format (csv | json) <s3_uri> [--delimiter=<delimiter>] [--limit=<limit>]
+    s3-fgate.py --gate-module <module> --service_module <svc-module> --gate-function <func> --format (csv | json) <s3_uri> [--delimiter=<delimiter>] [--limit=<limit>]
+'''
+
+
+import os, sys
+import re
+from collections import namedtuple
+import docopt
+from snap import snap, common
+from smart_open import smartopen
+
+
+FileGate = namedtuple('FileGate', 'format function_name delimiter')
+S3Object = namedtuple('S3Object', 'bucket key')
+
+ACCEPTED_FORMATS = ['csv', 'json']
+S3_KEY_PREFIX = 's3://'
+
+
+def validate_s3_uri(uri_string):
+    if not uri_string.startswith(S3_KEY_PREFIX):
+        return False
+    
+    return True
+
+
+def s3_uri_to_object(s3_uri):
+    full_path = s3_uri[len(S3_KEY_PREFIX):]
+    
+    tokens = full_path.split('/')
+    bucket_name = tokens[0]
+    path_tokens = tokens[1:]
+    return S3Object(bucket=bucket_name, key='/'.join(path_tokens))
+
+
+def load_gates(yaml_config):
+    gates = {}
+    if 'gates' not in yaml_config:
+        raise Exception('Your YAML config must contain a top-level "gates" section.')
+
+    for gate_name in yaml_config['gates']:
+        gate_config = yaml_config['gates'][gate_name]
+
+        gates[gate_name] = FileGate(format=gate_config['format'],
+                                    delimiter=gate_config.get('delimiter'), # delimiter can be null (e.g. if format is JSON)
+                                    function_name=gate_config['gate_function'])
+
+    return gates
+
+
+def main(args):
+    configfile_mode = False
+    if args['--config']:
+        configfile_mode = True
+
+    if configfile_mode:
+        configfile = args['<configfile>']
+        yaml_config = common.read_config_file(configfile)
+
+        common.load_config_var(yaml_config['globals']['project_home'])
+        service_tbl = snap.initialize_services(yaml_config)
+        svc_registry = common.ServiceObjectRegistry(service_tbl)
+
+        g = load_gates(yaml_config)
+    
+        target_gate_name = args['<gate>']
+        target_gate = g.get(target_gate_name)
+        if not target_gate:
+            print('No gate registered under the name %s. Please check your configuration file.' % target_gate_name, file=sys.stderr)
+            return 1
+
+        gate_module = yaml_config['globals']['gate_module']
+        
+    else: 
+        src_format = None
+        for file_format in ACCEPTED_FORMATS:
+            if args.get(file_format):
+                src_format = file_format
+                break
+
+        if not src_format:
+            print('Invalid file format specified. Accepted formats are: %s' % (ACCEPTED_FORMATS), file=sys.stderr)
+            return 1
+
+        delimiter = args.get('--delimiter', None)
+        if src_format == 'csv' and not delimiter:
+            print('You must specify a delimiter when the datafile format is csv.', file=sys.stderr)
+            return 1
+
+        target_gate = FileGate(format=src_format, function_name=args['<func>'], delimiter=delimiter)
+        gate_module = args['<module>']
+        svc_registry = common.ServiceObjectRegistry({})
+
+    s3_uri_string = args['<s3_uri>']
+    if not validate_s3_uri(s3_uri_string):
+        print('Invalid format for S3 URI "%s".' % s3_uri_string)
+        return 1
+
+    s3_target = s3_uri_to_object(s3_uri_string)
+    gate_function = common.load_class(target_gate.function_name, gate_module)
+    
+    print('executing gate logic for S3 key "%s" in bucket "%s"' % (s3_target.key, s3_target.bucket), file=sys.stderr)
+
+    try:
+        with smartopen(s3_uri_string, 'r') as f:
+            result = gate_function(f, target_gate.format, svc_registry, delimiter=target_gate.delimiter)
+            if result:
+                print('s3-fgate: datafile %s is GO for gate function %s' % (source_file, target_gate.function_name), file=sys.stderr)
+                print(source_file)
+            else:
+                print('s3-fgate: datafile %s is NO-GO for gate %s' % (source_file, target_gate.function_name), file=sys.stderr)                    
+                print('')
+
+    except:
+        raise
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

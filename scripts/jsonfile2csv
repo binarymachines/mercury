@@ -1,0 +1,82 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    jsonfile2csv <jsonfile> --generator <module.class> --delimiter <delimiter> [--params=<name:value>...] [--limit=<max_records>]
+    jsonfile2csv --generator <module.class> --delimiter <delimiter> [--params=<name:value>...] [--limit=<max_records>]
+'''
+
+import os, sys
+import json
+import docopt
+from mercury.utils import open_in_place, read_stdin, parse_cli_params
+from mercury.base_classes import JSONDocToCSVConverter
+
+from snap import common
+
+
+def main(args):
+
+    delimiter = args['<delimiter>']
+    src_filename = args['<jsonfile>']
+    generator = args['<module.class>']
+
+    limit = int(args.get('--limit') or -1)
+    
+    sys.path.append(os.getcwd())
+    
+    tokens = generator.split('.')
+    if len(tokens) != 2:
+        raise Exception('The --generator option must be of the format "module.classname".')
+
+    module_name = tokens[0]
+    classname = tokens[1]
+
+    generator_class = common.load_class(classname, module_name)
+    csv_generator = generator_class()
+
+    jsondata = None
+
+    if args['<jsonfile>']:
+        with open_in_place(src_filename, 'r') as f:
+            jsondata = json.loads(f.read())
+
+    else:
+        raw_lines = []
+        for line in read_stdin():
+            raw_lines.append(line)
+        
+        jsondata = json.loads(''.join(raw_lines))
+
+    input_params = {}
+    raw_params = ''
+    if args.get('--params'):
+        raw_param_str = args['--params']
+        input_params = parse_cli_params(raw_param_str)
+
+    record_count = 0
+    header_emitted = False
+    for record in csv_generator.convert(jsondata, delimiter, **input_params):
+
+        # skip the header
+        if record_count == 1 and not header_emitted:
+            record_count = 0
+            header_emitted = True
+            continue
+
+        if record_count == limit:
+            break
+        
+        print(record)
+
+        record_count += 1
+
+    '''
+    print(delimiter.join(get_column_names(jsondata)))
+    for row in row_generator(jsondata):        
+        print(delimiter.join(row))
+    '''
+
+if __name__=='__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

@@ -331,8 +331,8 @@ def json_record_generator(**kwargs):
                 record_count += 1
     else:
         for line in sys.stdin:
-            if not line:
-                break
+            if not len(line.strip()):
+                continue
             if record_count == limit:
                 break
 

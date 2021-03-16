@@ -1,0 +1,183 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    warp (--j2 | --py) [-v] --template-file=<tfile> --show
+    warp (--j2 | --py) [-v] --template=<module.name> --show
+    warp (--j2 | --py) [-v] [-i] --template-file=<tfile> [--macros=<module>] [--macro-args=<name:value>...] [--params=<name:value>...]
+    warp (--j2 | --py) [-v] [-i] --template=<module.name> [--macros=<module>] [--macro-args=<name:value>...] [--params=<name:value>...]
+    warp (--j2 | --py) [-v] --template=<module.name> [--macros=<module>] [--macro-args=<name:value>...] -s
+    warp (--j2 | --py) [-v] --template-file=<tfile> [--macros=<module>] [--macro-args=<name:value>...] -s
+    warp --config <configfile> --profile <profile> [--params=<name:value...>]
+
+Options:
+    --py                Use python style templating
+    --j2                Use Jinja2-style templating
+    --show              Print (but do not process) the template
+    -v --verbatim       Do not resolve embedded expressions (macros and environment vars)
+    -s --stdin          Read params from stdin
+    -i --interactive    Prompt the user to input template parameters 
+'''
+
+import os, sys
+import re
+import json
+import jinja2
+import docopt
+from snap import common
+
+from mercury import utils
+from utils import open_in_place, read_stdin
+from mercury import templateutils
+
+TEMPLATE_VAR_RX = re.compile(r'\{[a-zA-Z0-9_\-]+\}')
+
+debug_mode = False
+
+'''
+def get_template_params_from_user(template_str, **kwargs):
+
+    print('placeholder function for interactive mode', file=sys.stderr)
+    return {}
+    #params = {}
+    #return params
+'''
+
+def main(args):
+    # add the current directory to our PYTHONPATH, 
+    # so that we can load modules from this location dynamically
+    sys.path.append(os.getcwd())
+
+    if args['--j2']:
+        template_mode = 'jinja2'
+    elif args['--py']:
+        template_mode = 'python'
+
+    raw_template_str = None
+
+    # Users may either specify a template file (a plain textfile with a single template as an unquoted string),
+    # or a template module (a regular python module with one to N templates as quoted string constants).
+    #
+    # If the user passes 
+    #
+    #   --template-file=<tfile>
+    #
+    # then we load the template by opening the file and reading its contents.
+    #
+    # If the user passes
+    # 
+    # --template=<module.name>
+    # 
+    # then we load the template by dynamically loading 'module' and accessing its 'name' attribute. 
+    #
+
+    if args.get('--template-file'):
+        with open_in_place(args['--template-file'], 'r') as f:
+            raw_template_str = f.read()
+    else:
+        qualified_name = args['--template']
+        tokens = qualified_name.split('.')
+        if len(tokens) != 2:
+            raise Exception('The --template parameter must be of the form "module.template".')
+
+        module_name = tokens[0]
+        template_name = tokens[1]
+
+        # load_class() is poorly named. It will load any object from a module, 
+        # not just a class. My apologies. --DT
+        #
+        raw_template_str = common.load_class(template_name, module_name)
+        if not isinstance(raw_template_str, str):
+            print(f'### Warp has loaded the templates {template_name} as a {raw_template_str.__class__.__name__} instance.',
+                  file=sys.stderr)
+            raise Exception('A named template specified in a module must be a quoted string.')
+
+    if args['--show']:
+        print(raw_template_str)
+        return
+
+    # Does the template contain any macros? If so, the user must EITHER: 
+    # 
+    # (a) pass the
+    #
+    # --macros=<macro_module>
+    #
+    # command line argument, where <macro_module> is a Python module containing at least one
+    # class which inherits from the Macro abstract base class; OR
+    #
+    # (b) use dot notation to refer to the macro module and function, as in:
+    # 
+    # --params=some_param:~macro[python_module.macro_function]
+    #
+    macro_module_name = args.get('--macros')
+
+    # has the user passed us explicit template parameters?
+    input_params = {}
+    raw_params = ''
+    if args.get('--params'):
+        raw_param_str = args['--params']
+        input_params = utils.parse_cli_params(raw_param_str)
+
+    elif args.get('--stdin'):
+        # read the input params as JSON from stdin
+        
+        raw_param_str = None
+        for line in read_stdin():
+            # only read a single record for now, since we can't process more than one set of params 
+            raw_param_str = line.strip()
+            break
+        input_params = json.loads(raw_param_str)
+
+    
+    if args['--interactive']:
+        # This will launch an interactive command session
+        if template_mode != 'python':
+            print('Interactive mode is only supported for python-style template syntax.')
+            return
+
+        raise Exception('Warp interactive mode not yet supported.')
+        #input_params = get_template_params_from_user(raw_template_str)
+    
+
+    # Does our template refer to any macro functions? If so, evaluate them
+    # (pass whatever explicit macro arguments the user gave us)
+    #
+    macro_args = {}
+    if args.get('--macro-args'):
+        raw_arg_str = args['--macro-args']
+        macro_args = utils.parse_cli_params(raw_arg_str)
+    
+    if debug_mode:
+        print(f'### raw input parameters {input_params}', file=sys.stderr)
+
+
+    template_str = raw_template_str
+
+    if bool(args.get('--verbatim')):
+        template_params = input_params
+
+    else:
+        print(f'### resolving expressions using macro args: {macro_args}', file=sys.stderr)
+        template_str = templateutils.resolve_embedded_expressions(raw_template_str, macro_module_name, **macro_args)
+
+        if args.get('--macros') is not None:
+            template_params = templateutils.process_template_input_params(input_params, args['--macros'], macro_args)
+        else:
+            template_params = templateutils.process_template_input_params(input_params, macro_args)
+ 
+    if debug_mode:
+        print(f'### cooked input parameters: {template_params}', file=sys.stderr)
+
+    if template_mode == 'jinja2':
+        j2env = jinja2.Environment()
+        template_mgr = common.JinjaTemplateManager(j2env)
+        j2template = j2env.from_string(template_str)
+        print(j2template.render(template_params))
+
+    elif template_mode == 'python':
+        print(template_str.format(**template_params))
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

@@ -1,0 +1,69 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    snowexec --account <account> --user <username> --passwd <password> [--params=<n:v>...]
+    snowexec --account <account> --user <username> --passwd <password> --query <query> [--params=<n:v>...]
+    snowexec --account <account> --user <username> --passwd <password> --queryfile <sqlfile> [--params=<n:v>...]
+'''
+
+import os, sys
+from contextlib import contextmanager
+from mercury import utils
+import snowflake.connector
+import docopt
+
+
+@contextmanager 
+def sf_cursor(sf_connection):
+    try:
+        cursor = sf_connection.cursor()
+        yield cursor
+        sf_connection.commit()
+    except:
+        sf_connection.rollback()
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+
+
+def main(args):
+    query = None
+
+    if args['--query']:        
+        query = args['<query>']
+
+    elif args['--queryfile']:        
+        filename = args['<sqlfile>']
+        
+        with utils.open_in_place(filename, 'r') as f:
+            query = f.read()
+    else:
+        # stream from stdin        
+        for line in utils.read_stdin():
+            query = query + line
+
+    if args.get('--params'):
+        query_params = utils.parse_cli_params(args.get('--params') or [])
+        sql_statement = query.format(**query_params)
+    else:
+        sql_statement = query
+
+    sfparams = {}
+    sfparams['user'] = args['<username>']
+    sfparams['password'] = args['<password>']
+    sfparams['account'] = args['<account>']
+
+    sf_ctx = snowflake.connector.connect(**sfparams)
+    resultset = None
+    with sf_cursor(sf_ctx) as cursor:
+        resultset = cursor.execute(sql_statement)
+        
+        for record in resultset:
+            print(record)
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

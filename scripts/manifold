@@ -1,0 +1,103 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    manifold --write --param-generator <module.generator-function> [--inputs=<name:value>...]
+    manifold --read [-n] <paramfile> --warpcmd <command> --outfile-prefix <prefix> --outfile-suffix <suffix>
+    manifold --read [-n] <paramfile> --warpfile <file> --outfile-prefix <prefix> --outfile-suffix <suffix>
+
+Options:
+    -n --noindex   Do not automatically generate index numbers for outfile names
+'''
+
+
+import os, sys
+import json
+import datetime
+import docopt
+from snap import common
+from mercury.utils import open_in_place, parse_cli_params
+from plumbum import local
+
+
+def main(args):    
+    sys.path.append(os.getcwd())
+
+    if args['--write']:
+
+        qualified_name = args['<module.generator-function>']
+        tokens = qualified_name.split('.')
+        if len(tokens) != 2:
+            raise Exception('The --param-generator argument must be of the form "module.funcname".')
+
+        module_name = tokens[0]
+        function_name = tokens[1]
+
+        # load_class() is poorly named. It will load any object from a module, 
+        # not just a class. My apologies. --DT
+        #
+        generator_function = common.load_class(function_name, module_name)
+        generator_inputs = {}
+        raw_params = ''
+        if args.get('--inputs'):
+            raw_param_str = args['--inputs']
+            generator_inputs = parse_cli_params(raw_param_str)
+
+        for raw_paramset in generator_function(**generator_inputs):            
+            print(json.dumps(raw_paramset))
+    
+    elif args['--read']:        
+        warp_command_string = ''
+
+        if args['--warpcmd']:
+            warp_command_string = args['<command>']
+        elif args['--warpfile']:
+            warp_command_file = args['<file>']
+            with open_in_place(warp_command_file, 'r') as f:
+                warp_command_string = f.read()
+        
+        param_filename = args['<paramfile>']        
+        outfile_suffix = args['<suffix>']
+        warp = local['./warp.py']
+        index = 1
+
+        with open_in_place(param_filename, 'r') as f:
+            for line in f:
+                params = json.loads(line)
+
+                # We are giving the user the option to dynamically format manifold's outfile prefix
+                # -- so format it using whatever key/value pairs are in the inbound JSON record
+                #
+                outfile_prefix = args['<prefix>'].format(**params)
+                
+                print(f'params for Warp command: ', file=sys.stderr)
+                print(common.jsonpretty(params), file=sys.stderr)
+
+                print(f'Warp command string: {warp_command_string}', file=sys.stderr)
+
+                cmdstring = warp_command_string.format(**params)
+
+                print(f'FORMATTED Warp command string: {cmdstring}', file=sys.stderr)
+
+                cmd_tokens = cmdstring.split(' ')
+                cmd_params = cmd_tokens[1:]
+
+                print(f'Warp command parameters: {cmd_params}', file=sys.stderr)
+
+                if args['--noindex'] == True:
+                    output_filename = f'{outfile_prefix}{outfile_suffix}'
+                else:
+                    output_filename = f'{outfile_prefix}_{index}{outfile_suffix}'
+
+                print(output_filename)
+
+                with open_in_place(output_filename, 'w') as outfile:
+                    outfile.write(warp(*cmd_params))
+                
+                index += 1
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)
+

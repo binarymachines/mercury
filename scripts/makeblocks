@@ -1,0 +1,1563 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    makeblocks --type <blocktype> <blockname> [--makefile <filename>]
+    makeblocks --type <blocktype> <blockname> --decode [--makefile <filename>]
+    makeblocks --type <blocktype> <blockname> --decode (-s | -i) [--makefile <filename>]
+    makeblocks --type <blocktype> <blockname> --decode --paramfile <file> [--makefile <filename>]
+    makeblocks --type <blocktype> <blockname> --decode --params=<n:v>... [--makefile <filename>]    
+    makeblocks --type <blocktype> --list [--makefile <filename>]
+    makeblocks --type <blocktype> --all [--makefile <filename>]
+    makeblocks --scan [--makefile <filename>]
+    makeblocks --check <targetblock_name> [--makefile <filename>]
+    makeblocks --check [<targetblock_name>] --list [--makefile <filename>]    
+    makeblocks --find --type <blocktype> <blockname> [--makefile <filename>]    
+    makeblocks --copytarget <targetblock_name> [--makefile <filename>]
+    makeblocks --console
+
+Options:
+    -i --interactive  Prompt user for substitution values
+    -s --stdin  Receive template values from stdin
+    -c --console  Run makeblocks in an interactive console session
+'''
+
+#
+# 
+
+import os, sys
+import re
+import uuid
+import subprocess
+from types import FunctionType
+from io import StringIO
+from contextlib import contextmanager
+from collections import namedtuple
+import json
+from mercury.utils import read_stdin
+import docopt
+from docopt import docopt as docopt_func
+from docopt import DocoptExit
+from cmd import Cmd
+from snap import common
+from snap import cli_tools as cli
+from plumbum import local
+from mercury.utils import tab, clear
+
+OPEN_CMD_BLOCK_RX = re.compile(r'\+open-cmdblock\([a-zA-Z0-9_-]+\)')  
+CLOSE_CMD_BLOCK_RX = re.compile(r'\+close-cmdblock')
+
+OPEN_VAR_BLOCK_RX = re.compile(r'\+open-varblock\([a-zA-Z0-9_-]+\)')
+CLOSE_VAR_BLOCK_RX = re.compile(r'\+close-varblock')
+
+OPEN_TARGET_BLOCK_RX = re.compile(r'\+open-targetblock')
+CLOSE_TARGET_BLOCK_RX = re.compile(r'\+close-targetblock')
+
+
+MAKE_ENV_VAR_RX = re.compile(r'\$\$[A-Z0-9_-]+')
+MAKE_VAR_REF_RX = re.compile(r'\$\([a-zA-Z0-9_-]+\)')
+TEMPLATE_VAR_RX = re.compile(r'\{[a-zA-Z0-9_\-]+\}')
+
+AWK_EXPR_RX = re.compile(r'\$\$[0-9]{1}\s+')
+
+CHECKPOINT_RX = \
+re.compile(
+    r'\+checkpoint:[a-zA-Z0-9_-]*\[(var|val)=[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+){0,1}[\s]+test=[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+([\s]+\?[a-zA-Z0-9_-]+=[a-zA-Z0-9_-]+)*\]'
+)
+
+CMD_BLOCK = 'cmd'
+VAR_BLOCK = 'var'
+TARGET_BLOCK = 'target'
+
+VALID_BLOCK_TYPES = [CMD_BLOCK, VAR_BLOCK, TARGET_BLOCK]
+
+BLK_SCRIPT_TEMPLATE = '''
+#!/bin/bash
+
+{command}
+'''
+
+DEBUG_STATE_ENDED = 'ended'
+DEBUG_STATE_RUNNING = 'running'
+
+
+class InvalidCheckpoint(Exception):
+    def __init__(self, checkpoint_string):
+        super().__init__(self, f'Invalid checkpoint declaration syntax: {checkpoint_string}')
+
+
+CheckpointStatus = namedtuple('CheckpointStatus', 'is_ok message')
+
+class Checkpoint(object):
+    def __init__(self, var_designator:str, test_designator:str, name:str=None, **params):
+
+        self._name = name
+        self.parameters = params
+        self.varblock_name = None
+        self.variable = None
+
+        var_tokens = var_designator.split('.')
+
+        if len(var_tokens) == 1:
+            self.variable = var_tokens[0]
+
+        elif len(var_tokens) == 2:
+            self.varblock_name = var_tokens[0]
+            self.variable = var_tokens[1]
+        else:
+            raise Exception('A checkpoint var designator must be in the format <varblock_name.variable_name>')
+
+        test_tokens = test_designator.split('.')
+        if len(test_tokens) != 2:
+            raise Exception('A checkpoint test designator must be in the format <module_name.function_name>')
+
+        self.module_name = test_tokens[0]
+        self.test_function_name = test_tokens[1]
+        self.test_function = common.load_class(self.test_function_name, self.module_name)
+
+    def eval_variable(self, **varblock_data):
+        if self.varblock_name:
+            if varblock_data.haskey(self.variable):
+                return varblock_data[self.variable]
+            else:
+                raise Exception('checkpoint refers to variable "{self.variable}" not found in the reference varblock {self.varblock_name}')
+        else:
+            return self.variable
+        
+    def execute(self, value, **test_params):
+        try:
+            self.test_function(value, **test_params)
+            return CheckpointStatus(is_ok=True, message=None)
+        
+        except AssertionError as err:
+            return CheckpointStatus(is_ok=False, message=str(err))
+
+        except Exception as err:
+            return CheckpointStatus(is_ok=False, message=f'UNCHECKED EXCEPTION: {str(err)}')
+
+    @property
+    def name(self):
+        return self._name or '<anonymous_checkpoint>'
+
+    def __str__(self):
+        return json.dumps({
+            'name': self.name,
+            'source_varblock': self.varblock_name,
+            'variable': self.variable,
+            'test_module': self.module_name,
+            'test_function': self.test_function_name,
+            'parameters': self.parameters  
+        })
+
+
+CheckpointLocation = namedtuple('CheckpointLocation', 'checkpoint line_number')
+
+
+def parse_checkpoint_expression(checkpoint_string: str) -> Checkpoint:
+
+    if not CHECKPOINT_RX.match(checkpoint_string):
+        raise InvalidCheckpoint(f'Bad checkpoint declaration syntax: {checkpoint_string}')
+
+    checkpoint_name = None
+    checkpoint_params = {}
+
+    header = checkpoint_string[0:checkpoint_string.find('[')]
+    body = checkpoint_string[checkpoint_string.find('[')+1: checkpoint_string.find(']')]
+    header_tokens = [tok for tok in header.split(':') if len(tok)]
+    
+    if len(header_tokens) == 2:
+        checkpoint_name = header_tokens[1]    
+
+    body_tokens = [tok for tok in body.split(' ') if len(tok)]
+
+    var_token = body_tokens[0]
+    test_token = body_tokens[1]
+    var_name = var_token.split('=')[1]
+    test_name = test_token.split('=')[1]
+
+    # now read the (optional) parameters
+    if len(body_tokens) > 2:
+        for token in body_tokens[2:]:
+            if not token.startswith('?'):
+                raise InvalidCheckpoint(checkpoint_string)
+        
+            nvtokens = token[1:].split('=')
+            name = nvtokens[0]
+            value = nvtokens[1]
+            checkpoint_params[name] = value
+
+    return Checkpoint(var_name, test_name, checkpoint_name, **checkpoint_params)
+
+
+def load_checkpoint_locations_from_file(fileptr):
+    
+    checkpoint_locations = []
+    line_number = 0
+    for line in fileptr.readlines():
+        line_number += 1
+
+        match_ckpt_expr = CHECKPOINT_RX.search(line)
+        if match_ckpt_expr:         
+            checkpoint_string = line[match_ckpt_expr.span()[0]:match_ckpt_expr.span()[1]]                   
+            ckpt = parse_checkpoint_expression(checkpoint_string)
+            checkpoint_locations.append(CheckpointLocation(checkpoint=ckpt, line_number=line_number))
+                
+    return checkpoint_locations
+
+
+
+DecodedCommandBlock = namedtuple('DecodedCommandBlock', 'command_template param_list' )
+DebugStep = namedtuple('DebugStep', 'name command_block')
+DebugStatus = namedtuple('DebugStatus', 'session_state num_steps current_step next_step')
+
+
+class DebugSession(object):
+    def __init__(self, target_name: str, scriptfile_generator_func: FunctionType, **makevars):
+        
+        self.target_name = target_name
+        self.vardata = makevars
+        self.steps = []
+        self._index = 0
+        self.working_directory = '.'
+        self.generate_scriptfile_name = scriptfile_generator_func
+
+    def set_vars(self, **kwargs):
+        self.vardata.update(kwargs)
+
+    def add_step(self, name: str, cmd_block: DecodedCommandBlock):
+        self.steps.append(DebugStep(name=name, command_block=cmd_block))
+
+    def reset(self):
+        self.index = 0
+
+    def exec(self, cmd_block_name, stdout_fileptr=sys.stdout, stderr_fileptr=sys.stdout) -> DebugStatus:
+        pass
+
+    def step(self, stdout_fileptr=sys.stdout, stderr_fileptr=sys.stdout) -> DebugStatus:
+        
+        if self._index == -1:
+            return DebugStatus(session_state='ended',
+                               num_steps=len(self.steps),
+                               current_step=-1,
+                               next_step=0)
+
+
+        step = self.steps[self._index]
+
+        cmd = step.command_block
+        live_command = cmd.command_template.format(**self.vardata)
+        block_script_filename = self.generate_scriptfile_name(step.name)
+
+        print(f'+++ Generating tempfile: {block_script_filename}...')
+        with open(block_script_filename, 'w') as f:
+            f.write(BLK_SCRIPT_TEMPLATE.format(command=live_command))
+
+        print(f'+++ Executing command block ({step.name}):\n{live_command}')
+        
+        subprocess.call(['bash', f'{self.working_directory}/{block_script_filename}'],
+                        stdout=stdout_fileptr,
+                        stderr=stderr_fileptr)
+
+        os.remove(f'{self.working_directory}/{block_script_filename}')
+        
+        if self._index == len(self.steps) - 1:
+            prev_index = self._index
+            self._index = -1              
+            return DebugStatus(session_state=DEBUG_STATE_ENDED,
+                               num_steps=len(self.steps),
+                               current_step=prev_index,
+                               next_step=self._index)
+        else:
+            prev_index = self._index
+            self._index += 1
+            return DebugStatus(session_state=DEBUG_STATE_RUNNING,
+                               num_steps=len(self.steps),
+                               current_step=prev_index,
+                               next_step=self._index)
+            
+
+class ConsoleCLI(Cmd):
+    def __init__(self,
+                 name,
+                 makefile_name='Makefile',
+                 **kwargs):
+
+        Cmd.__init__(self)
+        self.name = name
+        self.prompt = '_[%s]> ' % (self.name)
+        self.makefile_name = makefile_name
+
+        self.data = {
+            'var_blocks': load_blocks(VAR_BLOCK, self.makefile_name),
+            'cmd_blocks': load_blocks(CMD_BLOCK, self.makefile_name),
+            'target_blocks': load_blocks(TARGET_BLOCK, self.makefile_name)
+        }
+
+        self.workspace = {
+            'sessions':{}  # DebugSession objects
+        }
+
+    @contextmanager
+    def docopt_parse(self, usage_string, *cmd_args):
+      try:
+        args = docopt.docopt(usage_string, *cmd_args)
+        yield args, None            
+
+      except DocoptExit as e:
+        # The DocoptExit is thrown when the args do not match.
+        # We print a message to the user and the usage block.
+
+        error_msg = '\nPlease specify one or more valid command parameters.\n%s\n' % e
+        yield None, error_msg
+
+      except SystemExit as e:
+        # The SystemExit exception prints the usage for --help
+        # We do not need to do the print here.
+        raise
+
+
+    def generate_scriptfile_name(self, blockname):
+        id = uuid.uuid4()
+        return f'mbscript-{id}.sh'
+
+
+    def find_block(self, blockname, blocktype):
+
+        block_table = None
+        if blocktype == VAR_BLOCK:
+            block_table = self.data['var_blocks']
+            
+        elif blocktype == CMD_BLOCK:
+            block_table = self.data['cmd_blocks']
+            
+        return block_table.get(blockname)
+    
+
+    def block_select_menu(self, block_type):
+
+        if block_type not in VALID_BLOCK_TYPES:
+            raise Exception(f'Undefined block type {block_type}. Supported types are {", ".join(VALID_BLOCK_TYPES)}')
+
+        menudata = []
+        
+        if block_type == CMD_BLOCK:
+            blocktable = self.data['cmd_blocks']
+
+        elif block_type == VAR_BLOCK:
+            blocktable = self.data['var_blocks']
+
+        elif block_type == TARGET_BLOCK:
+            blocktable = self.data['target_blocks']
+
+        for key, value in blocktable.items():
+            menudata.append({'label': key, 'value': key})
+                
+        if block_type == CMD_BLOCK:
+            return cli.MenuPrompt('select command block to load', menudata)
+
+        elif block_type == VAR_BLOCK:
+            return cli.MenuPrompt('select variable block to load', menudata)
+        
+        elif block_type == TARGET_BLOCK:
+            return cli.MenuPrompt('select target block to load', menudata)
+
+
+    @property
+    def usage_string_for_read(self):
+        template = '''Usage:
+        read (cmd | var) <blockname>
+        '''
+        return template
+
+
+    def do_read(self, *cmd_args):
+        '''Read the contents of the named block
+        '''
+
+        with self.docopt_parse(self.usage_string_for_read, *cmd_args) as (args, error):
+            if error:
+                print(error)
+                return
+
+            block_type = CMD_BLOCK if args['cmd'] else VAR_BLOCK
+
+            blockname = args['<blockname>']
+            if blockname == '?':
+                blockname = self.block_select_menu(block_type).show()
+
+            if not blockname:
+                return
+
+            block = self.find_block(blockname, block_type)
+            if block:
+                print('\n'.join(block.lines))
+            else:
+                print(f'No {block_type}-type block {blockname} declared in source makefile.')
+        
+
+    @property
+    def usage_string_for_decode(self):
+        template = '''Usage:
+        decode <cmd_block_name> [-x]
+        decode <cmd_block_name> with <var_block_name> [-x]
+        '''
+        return template
+
+
+    def do_decode(self, *cmd_args):
+        '''Decode a command block, using the variables in the specified variable block if necessary
+        '''
+
+        with self.docopt_parse(self.usage_string_for_decode, *cmd_args) as (args, error):
+            if error:
+                print(error)
+                return
+                
+            blockname = args['<cmd_block_name>']
+            if blockname == '?':
+                blockname = self.block_select_menu(CMD_BLOCK).show()
+                if not blockname:
+                    return
+
+            cmd_block = self.find_block(blockname, CMD_BLOCK)
+            if not cmd_block:
+                print(f'No command block "{blockname}" found in source makefile.')
+                return
+
+            if args['with']:
+                varbuffer = self.find_block(args['<var_block_name>'], VAR_BLOCK)
+                if not varbuffer:
+                    print(f'No var block "{blockname}" found in source makefile.')
+                    return
+
+                var_data = decode_blockbuffer(varbuffer, VAR_BLOCK)
+                decoded_command = decode_blockbuffer(cmd_block, CMD_BLOCK)
+                live_command = decoded_command.command_template.format(**var_data)
+
+                # if the command was invoked with the "execute" option, run the command
+                if args['-x']:
+                    block_script_filename = self.generate_scriptfile_name(blockname)
+
+                    print(f'+++ Generating tempfile: {block_script_filename}...')
+                    with open(block_script_filename, 'w') as f:
+                        f.write(BLK_SCRIPT_TEMPLATE.format(command=live_command))
+
+                    print(f'+++ Executing command block ({blockname}):\n{live_command}')
+                    
+                    subprocess.call(['bash', f'./{block_script_filename}'], stdout=sys.stdout, stderr=sys.stdout)
+                    os.remove(block_script_filename)
+
+                    print('\n+++ Done.\n')
+
+                # otherwise, print the populated command template
+                else:
+                    print(live_command)
+            else:
+                # show the command block, transformed into a Python-style template
+                # (if it references make variables)
+
+                decoded_command = decode_blockbuffer(cmd_block, CMD_BLOCK)
+                print(decoded_command.command_template)
+
+
+    @property
+    def usage_string_for_inspect(self):
+        template = '''Usage:
+        inspect <varblock_name>
+        '''
+        return template
+
+
+    def do_inspect(self, *cmd_args):
+        '''Inspect a variable block
+        '''
+
+        with self.docopt_parse(self.usage_string_for_inspect, *cmd_args) as (args, error):
+            
+            if error:
+                print(error)
+                return
+
+            blkstring = args['<varblock_name>']
+            # when inspecting a var block, users have the option of using dot notation ("blockname.varname")
+            # to get at a single variable in the block
+
+            tokens = blkstring.split('.')
+            if len(tokens) == 1:
+                blockname = tokens[0]
+
+                if blockname == '?':
+                    blockname = self.block_select_menu(VAR_BLOCK).show()
+
+                if not blockname:
+                    return
+
+                varblock = self.data['var_blocks'].get(blockname)
+
+                if not varblock:
+                    print(f'No variable block "{blockname}" loaded.')
+                    return
+                
+                blockdata = decode_blockbuffer(varblock, VAR_BLOCK)
+                print(common.jsonpretty(blockdata))
+            
+            if len(tokens) == 2:
+                blockname = tokens[0]
+                varname = tokens[1]
+
+                varblock = self.data['var_blocks'].get(blockname)
+                if not varblock:
+                    print(f'No variable block "{blockname}" loaded.')
+                    return
+
+                blockdata = decode_blockbuffer(varblock, VAR_BLOCK)
+                var_value = blockdata.get(varname)
+                if var_value is None:
+                    print(f'No variable "{varname}" in variable block "{blockname}".')
+                    return
+
+                print(f'{varname}: {var_value}')
+
+            if len(tokens) > 2:
+                print('To inspect an individual variable, please specify it in the form "blockname.varname".')
+                return
+
+
+    def session_select_menu(self):
+        menudata = []
+        
+        for key, value in self.workspace['sessions'].items():
+            menudata.append({'label': key, 'value': key})
+                
+        return cli.MenuPrompt('select saved debugging session to load', menudata)
+
+    
+    @property
+    def usage_string_for_resume(self):
+        template = '''Usage:
+        resume <debug_session_id>
+        '''
+        return template
+
+
+    def do_resume(self, *cmd_args):
+        '''Continue a paused step-debugging session
+        '''
+
+        with self.docopt_parse(self.usage_string_for_resume, *cmd_args) as (args, error):
+            if not error:
+
+                if not len(self.workspace['sessions'].items()):
+                    print('No saved debugging sessions available. Start one by issuing the "step" command.')
+                    return
+
+                session_id = args['<debug_session_id>']
+                
+                if session_id == '?':
+                    session_id = self.session_select_menu().show()
+
+                if not session_id:
+                    return
+                
+                should_start = cli.InputPrompt(f'Resume step-debugging make target ({session_id}) [Y/n]? ', 'Y').show()
+                if should_start.lower() != 'y':
+                    return
+                
+                session = self.workspace['sessions'][session_id]
+
+                while True:  
+                    status = session.step()
+                    print(common.jsonpretty(status._asdict()))
+                    if status.session_state == DEBUG_STATE_ENDED:
+                        print(f'\n+++ All command blocks in make target ({session_id}) executed.\n')
+                        break
+
+                    should_continue = cli.InputPrompt('Continue [Y/n]? ', 'Y').show()
+                    if should_continue.lower() == 'y':
+                        continue
+                    else:
+                        # save the session -- we can resume it later
+                        self.workspace['sessions'][session_id] = session
+                        break
+            else:
+                print(error)
+
+    @property
+    def usage_string_for_step(self):
+        template = '''Usage:
+        step <target_name>
+        '''
+        return template
+
+
+    def do_step(self, *cmd_args):
+        '''Step through an instrumented make target
+        '''
+
+        with self.docopt_parse(self.usage_string_for_step, *cmd_args) as (args, error):
+            if not error:                
+                target_name = args['<target_name>']
+                
+                if target_name == '?':
+                    target_name = self.block_select_menu(TARGET_BLOCK).show()
+
+                if not target_name: 
+                    return
+
+                blockbuffer = self.data['target_blocks'].get(target_name)
+                if not blockbuffer:
+                    print(f'No target block "{target_name}" declared in source makefile.')
+                    return
+
+                print(f'\n+++ Scanning target ({target_name})...\n')
+
+                target_block = parse_target_buffer(blockbuffer)
+                block_content = '\n'.join(target_block['body'])
+
+                # scan the body of the target block
+                virtual_file = StringIO(block_content)
+
+                # Ideally there should be only one varblock defined within a target, 
+                # but it is legal to define more than one. If there should be more than one,
+                # their contents will be merged in a single dictionary here. This means that
+                # if variable V_X is defined in varblock-a and varblock-b, the value of V_X
+                # in varblock-b will appear in the dictionary below if varblock-b lexically 
+                # follows varblock-a in the makefile.
+                # 
+                vardata = {}
+                varbuffers = load_blocks_from_file(virtual_file, VAR_BLOCK)
+                for name, buffer in varbuffers.items():
+                    vardata.update(decode_blockbuffer(buffer, VAR_BLOCK))
+
+                print(f'\n+++ Variable data found in target block:\n')
+                print(common.jsonpretty(vardata))
+
+                # create a session object to store context
+                #
+                session = DebugSession(target_name, self.generate_scriptfile_name, **vardata)
+               
+                # we are re-scanning the target's content for command-type blocks,
+                # so reset the filepointer to the beginning
+                #                 
+                virtual_file.seek(0, 0)
+                cmdbuffers = load_blocks_from_file(virtual_file, CMD_BLOCK)
+
+                print(f'+++ {len(cmdbuffers)} command blocks found in make target.\n')
+
+                for name, buffer in cmdbuffers.items():
+                    decoded_block = decode_blockbuffer(buffer, CMD_BLOCK)
+                    session.add_step(name, decoded_block)
+                
+                should_start = cli.InputPrompt(f'Begin step-debugging make target ({target_name}) [Y/n]? ', 'Y').show()
+                if should_start.lower() != 'y':
+                    return
+
+                while True:  
+                    status = session.step()
+                    print(common.jsonpretty(status._asdict()))
+                    if status.session_state == DEBUG_STATE_ENDED:
+                        print(f'\n+++ All command blocks in make target ({target_name}) executed.\n')
+                        break
+
+                    should_continue = cli.InputPrompt('Continue [Y/n]? ', 'Y').show()
+                    if should_continue.lower() == 'y':
+                        continue
+                    else:
+                        # save the session -- we can resume it later
+                        print(f'\n+++ Saving debug session with ID ({target_name}). Continue it at any time by issuing the "resume" command.\n')
+                        self.workspace['sessions'][target_name] = session
+                        break
+            else:
+                print(error)
+
+    @property
+    def usage_string_for_lsvar(self):
+        template = '''Usage:
+        lsvar [<regex>]
+        '''
+        return template
+
+    def do_lsvar(self, *cmd_args):
+        '''List all variable blocks in the source makefile
+        ''' 
+        with self.docopt_parse(self.usage_string_for_lsvar, *cmd_args) as (args, error):
+            if not error:
+                #blockbuffers = load_blocks(VAR_BLOCK, self.makefile_name)
+                blockbuffers = self.data['var_blocks']
+                for key, value in blockbuffers.items():
+                    print(key)
+            else:
+                print(error)
+
+
+    @property
+    def usage_string_for_lscmd(self):
+        template = '''Usage:
+        lscmd [<regex>]
+        '''
+        return template
+
+
+    def do_lscmd(self, *cmd_args):
+        '''List all command blocks in the source makefile
+        ''' 
+        with self.docopt_parse(self.usage_string_for_lscmd, *cmd_args) as (args, error):
+            if not error:
+                blockbuffers = load_blocks(CMD_BLOCK, self.makefile_name)
+                for key, value in blockbuffers.items():
+                    print(key)
+            else:
+                print(error)
+
+    
+    def do_quit(self, *cmd_args):
+        '''Exit the program
+        '''
+        print('%s CLI exiting.' % self.name)        
+        raise SystemExit
+
+    do_q = do_quit
+
+    def do_cls(self, *cmd_args):
+      '''Clear the screen'''
+      clear()
+
+
+class Blockbuffer(object):
+    def __init__(self, name: str, block_type: str, line: int):
+        self.name = name
+        self.block_type = block_type
+        self.start_linenumber = line
+        self._lines = []
+
+    def append(self, line: str):
+        self._lines.append(line)
+
+    @property
+    def lines(self):
+        return [l.lstrip('#') for l in self._lines]
+
+    
+    @property
+    def data(self):
+        if self.block_type == CMD_BLOCK:
+            return ''.join(line for line in self.lines if not line.startswith('#')).replace('\\', '')
+
+        elif self.block_type == VAR_BLOCK:
+            return '\n'.join(line for line in self.lines if not line.startswith('#'))
+
+        elif self.block_type == TARGET_BLOCK:
+            return self. _lines
+
+
+
+def find_keys(cmd_template: str) -> list:
+    keys = set()
+    for exp in TEMPLATE_VAR_RX.findall(cmd_template):        
+        keys.add(exp.lstrip('{').rstrip('}'))
+
+    return list(keys)
+
+
+
+def parse_eval_expression(expr: str) -> tuple:
+    raw_line = expr.lstrip('$(eval').rstrip(')')
+
+    index = raw_line.find('=')
+    key = raw_line[0:index].strip()        
+    var_expression = raw_line[index+1:].strip()
+
+    if var_expression.startswith('$(shell'):
+        shell_command_str = var_expression.lstrip('$(shell').rstrip(')').strip()
+        cmd_tokens = shell_command_str.split(' ')
+        shell_cmd = local[cmd_tokens[0]]    
+        shell_cmd_params = cmd_tokens[1:]
+
+        if 'curl' in cmd_tokens[0]:
+            #from sh import curl
+            #cmd_output = curl(*cmd_tokens)
+
+            shell_cmd = local['curl']
+            cmd_output = shell_cmd(*shell_cmd_params)
+            return key, cmd_output.strip()
+        else:
+            cmd_output = shell_cmd(*shell_cmd_params)
+            return key, cmd_output.strip()
+
+    else:
+        return key, var_expression
+
+
+def substitute_make_vars(makeblock_expr: str, **kwargs) -> str:
+
+    matches = MAKE_VAR_REF_RX.findall(makeblock_expr)
+    for var_ref in set(matches):        
+        varname = var_ref.lstrip('$(').rstrip(')')
+        makeblock_expr = makeblock_expr.replace(var_ref, kwargs[varname])
+    
+    return makeblock_expr
+
+
+def parse_command_buffer(buffer: Blockbuffer) -> DecodedCommandBlock:
+    blocktext = '\n'.join(line.strip('\n') for line in buffer.lines if not line.startswith('#'))
+    cmd_template = blocktext.replace('$(', '{').replace(')', '}')
+
+    # Edge case: any awk expression found in a makefile must use a double dollar-sign;
+    # this will be followed by a numeric digit. Replace the double dollar sign 
+    # with a single one
+    #
+    for match in AWK_EXPR_RX.finditer(cmd_template):
+        ref = cmd_template[match.span()[0]:match.span()[1]]
+        cmd_template = cmd_template.replace(ref, ref[1:])
+
+    # Environment variables are referenced in make targets using a double dollar sign;
+    # replace with a single one
+    #
+    for match in MAKE_ENV_VAR_RX.finditer(cmd_template):
+        ref = cmd_template[match.span()[0]:match.span()[1]]
+        cmd_template = cmd_template.replace(ref, ref[1:])
+
+
+    keys = find_keys(cmd_template)
+
+    return DecodedCommandBlock(command_template=cmd_template, param_list=keys)
+
+
+def parse_target_buffer(buffer: Blockbuffer) -> dict:
+    
+    output = {
+        'name': buffer.name,
+        'dependencies': [],
+        'body': []
+    }
+
+    declaration_line = False
+    continuing_decl = False
+    target_declaration_found = False
+
+    for raw_line in buffer.data:
+        line = raw_line.rstrip()
+
+        if not len(line):
+            continue
+
+        if not target_declaration_found:
+            if line[0].isalpha and ':' in line:
+                declaration_line = True
+                target_declaration_found = True
+
+                line_tokens = line.split(':')
+                non_name_tokens = line_tokens[1:]
+                for tok in non_name_tokens:
+                    tok = tok.strip()
+                    if len(tok):
+                        # is it an intentional break at the end?
+                        if tok[-1] == '\\':
+                            continuing_decl = True
+                            output['dependencies'].append(tok.strip('\\').strip())
+                        else:
+                            output['dependencies'].append(tok)
+            
+        
+        elif continuing_decl:
+            if line[-1] == '\\':
+                
+                line_tokens = line.split(' ')
+                for lt in line_tokens:
+                    depname = lt.strip().rstrip('\\')
+                    if len(depname):
+                        output['dependencies'].append(depname)
+
+            else:
+                line_tokens = line.split(' ')
+                for lt in line_tokens:
+                    depname = lt.strip().rstrip('\\')
+                    if len(depname):
+                        output['dependencies'].append(depname)
+
+                continuing_decl = False
+                
+        else:
+            output['body'].append(line)
+            continuing_decl = False
+
+    return output
+
+
+def parse_variable_buffer(buffer: Blockbuffer) -> dict:
+
+    block_text = '\n'.join(line.strip('\n') for line in buffer.lines if not line.startswith('#'))
+    raw_var_decl_lines = []
+    output = {}
+
+    for line in block_text.split('\n'):        
+        if line.startswith('$(eval'):
+            
+            # resolve references to environment variables
+            #
+            env_vars = {}
+
+            for match in re.finditer(AWK_EXPR_RX, line):
+                ref = line[match.span()[0]:match.span()[1]]
+                line = line.replace(ref, ref[1:])
+
+            
+            for match in re.finditer(MAKE_ENV_VAR_RX, line):
+
+                var_ref = line[match.span()[0]:match.span()[1]]
+
+                # In a makefile, env vars are referenced with a double dollar sign--strip it out
+                env_var_name = var_ref.lstrip('$$')
+
+                # try to resolve it and fail if we cannot
+                env_var_value = os.getenv(env_var_name)
+                if not env_var_value:
+                    raise common.MissingEnvironmentVarException(env_var_name)
+
+                env_vars[env_var_name] = env_var_value
+            
+            for key, value in env_vars.items():
+                line = line.replace(f'$${key}', value)
+            
+            raw_var_decl_lines.append(line)
+
+    # first, distinguish between the var declaration lines which themselves refer 
+    # to another Makefile variable ("dirty") and those which do not ("clean")
+    #
+    clean_var_decl_lines = []
+    dirty_var_decl_lines = []
+
+    for eval_expr in raw_var_decl_lines:        
+        expr_body = ' '.join(eval_expr.split(' ')[1:])        
+        makevar_match = MAKE_VAR_REF_RX.search(expr_body)
+
+        if makevar_match:            
+            dirty_var_decl_lines.append(eval_expr)
+        else:            
+            clean_var_decl_lines.append(eval_expr)
+
+    # populate a dictionary with the "clean" variable declarations
+    #
+    root_variable_values = {}
+    for line in clean_var_decl_lines:
+        # resolve references to environment variables
+        #
+        env_vars = {}
+
+        for match in re.finditer(AWK_EXPR_RX, line):
+            ref = line[match.span()[0]:match.span()[1]]
+            line = line.replace(ref, ref[1:])
+
+        
+        for match in re.finditer(MAKE_ENV_VAR_RX, line):
+
+            var_ref = line[match.span()[0]:match.span()[1]]
+
+            # In a makefile, env vars are referenced with a double dollar sign--strip it out
+            env_var_name = var_ref.lstrip('$$')
+
+            # try to resolve it and fail if we cannot
+            env_var_value = os.getenv(env_var_name)
+            if not env_var_value:
+                raise common.MissingEnvironmentVarException(env_var_name)
+
+            env_vars[env_var_name] = env_var_value
+        
+        for key, value in env_vars.items():
+            line = line.replace(f'$${key}', value)
+
+        key, value = parse_eval_expression(line)
+        root_variable_values[key] = value
+
+    output.update(root_variable_values)
+
+    # if we found any "root variable values" (variables which do not depend on the value
+    # of others), satisfy the variable refs which depend on them
+    #
+    var_decl_lines = []
+    for eval_exp in dirty_var_decl_lines:
+        var_decl_lines.append(substitute_make_vars(eval_exp, **root_variable_values))
+
+    for eval_exp in var_decl_lines:
+        raw_line = eval_exp.lstrip('$(eval').rstrip(')')
+
+        index = raw_line.find('=')
+        key = raw_line[0:index].strip()
+        var_expression = raw_line[index+1:].strip()
+
+        if var_expression.startswith('$(shell'):
+            shell_command_str = var_expression.lstrip('$(shell').rstrip(')').strip()
+
+            cmd_tokens = shell_command_str.split(' ')
+            shell_cmd = local[cmd_tokens[0]]
+            shell_cmd_params = cmd_tokens[1:]
+            
+            if shell_cmd == 'curl':
+                from sh import curl
+                cmd_output = curl(*cmd_tokens)                
+            else:
+                cmd_output = shell_cmd(*shell_cmd_params)
+
+            #cmd_output = shell_cmd(*shell_cmd_params)
+            output[key] = cmd_output.strip()
+
+        else:
+            output[key] = var_expression
+
+        #print(f'### VAR decl expression: {var_expression}', file=sys.stderr)
+
+    return output
+
+
+def receive_params_from_stdin():
+    buffer = []
+    json_string = None
+    for line in read_stdin():
+        buffer.append(line)
+        json_string = ''.join(buffer)
+    template_params = json.loads(json_string)
+    return template_params
+
+
+BLOCK_OPEN = 'open'
+BLOCK_CLOSE = 'close'
+
+BlockMarker = namedtuple('BlockMarker', 'name block_type mark_type line_number')
+
+
+def find_block_errors(block_markers: list, block_type: str):
+    
+    current_blockname = None
+    blocktbl = {}
+    errors = []
+    previous_marker = None
+
+    for m in block_markers:
+        if previous_marker:
+            # Report possible overlapping blocks (a block which is opened before the previous block
+            # was closed, is said to overlap its predecessor)
+            #
+            if m.mark_type == BLOCK_OPEN and previous_marker.mark_type != BLOCK_CLOSE:
+                err_clauses = []
+                err_clauses.append(f'({previous_marker.name}) opened at line {previous_marker.line_number}')
+                err_clauses.append(f'({m.name}) opened at line {m.line_number}')
+
+                errors.append(f'Possible overlapping blocks: {err_clauses[0]} and {err_clauses[1]}')
+
+        if blocktbl.get(m.name):            
+            blocktbl[m.name].append(m)
+        else:
+            blocktbl[m.name] = [m]
+
+        previous_marker = m
+
+    '''
+    if block_type == TARGET_BLOCK:
+        print(blocktbl)
+        return
+    '''
+
+    for block_name, markers in blocktbl.items():
+        # Report blocks which were opened but never closed
+        # 
+        if len(markers) < 2:
+            errors.append(f'Unterminated {markers[0].block_type} block ({block_name}) at line {markers[0].line_number}')
+
+        # Report blocks which were opened or closed more than once
+        #
+        if len(markers) >= 2:            
+            num_opens = 0
+            num_closes = 0
+            for m in markers:
+                if m.mark_type == BLOCK_OPEN:
+                    num_opens += 1
+                if m.mark_type == BLOCK_CLOSE:
+                    num_closes += 1
+
+            if num_opens > 1:                
+                open_lines = ', '.join([str(m.line_number) for m in markers if m.mark_type == BLOCK_OPEN])
+                errors.append(f'Possible duplicate {m.block_type} block ({block_name}): opened at line(s) {open_lines}')
+
+            if num_closes > 1:                
+                open_lines = ', '.join([str(m.line_number) for m in markers if m.mark_type == BLOCK_OPEN])
+                close_lines = ', '.join([str(m.line_number) for m in markers if m.mark_type == BLOCK_CLOSE])
+                errors.append(f'Possible unmatched closure for {m.block_type} block ({block_name}): opened at line(s) {open_lines}, closed at line(s) {close_lines}')
+
+    return errors
+
+
+def scan_makefile(makefile_name='Makefile', **kwargs) -> dict:
+
+    num_var_blocks = 0
+    num_cmd_blocks = 0
+    num_target_blocks = 0
+    num_checkpoints = 0
+
+    block_errors = 0
+    var_block_names = []
+    cmd_block_names = []
+    target_block_names = []
+
+    block_status = {
+        CMD_BLOCK: [],
+        VAR_BLOCK: [],
+        TARGET_BLOCK: []
+    }
+
+    with open(makefile_name, 'r') as f:
+        cmd_block_name = None
+        var_block_name = None
+
+        target_block_name = None
+        target_block_start_line = -1
+        target_block_reading_frame_open = False
+        target_declaration_found = False
+
+        line_num = 0
+        for line in f:
+            line_num += 1
+
+            # Do this at the top of the for loop
+
+            # This condition will be True if we have already seen an +open-targetblock marker in the file.
+            # We have to place this logic outside of the marker-detection code segment because of how target-type
+            # blocks are named. Unlike var and cmd blocks, the name of a target block is never on the same line
+            # as the block-declaration; its name is the name of the make target which the block encloses.
+            #
+            if target_block_reading_frame_open:                
+                if line[0].isalpha and ':' in line: # detect the start of a make target
+                    if not line[0] in  ['\t', '$', '#']:  
+                        tokens = line.split(':')
+                        block_name = tokens[0]
+                        target_block_name = block_name
+                        target_block_names.append(block_name)
+
+                        block_status[TARGET_BLOCK].append(BlockMarker(name=target_block_name,
+                                                                        block_type=TARGET_BLOCK,
+                                                                        mark_type='open',
+                                                                        line_number=target_block_start_line))
+                        target_declaration_found = True
+                
+            match_open_expr = OPEN_CMD_BLOCK_RX.search(line)
+            if match_open_expr:
+                block_decl = line[match_open_expr.span()[0]:match_open_expr.span()[1]]
+                cmd_block_name = block_decl.split('(')[1].rstrip(')')
+
+                num_cmd_blocks += 1
+                cmd_block_names.append(cmd_block_name)
+                
+                block_status[CMD_BLOCK].append(BlockMarker(name=cmd_block_name,
+                                                       block_type=CMD_BLOCK,
+                                                       mark_type='open',
+                                                       line_number=line_num))                               
+                continue
+
+            match_close_expr = CLOSE_CMD_BLOCK_RX.search(line)
+            if match_close_expr:                
+                block_status[CMD_BLOCK].append(BlockMarker(name=cmd_block_name,
+                                                           block_type=CMD_BLOCK,
+                                                           mark_type='close',
+                                                           line_number=line_num))
+                continue
+
+            match_open_expr = OPEN_VAR_BLOCK_RX.search(line)
+            if match_open_expr:
+                block_decl = line[match_open_expr.span()[0]:match_open_expr.span()[1]]
+                var_block_name = block_decl.split('(')[1].rstrip(')')
+
+                num_var_blocks += 1
+                var_block_names.append(var_block_name)
+                
+                block_status[VAR_BLOCK].append(BlockMarker(name=var_block_name,
+                                                          block_type=VAR_BLOCK,
+                                                          mark_type='open',
+                                                          line_number=line_num))
+                continue
+
+            match_close_expr = CLOSE_VAR_BLOCK_RX.search(line)
+            if match_close_expr:
+                block_status[VAR_BLOCK].append(BlockMarker(name=var_block_name,
+                                                          block_type=VAR_BLOCK,
+                                                          mark_type='close',
+                                                          line_number=line_num))
+                continue
+
+            match_open_expr = OPEN_TARGET_BLOCK_RX.search(line)
+            if match_open_expr:
+                target_block_start_line = line_num      # save the line number; we'll need it later
+                target_block_reading_frame_open = True
+                num_target_blocks += 1
+
+                # We cannot create a BlockMarker yet, because unlike other block types,
+                # a target-block's name is not declared on the same line as the marker;
+                # the block name is always the name of the make target it encloses.
+
+                continue
+
+            match_close_expr = CLOSE_TARGET_BLOCK_RX.search(line)
+            if match_close_expr:
+                target_block_reading_frame_open = False
+                target_declaration_found = False
+                target_block_start_line = -1
+                block_status[TARGET_BLOCK].append(BlockMarker(name=target_block_name,
+                                                              block_type=TARGET_BLOCK,
+                                                              mark_type='close',
+                                                              line_number=line_num))
+                continue                                                              
+
+    var_block_errors = find_block_errors(block_status[VAR_BLOCK], VAR_BLOCK)
+    cmd_block_errors = find_block_errors(block_status[CMD_BLOCK], CMD_BLOCK)
+    target_block_errors = find_block_errors(block_status[TARGET_BLOCK], TARGET_BLOCK)
+
+    status_tbl = {
+        'var_block_count': num_var_blocks,
+        'command_block_count': num_cmd_blocks,
+        'target_block_count': num_target_blocks,
+        'error_count': len(var_block_errors) + len(cmd_block_errors) + len(target_block_errors),
+        'errors': {
+            'var_blocks': var_block_errors,
+            'cmd_blocks': cmd_block_errors,
+            'target_blocks': target_block_errors
+        },
+        'var_blocks': var_block_names,
+        'command_blocks': cmd_block_names,
+        'target_blocks': target_block_names
+    }
+
+    return status_tbl
+
+
+def load_blocks_from_file(fileobj, block_type):
+
+    blockbuffers = {}
+    reading_frame_open = False
+    linenum = 0
+
+    if block_type == CMD_BLOCK:
+        block_name = None
+        for line in fileobj:
+            linenum += 1
+            match_open_expr = OPEN_CMD_BLOCK_RX.search(line)
+            if match_open_expr:
+                block_decl = line[match_open_expr.span()[0]:match_open_expr.span()[1]]
+                block_name = block_decl.split('(')[1].rstrip(')')
+
+                blockbuffers[block_name] = Blockbuffer(block_name, CMD_BLOCK, linenum)
+                reading_frame_open = True
+                continue
+
+            match_close_expr = CLOSE_CMD_BLOCK_RX.search(line)
+            if match_close_expr:
+                reading_frame_open = False
+                block_name = None
+                continue
+
+            if reading_frame_open:
+                blockbuffers[block_name].append(line.strip())
+    
+    elif block_type == VAR_BLOCK:
+        block_name = None
+        for line in fileobj:
+            linenum += 1
+            match_open_expr = OPEN_VAR_BLOCK_RX.search(line)
+            if match_open_expr:
+                block_decl = line[match_open_expr.span()[0]:match_open_expr.span()[1]]
+                block_name = block_decl.split('(')[1].rstrip(')')
+
+                blockbuffers[block_name] = Blockbuffer(block_name, VAR_BLOCK, linenum)
+                reading_frame_open = True
+                continue
+
+            match_close_expr = CLOSE_VAR_BLOCK_RX.search(line)
+            if match_close_expr:
+                reading_frame_open = False
+                block_name = None
+                continue
+
+            if reading_frame_open:
+                blockbuffers[block_name].append(line.strip())
+
+    elif block_type == TARGET_BLOCK:
+        target_block_name = None
+        block_name = None
+        target_declaration_found = False
+        for line in fileobj:
+            linenum += 1
+            match_open_expr = OPEN_TARGET_BLOCK_RX.search(line)
+            if match_open_expr:
+                reading_frame_open = True
+                continue
+
+            match_close_expr = CLOSE_TARGET_BLOCK_RX.search(line)
+            if match_close_expr:                
+                reading_frame_open = False
+                target_declaration_found = False
+                block_name = None
+                continue
+
+            if reading_frame_open:
+                # we rely on this flag because statements inside the block may also have colons --
+                # only the first statement matching the subsequent if predicate will be read as 
+                # a declaration of an actual make target
+                #
+                if not target_declaration_found:
+                    if line[0].isalpha and ':' in line:
+                        # this line is an actual make target declaration
+
+                        tokens = line.split(':')
+                        block_name = tokens[0]
+                        target_block_name = block_name
+
+                        blockbuffers[block_name] = Blockbuffer(block_name, TARGET_BLOCK, linenum)
+                        blockbuffers[block_name].append(line)
+
+                        target_declaration_found = True
+                    else:                        
+                        continue
+                else:                    
+                    blockbuffers[block_name].append(line)
+
+
+    return blockbuffers
+
+
+def load_blocks(block_type, makefile_name) -> dict:
+    if not makefile_name:
+        makefile_name = 'Makefile'
+
+    with open(makefile_name, 'r') as f:        
+        return load_blocks_from_file(f, block_type)
+
+
+def get_name_for_makevar(makevar_string):
+    return makevar_string.lstrip('$(').rstrip(')')
+
+
+def decode_blockbuffer(buffer: Blockbuffer, block_type: str):
+    
+    if block_type not in VALID_BLOCK_TYPES:
+        raise Exception(f'Invalid block type {block_type}')
+
+    if block_type == CMD_BLOCK:        
+        return parse_command_buffer(buffer)
+
+    elif block_type == VAR_BLOCK:
+        return parse_variable_buffer(buffer)
+
+    elif block_type == TARGET_BLOCK:
+        return parse_target_buffer(buffer)
+
+
+def load_blockbuffer(buffer: Blockbuffer, block_type: str):
+    blocktext = '\n'.join(line.strip('\n') for line in buffer.lines if not line.startswith('#'))
+
+    if block_type == VAR_BLOCK:
+        return blocktext
+    
+    elif block_type == CMD_BLOCK:
+        # change the $(varname) Makefile var expression syntax to Python-style {varname} template sytax
+        command_block = parse_command_buffer(buffer)
+        return command_block
+
+
+BufferExtent = namedtuple('BufferExtent', 'start_line end_line')
+
+def get_checkpoints_in_target_buffer(buffer: Blockbuffer, checkpoint_location_list: list) -> list:
+
+    buffer_extent = BufferExtent(start_line = buffer.start_linenumber,
+                                 end_line = buffer.start_linenumber + len(buffer.lines))
+
+    locations = []
+    for ckpt_loc in checkpoint_location_list:        
+        if buffer_extent.start_line <= ckpt_loc.line_number <=  buffer_extent.end_line:
+            locations.append(ckpt_loc)
+
+    return locations
+
+
+def execute_checkpoint(ckpt: Checkpoint, home_buffer: Blockbuffer, line_number) -> dict:
+
+    checkpoint_vars = {}
+    # load any varblocks declared in this target
+
+    buffer_contents = '\n'.join(home_buffer.lines)
+    virtual_file = StringIO(buffer_contents)
+    
+    varblocks = load_blocks_from_file(virtual_file, VAR_BLOCK)
+    checkpoint_function = ckpt.test_function
+    params = ckpt.parameters
+
+    # if the checkpoint variable was specified with respect to a variable block
+    # (using the syntax <blockname.variable_name>),
+    # load the named variable
+    #
+    if ckpt.varblock_name:
+        source_varblock = varblocks.get(ckpt.varblock_name)
+        if not source_varblock:
+            raise Exception(f'Checkpoint refers to a variable in unspecified varblock: {ckpt.varblock_name}')
+
+        vars = parse_variable_buffer(source_varblock)
+        variable = ckpt.variable
+        value = vars.get(variable)
+
+        #result = checkpoint_function(value, **params)
+        checkpoint_status = ckpt.execute(value, **params)
+        
+    else:
+        # the checkpoint was declared with an explicit variable
+        value = ckpt.variable
+        #result = checkpoint_function(value)
+        checkpoint_status = ckpt.execute(value, **params)
+
+    return {
+        'checkpoint': ckpt.name,
+        'line_number': line_number,
+        'function': ckpt.test_function_name,
+        'variable': value,
+        'parameters': params,        
+        'ok': checkpoint_status.is_ok,
+        'message': checkpoint_status.message
+    }
+    
+
+def main(args):
+
+    if args['--console']:
+        clear()
+        console_cli = ConsoleCLI('makeblocks', 'Makefile')
+        console_cli.cmdloop()
+        return
+
+    if args['--scan']:
+        print(json.dumps(scan_makefile()))
+        return
+
+    if args['--check']:
+
+        makefile_name = args.get('<filename>') or 'Makefile'
+        all_checkpoint_locations = []
+        with open(makefile_name, 'r') as f:
+            all_checkpoint_locations = load_checkpoint_locations_from_file(f)
+
+        if args['--list']:
+            block_name = args.get('<targetblock_name>')
+
+            if block_name:
+                target_blockbuffers = load_blocks(TARGET_BLOCK, makefile_name)
+                buffer = target_blockbuffers.get(block_name)
+                if not buffer:
+                    raise Exception(f'No target-type block "{block_name}" in source makefile.')
+
+                checkpoint_locations = get_checkpoints_in_target_buffer(buffer, all_checkpoint_locations)
+                print(json.dumps([{'name': c.checkpoint.name, 'line': c.line_number} for c in checkpoint_locations]))
+
+            else:
+                print(json.dumps([{'name': c.checkpoint.name, 'line': c.line_number} for c in all_checkpoint_locations]))
+
+        else:
+            target_blockbuffers = load_blocks(TARGET_BLOCK, makefile_name)
+            block_name = args['<targetblock_name>']            
+            buffer = target_blockbuffers.get(block_name)
+            if not buffer:
+                    raise Exception(f'No target-type block "{block_name}" in source makefile.')
+
+            checkpoint_locations = get_checkpoints_in_target_buffer(buffer, all_checkpoint_locations)
+            status_data = []
+            for ckpt_loc in checkpoint_locations:
+                ckpt = ckpt_loc.checkpoint
+                status_data.append(execute_checkpoint(ckpt, buffer, ckpt_loc.line_number))
+
+            print(json.dumps(status_data))
+
+        return
+
+    block_type = args['<blocktype>']
+
+    # Because of the way we load makefile blocks, the <blockbuffers> data structure
+    # will contain all blocks of a single type.
+    #
+    blockbuffers = load_blocks(block_type, args.get('<filename>') or None)
+
+    if block_type not in VALID_BLOCK_TYPES:
+        raise Exception(f'Invalid block type {block_type}. Valid block types are: {", ".join(VALID_BLOCK_TYPES)}')
+
+    if args['--copy']:
+        # copy the named target-type block verbatim and emit it to stdout
+        return
+
+    if args['--find']:
+        blockname = args['<blockname>']
+
+        blockbuffer = blockbuffers.get(blockname)
+       
+        if not blockbuffer:
+            print(json.dumps({}))
+            return
+
+        print(json.dumps({
+            'name': blockbuffer.name,
+            'blocktype': blockbuffer.block_type,
+            'line': blockbuffer.start_linenumber,
+            'data': blockbuffer.data
+        }))
+        return
+
+    if args['--list']:
+        print(json.dumps([k for k in blockbuffers.keys()]))
+        return
+
+    if args['--all']:
+        for blockname, buffer in blockbuffers.items():            
+            command_block = parse_command_buffer(buffer)
+            print(command_block.command_template)
+            print('\n')
+
+    if args.get('<blockname>'):
+        blockname = args['<blockname>']
+        buffer = blockbuffers.get(blockname)
+        if buffer is None:
+            raise Exception(f'No {block_type}-type block "{blockname}" was declared in the source makefile.')
+
+        if block_type == VAR_BLOCK:
+            if args['--decode']:
+                params = parse_variable_buffer(buffer)
+                print(json.dumps(params))
+            else:
+                print(buffer.data)
+    
+        elif block_type == CMD_BLOCK:
+            # change the $(varname) Makefile var expression syntax to Python-style {varname} template sytax
+            command_block = parse_command_buffer(buffer)
+
+            if args['--decode']: 
+                if args['--stdin']:
+                    # receive parameter values as JSON from standard input
+                    template_params = receive_params_from_stdin()                                                            
+                    print(command_block.command_template.format(**template_params))
+                    
+                elif args['--interactive']:
+                    # prompt the user to supply the template parameters
+                    template_params = {}
+                    for key in command_block.param_list:
+                        value = input(f'What is the value for {key} ?: ')
+                        if len(value.strip()):
+                            template_params[key] = value
+                        else:
+                            template_params[key] = '{%s}' % key
+                    print(command_block.command_template.format(**template_params))
+                else:
+                    # print the decoded template without trying to render it into a runnable command
+                    print(command_block.command_template)
+
+            # print the original command block without converting Makefile variable expressions
+            else:
+                print('\n'.join(buffer.lines))
+
+        elif block_type == TARGET_BLOCK:
+            target_block = parse_target_buffer(buffer)
+            print('\n'.join(target_block['body']))            
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

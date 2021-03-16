@@ -1,0 +1,34 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    mapname <filename> --mapper-function <module.func> [--params=<name:value>...]
+
+'''
+
+import os, sys
+import docopt
+from snap import common
+
+
+def main(args):
+
+    sys.path.append(os.getcwd())
+    input_filename = args['<filename>']
+    
+    mapper = args['<module.func>']
+
+    tokens = mapper.split('.')
+    if len(tokens) != 2:
+        raise Exception('The --mapper-function option must be of the format "module.classname".')
+
+    module_name = tokens[0]
+    classname = tokens[1]
+
+    mapper_function = common.load_class(classname, module_name)
+    print(mapper_function(input_filename))
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

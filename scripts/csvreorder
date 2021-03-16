@@ -1,0 +1,238 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    csvreorder --output-field-list <module.list-object> --delimiter <delimiter> [-q] --datafile <filename> [--limit=<limit>]
+    csvreorder --config <configfile> --setup <setup> --delimiter <delimiter> --datafile <filename> [--limit=<limit>]
+
+Options:
+    -q --quote-all    Quote all outgoing data values
+'''
+
+
+import os, sys
+import csv
+import copy
+from mercury.utils import open_in_place
+from snap import common
+import docopt
+from mercury import templateutils
+
+
+def reorder_fields(input_record: dict, field_order_list: list, mode: str) -> list:
+    output_record = []
+    for field_name in field_order_list:
+        output_value = input_record[field_name]
+        output_record.append(str(output_value))
+    
+    return output_record
+
+
+class FieldSequencer(object):
+
+    def __init__(self, setup_name, macro_module_name=None):
+        self.name = setup_name
+        self.field_list = []
+        self.custom_field_settings = {}
+        self.field_generators = {}
+        self.macro_module_name = macro_module_name
+
+    def add_field(self, field_name, **kwargs):
+        self.field_list.append(field_name)        
+        if kwargs:
+            self.custom_field_settings[field_name] = kwargs
+
+    def register_field_generator(self, field_name, generator_function):
+        self.field_generators[field_name] = generator_function
+
+    def output_header(self, delimiter):
+        return delimiter.join(self.field_list)
+
+
+    def resolve_field(self, field_name: str, source_record: dict):
+        output_value = None
+        if field_name in self.custom_field_settings: # this means we've specified custom logic for generating this field's output value
+            settings = self.custom_field_settings[field_name]
+
+            if 'value' in settings: # this means the value of the field will be either the value of an env var, or the output of a macro
+                raw_value = settings['value']
+
+                if isinstance(raw_value, str):
+                    if templateutils.template_contains_macros(raw_value) and not self.macro_module_name:
+                        raise Exception(f'CSV reordering setup "{self.name}" refers to a macro expression, but no macro module was specified.')
+
+                    output_value = templateutils.resolve_embedded_expressions(raw_value,
+                                                                              self.macro_module_name)
+
+            elif 'generator' in settings: # this means the value of the field will be the result of an iterator (usually a counter)
+                gen_func = self.field_generators.get(field_name)
+                output_value = next(gen_func)
+            else:
+                raise Exception(f'Unrecognized field settings: {settings}')
+        else:
+            output_value = source_record[field_name]
+        
+        return output_value
+
+
+    def reorder_fields(self, input_record: dict, delimiter: str, **kwargs) -> str:
+        # TODO: add bulletproofing (e.g. what to do about missing input fields?)
+        output_record = []
+        for field_name in self.field_list:
+            
+            if field_name in kwargs: # we can pass override values to this method; useful for debugging
+                output_value = kwargs[field_name]
+            else:
+                output_value = self.resolve_field(field_name, input_record)
+
+            output_record.append(output_value)
+        
+        return delimiter.join([str(value) for value in output_record])
+
+
+    def __str__(self):
+        return str({
+            'fields': self.field_list,
+            'field_settings': self.field_settings
+        })
+
+
+def load_sequencer(setup_name, yaml_config):
+    
+    generators = load_generators(setup_name, yaml_config)
+
+    macro_module_name = yaml_config['globals'].get('macro_module')
+    sequencer = FieldSequencer(setup_name, macro_module_name)
+    target_setup = yaml_config['setups'].get(setup_name)
+
+    if not target_setup:
+        raise Exception(f'No setup "{setup_name}" registered. Please check your config.')
+
+    for field in target_setup['columns']:
+
+        if isinstance(field, str):
+            sequencer.add_field(field)
+
+        elif isinstance(field, dict):
+            fieldname, settings = field.popitem()
+            sequencer.add_field(fieldname, **settings)
+
+    for field_name, gen_function in generators.items():
+        sequencer.register_field_generator(field_name, gen_function)
+
+    return sequencer
+
+
+def load_generators(setup_name, yaml_config):
+
+    # we are popping items off the config here, which would introduce side effects -- let's use a copy
+    config_data = copy.deepcopy(yaml_config)
+    generators = {}
+    generator_module_name = config_data['globals'].get('generator_module')
+
+    target_setup = config_data['setups'][setup_name]
+    #print(f'############# TARGET: {target_setup}')
+    
+    for column_def in target_setup['columns']:
+        if isinstance(column_def, dict):
+            fieldname, settings = column_def.popitem()
+
+            #print(f'######## FIELD NAME: {fieldname}')
+            #print(f'######## FIELD SETTINGS: {settings}')
+
+            generator_name = settings.get('generator')
+
+            if not generator_name:
+                continue
+
+            #print(f'found generator: {generator_name}')
+            
+            if not generator_module_name:
+                raise Exception(f'The setup {setup_name} uses a generator, but no generator_module was specified in the "globals" section.')
+
+            generator_init_values = {}
+            for nvpair in settings.get('init_values', []):
+                name = nvpair['name']
+                value = nvpair['value']
+                generator_init_values[name] = value
+
+            generator_type = common.load_class(generator_name, generator_module_name)
+            generator_instance = generator_type(**generator_init_values)
+
+            generators[fieldname] = generator_instance
+    
+    return generators
+
+
+'''
+def rowid_counter(start_value: int, increment: int) -> int:    
+    counter_value = start_value
+    
+    while True:
+        yield counter_value
+        counter_value += increment
+'''
+
+def main(args):
+    #print(args)
+    #return
+    sys.path.append(os.getcwd())
+    
+    mode = None
+    # are we doing a straight reorder? Or are we doing type conversions?
+    if args['--output-field-list']:
+        mode = 'simple'
+    elif args['--config']:
+        mode = 'advanced'
+
+    field_delimiter = args['<delimiter>']    
+    source_filename = args['<filename>']
+    limit = int(args.get('--limit') or -1)    
+
+    # "simple" mode: load an actual Python list of field names from a module and reorder based on that
+    if mode == 'simple':
+        # load field-order list
+        list_designator = args['<module.list-object>']
+        tokens = list_designator.split('.')
+
+        if len(tokens) != 2:
+            raise Exception('The --output-field-list option must be of the format "module.list-object".')
+
+        module_name = tokens[0]
+        list_name = tokens[1]
+
+        # Any day now I'm going to rename this function, which loads ANY OBJECT (not just classes) -DT
+        field_order_list = common.load_class(list_name, module_name) 
+        
+        # emit CSV header
+        print(field_delimiter.join(field_order_list))
+        
+        with open(source_filename, 'r') as source_file:
+            reader = csv.DictReader(source_file, delimiter=field_delimiter)
+            for record in reader:
+                input_record = dict(record)                
+                # for each record, reorder based on designated field sequence
+                print(field_delimiter.join(reorder_fields(input_record, field_order_list)))
+                
+    # "advanced" mode: load YAML config file and reorder data according to designated setup
+    else:
+        config_filename = args['<configfile>']
+        setup_name = args['<setup>']
+        yaml_config = common.read_config_file(config_filename)        
+        
+        sequencer = load_sequencer(setup_name, yaml_config)
+
+        # emit header
+        print(sequencer.output_header(field_delimiter))
+
+        with open(source_filename, 'r') as source_file:
+            reader = csv.DictReader(source_file, delimiter=field_delimiter)
+            
+            for record in reader:
+                input_record = dict(record)
+                print(sequencer.reorder_fields(input_record, field_delimiter))
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

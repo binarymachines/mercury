@@ -38,6 +38,8 @@ watchdog = "*"
 pgpubsub = "*"
 pyyaml = "*"
 snap-micro = "*"
+keyring = ">=15.1"
+plumbum = "*"
 
 [dev-packages]
 

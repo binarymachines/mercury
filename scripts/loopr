@@ -1,0 +1,168 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    loopr [-p] -t --listfile <filename> --vartoken <token> --cmd-string <command> [--postcmd <post-command>] [--limit=<limit>]
+    loopr [-p] -j --listfile <filename> --cmd-string <command> [--postcmd <post-command>] [--limit=<limit>]
+    loopr [-p] -c --listfile <filename> --delimiter <delim> --cmd-string <command> [--postcmd <post-command>] [--limit=<limit>]
+
+Options:
+    -t --text   read each line from the listfile as a monolithic text value
+    -c --csv    read each line from a CSV listfile as a dictionary record
+    -j --json   read each line from a JSON listfile as a dictionary record
+    -p --preview  show (but do not execute) the final command string
+'''
+
+#
+# loopr: command-line utility for looping through lists and performing a user-defined action on each iteration.
+#
+# In --text mode, loopr will use each line from the listfile as a monolithic value to be optionally inserted in the command string
+# wherever the --vartoken sequence is found (similar to the way xargs works with the -I argument).
+#
+# In --json mode, loopr assumes that each line of the listfile is a JSON record, and will use th corresponding dictionary 
+# to populate any Python-style template variables in the command string.
+#
+# In --csv mode, loopr will read the listfile as a set of CSV records and read each line into a dictionary which can be used 
+# to populate any Python-style template variables in the command string.
+#
+# loopr will also run an optional command (specified by the --post-cmd argument) after each iteration.
+#
+
+import os, sys
+import json
+import subprocess
+import docopt
+from snap import common
+from mercury import datamap
+from mercury.utils import open_in_place, parse_cli_params
+from plumbum import local, FG
+
+
+def generate_text_records_from_file(filename, limit=-1):
+    with open(filename, 'r') as f:
+        line_count = 0
+        for line in f:
+            if line_count == limit:
+                break
+            record = line.strip()
+            if record:
+                yield record
+
+            line_count += 1
+
+
+def generate_json_records_from_file(filename, limit=-1):
+    with open(filename, 'r') as f:
+        line_count = 0
+        for rawline in f:
+            if line_count == limit:
+                break
+            line = rawline.strip()
+            if line:
+                yield(json.loads(line))
+
+            line_count += 1
+
+
+def generate_csv_records_from_file(filename, field_delimiter, limit=-1):
+    rec_source = datamap.RecordSource(datamap.csvfile_record_generator,
+                                      filename=filename,                           
+                                      delimiter=field_delimiter,
+                                      limit=limit)
+    for rec in rec_source.records():
+        yield rec
+                                
+
+def main(args):    
+    raw_command_string = args['<command>']    
+    input_filename = args['<filename>']
+    replacement_token = args['<token>']
+
+    limit = -1
+    if args.get('--limit'):
+        limit = int(args['--limit'])
+
+    if args['--text']:
+        for record in generate_text_records_from_file(input_filename, limit):
+
+            command_string = raw_command_string.replace(replacement_token, record)
+
+            if args['--preview']:
+                print(command_string)
+            else:            
+                #print(f'### Executing loop command: {command_string}', file=sys.stderr)
+
+                loop_cmd_tokens = command_string.split(' ')
+
+                loop_cmd = local[loop_cmd_tokens[0]]
+                params = loop_cmd_tokens[1:]
+                print(loop_cmd(*params))
+                
+                if args['--postcmd'] == True:
+                    
+                    post_cmd_string = args['<post-command>']
+                    post_cmd_tokens = post_cmd_string.split(' ')
+
+                    post_cmd = local[post_cmd_tokens[0]]
+                    post_cmd_args = post_cmd_tokens[1:]
+                                
+                    print(post_cmd(*post_cmd_args), file=sys.stderr)
+
+    elif args['--csv']:
+        delimiter = args['<delim>']
+        for record in generate_csv_records_from_file(input_filename, delimiter, limit):
+            command_string = raw_command_string.format(**record)
+
+            if args['--preview']:
+                print(command_string)
+            else:
+                #print(f'### Executing loop command: {command_string}', file=sys.stderr)
+                
+                loop_cmd_tokens = command_string.split(' ')
+
+                loop_cmd = local[loop_cmd_tokens[0]]
+                params = loop_cmd_tokens[1:]
+                print(loop_cmd(*params))
+                
+                if args['--postcmd'] == True:
+                    
+                    post_cmd_string = args['<post-command>']
+                    post_cmd_tokens = post_cmd_string.split(' ')
+
+                    post_cmd = local[post_cmd_tokens[0]]
+                    post_cmd_args = post_cmd_tokens[1:]
+                                
+                    print(post_cmd(*post_cmd_args), file=sys.stderr)
+
+    else: # args['--json'] is True, which means read every incoming line as a JSON record
+
+        for record in generate_json_records_from_file(input_filename, limit):
+            
+            command_string = raw_command_string.format(**record)
+
+            if args['--preview']:
+                print(command_string)
+            else:
+
+                print(f'### Executing loop command: {command_string}', file=sys.stderr)
+                
+                loop_cmd_tokens = command_string.split(' ')
+
+                subprocess.call(loop_cmd_tokens,
+                        stdout=sys.stdout,
+                        stderr=sys.stderr)
+                
+                if args['--postcmd'] == True:
+                    
+                    post_cmd_string = args['<post-command>']
+                    post_cmd_tokens = post_cmd_string.split(' ')
+
+                    post_cmd = local[post_cmd_tokens[0]]
+                    post_cmd_args = post_cmd_tokens[1:]
+                                
+                    print(post_cmd(*post_cmd_args), file=sys.stderr)
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

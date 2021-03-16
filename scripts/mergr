@@ -1,0 +1,82 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    mergr --files=<filename>... --keys=<key>...
+
+'''
+
+import os, sys
+import json
+import docopt
+from snap import common
+
+'''
+
+mergr: command-line utility for merging lists and emitting JSON records
+
+
+Given file1.txt with content: 
+
+one
+two
+three
+
+and file2.txt with content:
+
+blue
+red
+green
+
+issuing the command:   
+
+mergr --files=file1.txt,file2.txt --keys=number,color
+
+would yield the JSON output:
+
+{"number": "one", "color": "blue"}
+{"number": "two", "color": "red"}
+{"number": "three", "color": "green"}
+
+
+'''
+
+def generate_merged_records(filenames: list, keys: list):
+
+    file_handles = []
+    try:
+        for filename in filenames:
+            file_handles.append(open(filename))
+
+        while True:
+            record = {}
+            file_index = 0
+            for handle in file_handles:
+                line = handle.readline().strip()
+                if len(line):
+                    record[keys[file_index]] = line                
+                    
+                file_index += 1
+            if len(record.keys()):
+                yield record
+            else:
+                break
+
+    finally:
+        for handle in file_handles:
+            handle.close()
+
+
+def main(args):
+    
+    filenames = args['--files'][0].split(',')
+    keys = args['--keys'][0].split(',')
+    file_handles = []
+
+    for rec in generate_merged_records(filenames, keys):
+        print(json.dumps(rec))
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

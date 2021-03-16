@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    jsonrec2csv --config <configfile> --setup <setup> --delimiter <delimiter> [--datafile <jsonfile>] [--limit=<max_records>]
+'''
+
+import os, sys
+import json
+import docopt
+from snap import common
+from mercury.utils import open_in_place, read_stdin
+
+
+class JSONRecordConverter(object):
+    def __init__(self, field_names: list, delimiter: str, default_null_value=None):
+        self.field_names = field_names
+        self.default_null = default_null_value
+        self.delimiter = delimiter
+
+    def create_row(self, json_record):
+        row = []
+        for field in self.field_names:
+            value = json_record.get(field)
+
+            if value is None:
+                row.append(self.default_null)
+            elif isinstance(value, str):
+                row.append(f'"{value}"')
+            else:
+                row.append(value)
+        return row
+
+    def convert_json_record(self, json_rec) -> list:
+        return self.delimiter.join(self.create_row(json_rec))
+
+    @property
+    def header(self):
+        return self.delimiter.join(self.field_names)
+
+
+def load_converter(setup_name: str, yaml_config: dict, delimiter: str) -> JSONRecordConverter:
+
+    if not yaml_config['setups'].get(setup_name):
+        raise Exception(f'No setup "{setup_name}" found. Please check your config file.')
+
+    setup_segment = yaml_config['setups'][setup_name]
+    columns = setup_segment['columns']
+    default_null = setup_segment['default_null_value']
+
+    return JSONRecordConverter(columns, delimiter, default_null)
+
+
+def main(args):
+    
+    src_filename = args.get('<jsonfile>')
+    delimiter = args['<delimiter>']
+    config_filename = args['<configfile>']
+    setup_name = args['<setup>']
+
+    yaml_config = common.read_config_file(config_filename)
+    converter = load_converter(setup_name, yaml_config, delimiter)
+    print(converter.header)
+
+    if src_filename:
+        with open_in_place(src_filename, 'r') as f:    
+            for json_line in f:
+                record = json.loads(json_line)
+                print(converter.convert_json_record(record))
+    else:    
+        # no input file specified; read records from stdin
+        for line in read_stdin():
+            record = json.loads(line)
+            print(converter.convert_json_record(record))
+
+
+if __name__=='__main__':
+    args = docopt.docopt(__doc__)
+    main(args)
