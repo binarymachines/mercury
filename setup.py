@@ -36,7 +36,8 @@ DEPENDENCIES=['snap-micro',
               'raven',
               'redis',
               'sh',
-              'pgpubsub']
+              'pgpubsub',
+              'plumbum']
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
@@ -84,7 +85,8 @@ setup(
              'scripts/tuple2json',
              'scripts/makeblocks',
              'scripts/mapname',
-             'scripts/mergr',],
+             'scripts/mergr',
+             'scripts/filtr'],
     packages=find_packages(),
     install_requires=DEPENDENCIES,
     test_suite='tests',

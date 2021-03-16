@@ -25,9 +25,7 @@ import json
 import jinja2
 import docopt
 from snap import common
-
-from mercury import utils
-from utils import open_in_place, read_stdin
+from mercury.utils import open_in_place, read_stdin
 from mercury import templateutils
 
 TEMPLATE_VAR_RX = re.compile(r'\{[a-zA-Z0-9_\-]+\}')
