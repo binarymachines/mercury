@@ -25,7 +25,7 @@ import json
 import jinja2
 import docopt
 from snap import common
-from mercury.utils import open_in_place, read_stdin
+from mercury.utils import open_in_place, read_stdin, parse_cli_params
 from mercury import templateutils
 
 TEMPLATE_VAR_RX = re.compile(r'\{[a-zA-Z0-9_\-]+\}')
@@ -114,7 +114,7 @@ def main(args):
     raw_params = ''
     if args.get('--params'):
         raw_param_str = args['--params']
-        input_params = utils.parse_cli_params(raw_param_str)
+        input_params = parse_cli_params(raw_param_str)
 
     elif args.get('--stdin'):
         # read the input params as JSON from stdin
@@ -143,7 +143,7 @@ def main(args):
     macro_args = {}
     if args.get('--macro-args'):
         raw_arg_str = args['--macro-args']
-        macro_args = utils.parse_cli_params(raw_arg_str)
+        macro_args = parse_cli_params(raw_arg_str)
     
     if debug_mode:
         print(f'### raw input parameters {input_params}', file=sys.stderr)
