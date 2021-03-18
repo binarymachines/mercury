@@ -86,7 +86,10 @@ setup(
              'scripts/makeblocks',
              'scripts/mapname',
              'scripts/mergr',
-             'scripts/filtr'],
+             'scripts/filtr',
+             'scripts/ffilter'
+             'scripts/fgate',
+             'scripts/sqs-consume'],
     packages=find_packages(),
     install_requires=DEPENDENCIES,
     test_suite='tests',

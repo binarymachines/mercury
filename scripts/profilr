@@ -2,14 +2,15 @@
 
 '''
 Usage:
-    profilr --config <configfile> --dataset <dataset_name> --format <format> [--datafile <file>] [--limit=<limit>]
+    profilr --config <configfile> --job <job_name> --format <format> --datafile <file> [--params=<name:value>...] [--limit=<limit>]
     profilr --config <configfile> --list
 '''
 
 import os, sys
+import json
+from mercury.utils import parse_cli_params
 from snap import snap, common
 from mercury import datamap as dmap
-from mercury import journaling as jrnl
 from mercury import profiling as prf
 import docopt
 
@@ -24,14 +25,13 @@ def main(args):
     configfile = args['<configfile>']
     if args['--list'] is True:
         yaml_config = common.read_config_file(configfile)
-        print('\n'.join([dataset for dataset in yaml_config['datasets']]))
+        print('\n'.join([job for job in yaml_config['jobs']]))
         return
 
     datafile = None
-    stream_input = True
-    if args['--datafile'] is True:
-        stream_input = False
-        datafile = args['<file>']
+    stream_input = False
+    
+    datafile = args['<file>']
 
     if args['<format>'] == 'csv':
         intake_format = Format.CSV
@@ -48,18 +48,20 @@ def main(args):
 
     field_delimiter = '|'
 
+    user_params = parse_cli_params(args.get('--params') or [])
+
     if stream_input: # read input from stdin
         if intake_format == Format.CSV:
             rec_source = dmap.RecordSource(dmap.csvstream_record_generator,
-                                        delimiter=field_delimiter,
-                                        limit=limit)
+                                           delimiter=field_delimiter,
+                                           limit=limit)
         else:
             rec_source = dmap.RecordSource(dmap.json_record_generator,
-                                        limit=limit)
+                                          limit=limit)
     else: # read input from file        
         if intake_format == Format.CSV:
-            rec_source = dmap.RecordSource(dmap.csvstream_record_generator,
-                                           filename=datafile,                
+            rec_source = dmap.RecordSource(dmap.csvfile_record_generator,
+                                           filename=datafile,                           
                                            delimiter=field_delimiter,
                                            limit=limit)
         elif intake_format == Format.JSON: 
@@ -67,17 +69,14 @@ def main(args):
                                            filename=datafile,
                                            limit=limit)
 
-    target_dataset = args['<dataset_name>']
+    target_job = args['<job_name>']
     yaml_config = common.read_config_file(configfile)
-    project_dir = common.load_config_var(yaml_config['globals']['project_home'])
-    sys.path.append(project_dir)
     service_registry = snap.initialize_services(yaml_config)
 
-    profiler = prf.ProfilerFactory.create(target_dataset, yaml_config)
-    profile_dict, record_count = profiler.profile(rec_source.records(), service_registry)
-
-    print(common.jsonpretty(profile_dict))    
-    print('%d records processed.' % record_count)
+    profiler = prf.ProfilerFactory.create(target_job, yaml_config)
+    profile_dict = profiler.profile(rec_source.records(), service_registry, **user_params)
+    profile_dict['source_filename'] = datafile
+    print(json.dumps(profile_dict))
 
 
 if __name__ == '__main__':

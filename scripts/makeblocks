@@ -6,15 +6,15 @@ Usage:
     makeblocks --type <blocktype> <blockname> --decode [--makefile <filename>]
     makeblocks --type <blocktype> <blockname> --decode (-s | -i) [--makefile <filename>]
     makeblocks --type <blocktype> <blockname> --decode --paramfile <file> [--makefile <filename>]
-    makeblocks --type <blocktype> <blockname> --decode --params=<n:v>... [--makefile <filename>]    
+    makeblocks --type <blocktype> <blockname> --decode --params=<n:v>... [--makefile <filename>]
     makeblocks --type <blocktype> --list [--makefile <filename>]
     makeblocks --type <blocktype> --all [--makefile <filename>]
     makeblocks --scan [--makefile <filename>]
     makeblocks --check <targetblock_name> [--makefile <filename>]
-    makeblocks --check [<targetblock_name>] --list [--makefile <filename>]    
-    makeblocks --find --type <blocktype> <blockname> [--makefile <filename>]    
+    makeblocks --check [<targetblock_name>] --list [--makefile <filename>]
+    makeblocks --find --type <blocktype> <blockname> [--makefile <filename>]
     makeblocks --copytarget <targetblock_name> [--makefile <filename>]
-    makeblocks --console
+    makeblocks --console [--makefile <filename>]
 
 Options:
     -i --interactive  Prompt user for substitution values
@@ -23,7 +23,47 @@ Options:
 '''
 
 #
-# 
+# makeblocks: command-line utility for managing data pipeline configurations based on the M2
+# (Mercury makefile) design pattern.
+#
+# A "Mercury" makefile is a canonical makefile, but organized and instrumented to run data pipelines.
+#
+# An M2 data pipeline is a make target organized into a variable block and 1-N command blocks.
+# Variable and command blocks can be instrumented, with formatted comments, such that we can isolate
+# and inspect the blocks, load and inspect make variables, and resolve make-variable references
+# in command blocks.
+#
+# Make targets can also be instrumented in this way, allowing us to step-debug data pipelines.
+#
+# There are four types of logical structures we can define in the comments of an M2 makefile:
+# targetblocks, varblocks, cmdblocks, and checkpoints. A targetblock is defined at the top of
+# (immediately before) a make target with the syntax:
+#
+# +open-targetblock
+#
+# and must be closed at the end of the make target with:
+#
+# +close-targetblock
+#
+# (A targetblock is implicitly named; its name is always the name of the make target it encloses.)
+#
+# A varblock is defined inside a make target, with
+#
+# +open-varblock(blockname)
+# <make var declarations>
+# +close-varblock
+#
+# A cmdblock is defined (also inside a make target) with
+#
+# +open-cmdblock(blockname)
+# <1-N commands>
+# +close-varblock
+#
+# A checkpoint is defined with
+#
+# +checkpoint:[var=<varblock_name>.<variable_name> test=<python_module>.<test_function>]
+#
+#
 
 import os, sys
 import re
@@ -44,7 +84,7 @@ from snap import cli_tools as cli
 from plumbum import local
 from mercury.utils import tab, clear
 
-OPEN_CMD_BLOCK_RX = re.compile(r'\+open-cmdblock\([a-zA-Z0-9_-]+\)')  
+OPEN_CMD_BLOCK_RX = re.compile(r'\+open-cmdblock\([a-zA-Z0-9_-]+\)')
 CLOSE_CMD_BLOCK_RX = re.compile(r'\+close-cmdblock')
 
 OPEN_VAR_BLOCK_RX = re.compile(r'\+open-varblock\([a-zA-Z0-9_-]+\)')

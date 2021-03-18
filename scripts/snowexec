@@ -9,7 +9,7 @@ Usage:
 
 import os, sys
 from contextlib import contextmanager
-from mercury import utils
+from mercury.utils import open_in_place, read_stdin, parse_cli_params
 import snowflake.connector
 import docopt
 
@@ -37,15 +37,15 @@ def main(args):
     elif args['--queryfile']:        
         filename = args['<sqlfile>']
         
-        with utils.open_in_place(filename, 'r') as f:
+        with open_in_place(filename, 'r') as f:
             query = f.read()
     else:
         # stream from stdin        
-        for line in utils.read_stdin():
+        for line in read_stdin():
             query = query + line
 
     if args.get('--params'):
-        query_params = utils.parse_cli_params(args.get('--params') or [])
+        query_params = parse_cli_params(args.get('--params') or [])
         sql_statement = query.format(**query_params)
     else:
         sql_statement = query
