@@ -87,7 +87,7 @@ setup(
              'scripts/mapname',
              'scripts/mergr',
              'scripts/filtr',
-             'scripts/ffilter'
+             'scripts/ffilter',
              'scripts/fgate',
              'scripts/sqs-consume'],
     packages=find_packages(),
