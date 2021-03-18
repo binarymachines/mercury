@@ -58,7 +58,7 @@ def main(args):
         
         param_filename = args['<paramfile>']        
         outfile_suffix = args['<suffix>']
-        warp = local['./warp.py']
+        warp = local['warp']
         index = 1
 
         with open_in_place(param_filename, 'r') as f:
