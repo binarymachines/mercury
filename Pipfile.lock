@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "27a38d763c31b2852d3b1a56e9806e04acf5c0888a3642c657929b26b8439fcf"
+            "sha256": "c35c0dc102f8cc2c5dbdea37742277b5dd7b8ea3e3856e3e77d58d6e1975bf5e"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -560,10 +560,10 @@
         },
         "sqlalchemy-utils": {
             "hashes": [
-                "sha256:0ebd4d176a5786233db9f2e92040476fcff8b1b426fdbbb7ee4f478280ee9166"
+                "sha256:fb66e9956e41340011b70b80f898fde6064ec1817af77199ee21ace71d7d6ab0"
             ],
             "index": "pypi",
-            "version": "==0.34.0"
+            "version": "==0.36.8"
         },
         "teamcity-messages": {
             "hashes": [
