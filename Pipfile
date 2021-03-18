@@ -36,12 +36,12 @@ SQLAlchemy-Utils = "==0.34.0"
 sh = "*"
 watchdog = "*"
 pgpubsub = "*"
-pyyaml = "*"
 snap-micro = "*"
 keyring = ">=15.1"
 plumbum = "*"
+pyyaml = "*"
 
 [dev-packages]
 
 [requires]
-python_version = "3.5"
+python_version = "*"
