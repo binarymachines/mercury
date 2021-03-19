@@ -6,6 +6,9 @@ Testing checklist:
 - load and edit config: add, rm, edit, preview
 
 
+pipenv install -e git+https://github.com/binarymachines/mercury#egg=mercury
+
+
 Adding new utils to mkcfg
 
 To enable a new configuration target:
