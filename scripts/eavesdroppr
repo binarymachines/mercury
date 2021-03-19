@@ -11,9 +11,17 @@
 '''
 
 #
-# eavesdroppr: eavesdrop on PostgreSQL records
-# code generator and dependency injector for observing Postgres changes
-# via LISTEN/NOTIFY
+# eavesdroppr: command-line utility for "eavesdropping" on PostgreSQL databases.
+# This is a code generator and dependency injector for observing Postgres changes
+# via LISTEN/NOTIFY. 
+#
+# Event "channels" (a channel is a named context for listening to Postgres inserts/updates) are configured
+# in a YAML file. Run eavesdroppr in generate mode (using the -g argument) to generate the
+# trigger and stored procedure DDL scripts necessary for setting up listen/notify on a given channel;
+# then (after executing the DDL scripts), run eavesdroppr in normal mode (using the -c argument
+# to specify the channel). The handler in the configured channel will execute for as long as the
+# eavesdroppr process is running.
+#  
 #
 
 import os, sys

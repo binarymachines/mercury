@@ -17,9 +17,9 @@ Usage:
     makeblocks --console [--makefile <filename>]
 
 Options:
-    -i --interactive  Prompt user for substitution values
-    -s --stdin  Receive template values from stdin
-    -c --console  Run makeblocks in an interactive console session
+    -i --interactive    prompt user for substitution values
+    -s --stdin          receive template values from stdin
+    -c --console        run makeblocks in an interactive console session
 '''
 
 #

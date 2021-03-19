@@ -7,11 +7,11 @@ Usage:
     loopr [-d] [-p] -c --listfile <filename> --delimiter <delim> --cmd-string <command> [--postcmd <post-command>] [--limit=<limit>]
 
 Options:
-    -d --debug  run in debug mode (dump commands and parameters to stderr)
-    -t --text   read each line from the listfile as a monolithic text value
-    -c --csv    read each line from a CSV listfile as a dictionary record
-    -j --json   read each line from a JSON listfile as a dictionary record
-    -p --preview  show (but do not execute) the final command string
+    -d --debug      run in debug mode (dump commands and parameters to stderr)
+    -t --text       read each line from the listfile as a monolithic text value
+    -c --csv        read each line from a CSV listfile as a dictionary record
+    -j --json       read each line from a JSON listfile as a dictionary record
+    -p --preview    show (but do not execute) the final command string
 '''
 
 #

@@ -11,7 +11,7 @@ Usage:
     warp [-d] --config <configfile> --profile <profile> [--params=<name:value...>]
 
 Options:
-    -d --debug         Execute in debug mode (dump parameters and resolved expressions to stderr)
+    -d --debug          Execute in debug mode (dump parameters and resolved expressions to stderr)
     --py                Use python style templating
     --j2                Use Jinja2-style templating
     --show              Print (but do not process) the template
