@@ -2,12 +2,13 @@
 
 '''
 Usage:
-    manifold --write --param-generator <module.generator-function> [--inputs=<name:value>...]
-    manifold --read [-n] <paramfile> --warpcmd <command> --outfile-prefix <prefix> --outfile-suffix <suffix>
-    manifold --read [-n] <paramfile> --warpfile <file> --outfile-prefix <prefix> --outfile-suffix <suffix>
+    manifold [-d] --write --param-generator <module.generator-function> [--inputs=<name:value>...]
+    manifold [-d] --read [-n] <paramfile> --warpcmd <command> --outfile-prefix <prefix> --outfile-suffix <suffix>
+    manifold [-d] --read [-n] <paramfile> --warpfile <file> --outfile-prefix <prefix> --outfile-suffix <suffix>
 
 Options:
     -n --noindex   Do not automatically generate index numbers for outfile names
+    -d --debug     Run manifold in debug mode
 '''
 
 
@@ -20,8 +21,14 @@ from mercury.utils import open_in_place, parse_cli_params
 from plumbum import local
 
 
+
+
 def main(args):    
     sys.path.append(os.getcwd())
+
+    debug_mode = False
+    if args['--debug']:
+        debug_mode = True
 
     if args['--write']:
 
@@ -69,20 +76,22 @@ def main(args):
                 # -- so format it using whatever key/value pairs are in the inbound JSON record
                 #
                 outfile_prefix = args['<prefix>'].format(**params)
-                
-                print(f'params for Warp command: ', file=sys.stderr)
-                print(common.jsonpretty(params), file=sys.stderr)
 
-                print(f'Warp command string: {warp_command_string}', file=sys.stderr)
+                if debug_mode:
+                    print(f'params for Warp command: ', file=sys.stderr)
+                    print(common.jsonpretty(params), file=sys.stderr)
+                    print(f'Warp command string: {warp_command_string}', file=sys.stderr)
 
                 cmdstring = warp_command_string.format(**params)
 
-                print(f'FORMATTED Warp command string: {cmdstring}', file=sys.stderr)
+                if debug_mode:
+                    print(f'FORMATTED Warp command string: {cmdstring}', file=sys.stderr)
 
                 cmd_tokens = cmdstring.split(' ')
                 cmd_params = cmd_tokens[1:]
 
-                print(f'Warp command parameters: {cmd_params}', file=sys.stderr)
+                if debug_mode:
+                    print(f'Warp command parameters: {cmd_params}', file=sys.stderr)
 
                 if args['--noindex'] == True:
                     output_filename = f'{outfile_prefix}{outfile_suffix}'
