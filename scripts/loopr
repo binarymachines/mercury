@@ -2,9 +2,9 @@
 
 '''
 Usage:
-    loopr [-p] -t --listfile <filename> --vartoken <token> --cmd-string <command> [--postcmd <post-command>] [--limit=<limit>]
-    loopr [-p] -j --listfile <filename> --cmd-string <command> [--postcmd <post-command>] [--limit=<limit>]
-    loopr [-p] -c --listfile <filename> --delimiter <delim> --cmd-string <command> [--postcmd <post-command>] [--limit=<limit>]
+    loopr [-d] [-p] -t --listfile <filename> --vartoken <token> --cmd-string <command> [--postcmd <post-command>] [--limit=<limit>]
+    loopr [-d] [-p] -j --listfile <filename> --cmd-string <command> [--postcmd <post-command>] [--limit=<limit>]
+    loopr [-d] [-p] -c --listfile <filename> --delimiter <delim> --cmd-string <command> [--postcmd <post-command>] [--limit=<limit>]
 
 Options:
     -d --debug  run in debug mode (dump commands and parameters to stderr)
