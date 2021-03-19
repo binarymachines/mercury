@@ -7,6 +7,7 @@ Usage:
     loopr [-p] -c --listfile <filename> --delimiter <delim> --cmd-string <command> [--postcmd <post-command>] [--limit=<limit>]
 
 Options:
+    -d --debug  run in debug mode (dump commands and parameters to stderr)
     -t --text   read each line from the listfile as a monolithic text value
     -c --csv    read each line from a CSV listfile as a dictionary record
     -j --json   read each line from a JSON listfile as a dictionary record
@@ -37,6 +38,8 @@ from mercury import datamap
 from mercury.utils import open_in_place, parse_cli_params
 from plumbum import local, FG
 
+
+debug_mode = False
 
 def generate_text_records_from_file(filename, limit=-1):
     with open(filename, 'r') as f:
@@ -73,7 +76,12 @@ def generate_csv_records_from_file(filename, field_delimiter, limit=-1):
         yield rec
                                 
 
-def main(args):    
+def main(args):
+
+    global debug_mode
+    if args['--debug']:
+        debug_mode = True
+    
     raw_command_string = args['<command>']    
     input_filename = args['<filename>']
     replacement_token = args['<token>']
@@ -89,9 +97,7 @@ def main(args):
 
             if args['--preview']:
                 print(command_string)
-            else:            
-                #print(f'### Executing loop command: {command_string}', file=sys.stderr)
-
+            else:        
                 loop_cmd_tokens = command_string.split(' ')
 
                 loop_cmd = local[loop_cmd_tokens[0]]
@@ -115,9 +121,7 @@ def main(args):
 
             if args['--preview']:
                 print(command_string)
-            else:
-                #print(f'### Executing loop command: {command_string}', file=sys.stderr)
-                
+            else:                            
                 loop_cmd_tokens = command_string.split(' ')
 
                 loop_cmd = local[loop_cmd_tokens[0]]
@@ -143,8 +147,8 @@ def main(args):
             if args['--preview']:
                 print(command_string)
             else:
-
-                print(f'### Executing loop command: {command_string}', file=sys.stderr)
+                if debug_mode:
+                    print(f'### Executing loop command: {command_string}', file=sys.stderr)
                 
                 loop_cmd_tokens = command_string.split(' ')
 
@@ -152,8 +156,7 @@ def main(args):
                         stdout=sys.stdout,
                         stderr=sys.stderr)
                 
-                if args['--postcmd'] == True:
-                    
+                if args['--postcmd'] == True:                    
                     post_cmd_string = args['<post-command>']
                     post_cmd_tokens = post_cmd_string.split(' ')
 

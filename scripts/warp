@@ -2,15 +2,16 @@
 
 '''
 Usage:
-    warp (--j2 | --py) [-v] --template-file=<tfile> --show
-    warp (--j2 | --py) [-v] --template=<module.name> --show
-    warp (--j2 | --py) [-v] [-i] --template-file=<tfile> [--macros=<module>] [--macro-args=<name:value>...] [--params=<name:value>...]
-    warp (--j2 | --py) [-v] [-i] --template=<module.name> [--macros=<module>] [--macro-args=<name:value>...] [--params=<name:value>...]
-    warp (--j2 | --py) [-v] --template=<module.name> [--macros=<module>] [--macro-args=<name:value>...] -s
-    warp (--j2 | --py) [-v] --template-file=<tfile> [--macros=<module>] [--macro-args=<name:value>...] -s
-    warp --config <configfile> --profile <profile> [--params=<name:value...>]
+    warp [-d] (--j2 | --py) [-v] --template-file=<tfile> --show
+    warp [-d] (--j2 | --py) [-v] --template=<module.name> --show
+    warp [-d] (--j2 | --py) [-v] [-i] --template-file=<tfile> [--macros=<module>] [--macro-args=<name:value>...] [--params=<name:value>...]
+    warp [-d] (--j2 | --py) [-v] [-i] --template=<module.name> [--macros=<module>] [--macro-args=<name:value>...] [--params=<name:value>...]
+    warp [-d] (--j2 | --py) [-v] --template=<module.name> [--macros=<module>] [--macro-args=<name:value>...] -s
+    warp [-d] (--j2 | --py) [-v] --template-file=<tfile> [--macros=<module>] [--macro-args=<name:value>...] -s
+    warp [-d] --config <configfile> --profile <profile> [--params=<name:value...>]
 
 Options:
+    -d  --debug         Execute in debug mode (dump parameters and resolved expressions to stderr)
     --py                Use python style templating
     --j2                Use Jinja2-style templating
     --show              Print (but do not process) the template
@@ -32,16 +33,12 @@ TEMPLATE_VAR_RX = re.compile(r'\{[a-zA-Z0-9_\-]+\}')
 
 debug_mode = False
 
-'''
-def get_template_params_from_user(template_str, **kwargs):
-
-    print('placeholder function for interactive mode', file=sys.stderr)
-    return {}
-    #params = {}
-    #return params
-'''
-
 def main(args):
+
+    global debug_mode
+    if args['--debug']:
+        debug_mode = True
+
     # add the current directory to our PYTHONPATH, 
     # so that we can load modules from this location dynamically
     sys.path.append(os.getcwd())
@@ -148,14 +145,15 @@ def main(args):
     if debug_mode:
         print(f'### raw input parameters {input_params}', file=sys.stderr)
 
-
     template_str = raw_template_str
 
     if bool(args.get('--verbatim')):
         template_params = input_params
 
     else:
-        print(f'### resolving expressions using macro args: {macro_args}', file=sys.stderr)
+        if debug_mode:
+            print(f'### resolving expressions using macro args: {macro_args}', file=sys.stderr)
+
         template_str = templateutils.resolve_embedded_expressions(raw_template_str, macro_module_name, **macro_args)
 
         if args.get('--macros') is not None:
