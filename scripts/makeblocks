@@ -1476,8 +1476,7 @@ def main(args):
         if not buffer:
             raise Exception(f'No target-type block "{block_name}" in source makefile.')
 
-        print('\n'.join(buffer.lines()))
-
+        print('\n'.join(buffer.lines))
         return
 
     if args['--console']:
