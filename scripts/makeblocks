@@ -1466,6 +1466,20 @@ def execute_checkpoint(ckpt: Checkpoint, home_buffer: Blockbuffer, line_number) 
 
 def main(args):
 
+    if args['--copytarget']:
+
+        makefile_name = args.get('<filename>') or 'Makefile'
+        block_name = args['<targetblock_name>']
+        target_blockbuffers = load_blocks(TARGET_BLOCK, makefile_name)
+        buffer = target_blockbuffers.get(block_name)
+
+        if not buffer:
+            raise Exception(f'No target-type block "{block_name}" in source makefile.')
+
+        print('\n'.join(buffer.lines()))
+
+        return
+
     if args['--console']:
         clear()
         console_cli = ConsoleCLI('makeblocks', 'Makefile')
