@@ -47,7 +47,7 @@ Options:
 #
 # (A targetblock is implicitly named; its name is always the name of the make target it encloses.)
 #
-# A varblock is defined inside a make target, with
+# A varblock is defined inside a make target and *explicitly* named, with
 #
 # +open-varblock(blockname)
 # <make var declarations>
@@ -59,9 +59,13 @@ Options:
 # <1-N commands>
 # +close-varblock
 #
-# A checkpoint is defined with
+# A checkpoint may either be named, or anonymous. An anonymous checkpoint is defined with
 #
 # +checkpoint:[var=<varblock_name>.<variable_name> test=<python_module>.<test_function>]
+#
+# and a named checkpoint is defined with
+#
+# +checkpoint:<checkpoint_name>[var=<varblock_name>.<variable_name> test=<python_module>.<test_function>]
 #
 #
 
