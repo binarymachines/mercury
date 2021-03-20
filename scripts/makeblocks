@@ -1539,9 +1539,6 @@ def main(args):
     if block_type not in VALID_BLOCK_TYPES:
         raise Exception(f'Invalid block type {block_type}. Valid block types are: {", ".join(VALID_BLOCK_TYPES)}')
 
-    if args['--copy']:
-        # copy the named target-type block verbatim and emit it to stdout
-        return
 
     if args['--find']:
         blockname = args['<blockname>']
