@@ -1130,7 +1130,7 @@ def find_block_errors(block_markers: list, block_type: str):
     return errors
 
 
-def scan_makefile(makefile_name='Makefile', **kwargs) -> dict:
+def scan_makefile(makefile_name, **kwargs) -> dict:
 
     num_var_blocks = 0
     num_cmd_blocks = 0
@@ -1486,7 +1486,8 @@ def main(args):
         return
 
     if args['--scan']:
-        print(json.dumps(scan_makefile()))
+        makefile_name = args.get('<filename>') or 'Makefile'
+        print(json.dumps(scan_makefile(makefile_name)))
         return
 
     if args['--check']:
