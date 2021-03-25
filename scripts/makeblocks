@@ -1034,9 +1034,15 @@ def parse_variable_buffer(buffer: Blockbuffer) -> dict:
     var_decl_lines = []
     for eval_exp in dirty_var_decl_lines:
 
-        print(f'### substituting var(s) in expression: {eval_exp}...', file=sys.stderr)
+        print(f'### passing root vars to substitution function: {root_variable_values}', file=sys.stderr)
 
-        var_decl_lines.append(substitute_make_vars(eval_exp, **root_variable_values))
+        print(f'### substituting var(s) in expression: {eval_exp}...', file=sys.stderr)
+        decl = substitute_make_vars(eval_exp, **root_variable_values)
+
+        print(f'### satisfied expression. Output is: {decl}', file=sys.stderr)
+
+        var_decl_lines.append(decl)
+
 
     for eval_exp in var_decl_lines:
         raw_line = eval_exp.lstrip('$(eval').rstrip(')')
