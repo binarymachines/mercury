@@ -980,14 +980,6 @@ def parse_variable_buffer(buffer: Blockbuffer) -> dict:
         else:            
             clean_var_decl_lines.append(eval_expr)
 
-    # TODO: remove
-    print(f'CLEAN vars:')
-    print('\n'.join(clean_var_decl_lines), file=sys.stderr)
-
-    print('DIRTY vars:')
-    print('\n'.join(dirty_var_decl_lines), file=sys.stderr)
-    # TODO: end remove
-
     # populate a dictionary with the "clean" variable declarations
     #
     root_variable_values = {}
@@ -1023,25 +1015,15 @@ def parse_variable_buffer(buffer: Blockbuffer) -> dict:
 
     output.update(root_variable_values)
 
-    # TODO: remove
-    print('updated root variables (output var): ', file=sys.stderr)
-    print(common.jsonpretty(output), file=sys.stderr)
-    # TODO: end remove
-
     # if we found any "root variable values" (variables which do not depend on the value
     # of others), satisfy the variable refs which depend on them
     #
     var_decl_lines = []
     for eval_exp in dirty_var_decl_lines:
-
-        print(f'### passing root vars to substitution function: {root_variable_values}', file=sys.stderr)
-
-        print(f'### substituting var(s) in expression: {eval_exp}...', file=sys.stderr)
         decl = substitute_make_vars(eval_exp, **root_variable_values)
 
-        print(f'### satisfied expression. Output is: {decl}', file=sys.stderr)
-
-        root_variable_values.update(eval_var_decl_expression(decl))
+        key, value = parse_eval_expression(decl)
+        root_variable_values[key] = value
         var_decl_lines.append(decl)
 
 
@@ -1069,8 +1051,6 @@ def parse_variable_buffer(buffer: Blockbuffer) -> dict:
 
         else:
             output[key] = var_expression
-
-        
 
     return output
 
