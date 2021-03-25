@@ -1016,12 +1016,11 @@ def parse_variable_buffer(buffer: Blockbuffer) -> dict:
     output.update(root_variable_values)
 
     # if we found any "root variable values" (variables which do not depend on the value
-    # of others), satisfy the variable refs which depend on them
+    # of others), satisfy the "dirty" variable refs which depend on them
     #
     var_decl_lines = []
     for eval_exp in dirty_var_decl_lines:
         decl = substitute_make_vars(eval_exp, **root_variable_values)
-
         key, value = parse_eval_expression(decl)
         root_variable_values[key] = value
         var_decl_lines.append(decl)
@@ -1036,7 +1035,6 @@ def parse_variable_buffer(buffer: Blockbuffer) -> dict:
 
         if var_expression.startswith('$(shell'):
             shell_command_str = var_expression.lstrip('$(shell').rstrip(')').strip()
-
             cmd_tokens = shell_command_str.split(' ')
             shell_cmd = local[cmd_tokens[0]]
             shell_cmd_params = cmd_tokens[1:]
@@ -1051,36 +1049,6 @@ def parse_variable_buffer(buffer: Blockbuffer) -> dict:
 
         else:
             output[key] = var_expression
-
-    return output
-
-
-def eval_var_decl_expression(expression: str):
-
-    output = {}
-    raw_line = expression.lstrip('$(eval').rstrip(')')
-
-    index = raw_line.find('=')
-    key = raw_line[0:index].strip()
-    var_expression = raw_line[index+1:].strip()
-
-    if var_expression.startswith('$(shell'):
-        shell_command_str = var_expression.lstrip('$(shell').rstrip(')').strip()
-
-        cmd_tokens = shell_command_str.split(' ')
-        shell_cmd = local[cmd_tokens[0]]
-        shell_cmd_params = cmd_tokens[1:]
-        
-        if shell_cmd == 'curl':
-            from sh import curl
-            cmd_output = curl(*cmd_tokens)                
-        else:
-            cmd_output = shell_cmd(*shell_cmd_params)
-        
-        output[key] = cmd_output.strip()
-
-    else:
-        output[key] = var_expression
 
     return output
 
