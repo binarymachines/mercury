@@ -1041,6 +1041,7 @@ def parse_variable_buffer(buffer: Blockbuffer) -> dict:
 
         print(f'### satisfied expression. Output is: {decl}', file=sys.stderr)
 
+        root_variable_values.update(eval_var_decl_expression(decl))
         var_decl_lines.append(decl)
 
 
@@ -1063,14 +1064,43 @@ def parse_variable_buffer(buffer: Blockbuffer) -> dict:
                 cmd_output = curl(*cmd_tokens)                
             else:
                 cmd_output = shell_cmd(*shell_cmd_params)
-
-            #cmd_output = shell_cmd(*shell_cmd_params)
+            
             output[key] = cmd_output.strip()
 
         else:
             output[key] = var_expression
 
-        #print(f'### VAR decl expression: {var_expression}', file=sys.stderr)
+        
+
+    return output
+
+
+def eval_var_decl_expression(expression: str):
+
+    output = {}
+    raw_line = expression.lstrip('$(eval').rstrip(')')
+
+    index = raw_line.find('=')
+    key = raw_line[0:index].strip()
+    var_expression = raw_line[index+1:].strip()
+
+    if var_expression.startswith('$(shell'):
+        shell_command_str = var_expression.lstrip('$(shell').rstrip(')').strip()
+
+        cmd_tokens = shell_command_str.split(' ')
+        shell_cmd = local[cmd_tokens[0]]
+        shell_cmd_params = cmd_tokens[1:]
+        
+        if shell_cmd == 'curl':
+            from sh import curl
+            cmd_output = curl(*cmd_tokens)                
+        else:
+            cmd_output = shell_cmd(*shell_cmd_params)
+        
+        output[key] = cmd_output.strip()
+
+    else:
+        output[key] = var_expression
 
     return output
 
