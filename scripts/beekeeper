@@ -256,16 +256,20 @@ def load_config_dictionary(config_dict:dict, yaml_config:dict, macro_defs:dict, 
 
     for key, value in config_dict.items():
 
-        # TODO: remove
-        print(f'### found key in config dictionary: {key}', file=sys.stderr)
-        print(f'### value: {value}', file=sys.stderr)
-        
         macro_rx_match = MACRO_RX.match(str(value))
         template_rx_match = TEMPLATE_RX.match(str(value))
 
         # if we have a macro as the value, load and execute it
         if macro_rx_match:
-            macro_function_name = str(value).lstrip(MACRO_PREFIX).rstrip(MACRO_SUFFIX)
+            macro_function_name = value.split('[')[1].rstrip(']')
+            # this is yielding odd behavior:
+            #
+            # str(value).lstrip(MACRO_PREFIX).rstrip(MACRO_SUFFIX)
+            #
+            # For some reason it is stripping off one character too many chars--but only 
+            # intermittently. I'm going to work around it now and investigate later
+            # (might be a character encoding issue).
+            #
 
             # is this macro registered?
             macro_def = macro_defs.get(macro_function_name)
@@ -325,14 +329,7 @@ def load_api_target(target_name:str, yaml_config:dict, macro_defs:dict, macro_ar
     # retrieve any default template values supplied in the configuration file
     #
     raw_template_params = target_config.get('template_params', {})
-
-    # TODO: remove
-    print(common.jsonpretty(raw_template_params), file=sys.stderr)
-    
     template_params = load_config_dictionary(raw_template_params, yaml_config, macro_defs, macro_args, **cli_template_parameters)
-
-    # TODO: remove
-    print(common.jsonpretty(template_params), file=sys.stderr)
     
     raw_url = target_config['url']
     url = None
