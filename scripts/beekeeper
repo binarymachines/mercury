@@ -261,15 +261,20 @@ def load_config_dictionary(config_dict:dict, yaml_config:dict, macro_defs:dict, 
 
         # if we have a macro as the value, load and execute it
         if macro_rx_match:
-            macro_function_name = value.split('[')[1].rstrip(']')
-            # this is yielding odd behavior:
+            macro_function_name = value.split(MACRO_PREFIX)[1].rstrip(MACRO_SUFFIX)
+            #
+            # this was yielding odd behavior:
             #
             # str(value).lstrip(MACRO_PREFIX).rstrip(MACRO_SUFFIX)
             #
-            # For some reason it is stripping off one character too many chars--but only 
-            # intermittently. I'm going to work around it now and investigate later
-            # (might be a character encoding issue).
-            #
+            # It was stripping off one character too many -- intermittently.
+            # The problem was an odd behavior in lstrip(). It would strip
+            # an additional letter from the string if that letter matched
+            # one of the letters in the MACRO_PREFIX string -- so instead of
+            # stripping off "~macro[", it would strip off "~macro[c" if the
+            # target string began with "c".
+            # Keeping this note because it might be a Python bug.
+            # --DT
 
             # is this macro registered?
             macro_def = macro_defs.get(macro_function_name)
