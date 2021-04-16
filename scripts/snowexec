@@ -2,9 +2,9 @@
 
 '''
 Usage:
-    snowexec --account <account> --user <username> [--role <role>] --passwd <password> [--params=<n:v>...]
-    snowexec --account <account> --user <username> [--role <role>] --passwd <password> --query <query> [--params=<n:v>...]
-    snowexec --account <account> --user <username> [--role <role>] --passwd <password> --queryfile <sqlfile> [--params=<n:v>...]
+    snowexec --account <account> --user <username> [--role=<role>] --passwd <password> [--params=<n:v>...]
+    snowexec --account <account> --user <username> [--role=<role>] --passwd <password> --query <query> [--params=<n:v>...]
+    snowexec --account <account> --user <username> [--role=<role>] --passwd <password> --queryfile <sqlfile> [--params=<n:v>...]
 '''
 
 import os, sys
@@ -54,8 +54,8 @@ def main(args):
     sfparams['user'] = args['<username>']
     sfparams['password'] = args['<password>']
     sfparams['account'] = args['<account>']
-    if args.get('<role>'):
-        sfparams['role'] = args['<role>']
+    if args.get('--role'):
+        sfparams['role'] = args['--role']
 
     sf_ctx = snowflake.connector.connect(**sfparams)
     resultset = None
