@@ -97,6 +97,9 @@ CLOSE_VAR_BLOCK_RX = re.compile(r'\+close-varblock')
 OPEN_TARGET_BLOCK_RX = re.compile(r'\+open-targetblock')
 CLOSE_TARGET_BLOCK_RX = re.compile(r'\+close-targetblock')
 
+OPEN_TIMING_BLOCK_RX = re.compile(r'\+start-timer\([a-zA-Z0-9_-]+\)')
+CLOSE_TIMING_BLOCK_RX = re.compile(r'\+stop-timer')
+
 
 MAKE_ENV_VAR_RX = re.compile(r'\$\$[A-Z0-9_-]+')
 MAKE_VAR_REF_RX = re.compile(r'\$\([a-zA-Z0-9_-]+\)')
@@ -112,8 +115,9 @@ re.compile(
 CMD_BLOCK = 'cmd'
 VAR_BLOCK = 'var'
 TARGET_BLOCK = 'target'
+TIMING_BLOCK = 'timer'
 
-VALID_BLOCK_TYPES = [CMD_BLOCK, VAR_BLOCK, TARGET_BLOCK]
+VALID_BLOCK_TYPES = [CMD_BLOCK, VAR_BLOCK, TARGET_BLOCK, TIMING_BLOCK]
 
 BLK_SCRIPT_TEMPLATE = '''
 #!/bin/bash
@@ -123,6 +127,14 @@ BLK_SCRIPT_TEMPLATE = '''
 
 DEBUG_STATE_ENDED = 'ended'
 DEBUG_STATE_RUNNING = 'running'
+
+
+class TimingBlock(object):
+    def __init__(self, name: str, start_line: int, end_line: int):
+        pass
+
+    def contents(self):
+        pass
 
 
 class InvalidCheckpoint(Exception):
@@ -1276,6 +1288,28 @@ def load_blocks_from_file(fileobj, block_type):
     blockbuffers = {}
     reading_frame_open = False
     linenum = 0
+
+    if block_type == TIMING_BLOCK:
+        block_name = None
+        for line in fileobj:
+            linenum += 1
+            match_open_expr = OPEN_TIMING_BLOCK_RX.search(line)
+            if match_open_expr:
+                block_decl = line[match_open_expr.span()[0]:match_open_expr.span()[1]]
+                block_name = block_decl.split('(')[1].rstrip(')')
+
+                blockbuffers[block_name] = Blockbuffer(block_name, TIMING_BLOCK, linenum)
+                reading_frame_open = True
+                continue
+
+            match_close_expr = CLOSE_TIMING_BLOCK_RX.search(line)
+            if match_close_expr:
+                reading_frame_open = False
+                block_name = None
+                continue
+
+            if reading_frame_open:
+                blockbuffers[block_name].append(line.strip())
 
     if block_type == CMD_BLOCK:
         block_name = None

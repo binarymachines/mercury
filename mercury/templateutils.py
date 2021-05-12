@@ -113,7 +113,7 @@ def resolve_macros_in_template(input_string, macro_module_name, **kwargs):
         macro_module = __import__(macro_module_name)
 
     else:
-        print(f'WARNING: No explicit macro module specified. Macro refs must be in the format <module.name>.',
+        print(f'NOTE: No explicit macro module was specified, so any macro refs must be in the format <module.name>.',
               file=sys.stderr)
 
         return input_string
