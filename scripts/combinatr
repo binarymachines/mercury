@@ -1,0 +1,97 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    combinatr [-d] --delimiter <delimiter> --listfiles=<filename>... [--exclude=<tuple>...] [--regex-mask=<regex>]
+
+Options:
+    -d --debug  execute in debug mode
+'''
+
+import os, sys
+import re
+import json
+from itertools import product
+import docopt
+from snap import common
+
+debug_mode = False
+
+def main(args):
+
+    global debug_mode
+
+    if args['--debug']:
+        debug_mode = True
+
+    delimiter = args['<delimiter>']
+    listfile_names = args['--listfiles'][0].split(',')
+    
+    tuples_to_exclude = []
+
+    if args['--exclude']:
+        exclusion_list_string = args['--exclude'][0]
+        tuples_to_exclude = exclusion_list_string.split(',')
+    
+    excluded_tuples = []
+    for t in tuples_to_exclude:
+        excluded_tuples.append(set(t.split(delimiter)))
+
+    if debug_mode:
+        print('+++ tuples to exclude from output:', file=sys.stderr)
+        if len(excluded_tuples):
+            for et in excluded_tuples:
+                print(delimiter.join(et), file=sys.stderr)
+        else:
+            print('[]', file=sys.stderr) 
+
+    pattern_to_exclude = None
+    if args['--regex-mask']:
+        regex_string = args['--regex-mask']
+        pattern_to_exclude = re.compile(regex_string)
+
+    if debug_mode:
+        print('+++ regular expression mask:', file=sys.stderr)
+        if pattern_to_exclude:
+            print(pattern_to_exclude, file=sys.stderr)
+        else:
+            print('NONE')
+
+    lists = []
+    for filename in listfile_names:
+        value_list = []
+        with open(filename, 'r') as f:
+            for raw_line in f:
+                line = raw_line.rstrip().lstrip()
+                if not len(line):
+                    continue
+                value_list.append(line)
+        
+        lists.append(value_list)
+
+    for n_tuple in product(*lists):
+        exclude = False
+        for t in excluded_tuples:
+            if set(n_tuple) == t:
+
+                if debug_mode:
+                    print(f'+++ generated tuple {n_tuple} matches one in exclusion list -- skipping.', file=sys.stderr)
+
+                exclude = True
+                break
+        
+        tuple_string = delimiter.join(n_tuple)
+        if pattern_to_exclude and pattern_to_exclude.match(tuple_string):
+
+            if debug_mode:
+                print(f'+++ generated csv record [ {tuple_string} ] matches regex mask: {args["--regex-mask"]} -- skipping.', file=sys.stderr)
+
+            exclude = True
+
+        if not exclude:
+            print(tuple_string)
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)
