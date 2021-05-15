@@ -171,9 +171,9 @@ def read_target_params(target_yaml_config: dict, global_yaml_config: dict, macro
     # specified in the config file.
     #
     params = {}
-    config_params = target_yaml_config.get('request_params', [])
+    config_params = target_yaml_config.get('request_params')
 
-    if not len(config_params):
+    if not config_params:
         return params
 
     for p in config_params:
