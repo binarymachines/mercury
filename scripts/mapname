@@ -9,6 +9,7 @@ Usage:
 import os, sys
 import docopt
 from snap import common
+from mercury.utils import parse_cli_params
 
 
 def main(args):
@@ -25,8 +26,10 @@ def main(args):
     module_name = tokens[0]
     classname = tokens[1]
 
-    mapper_function = common.load_class(classname, module_name)
-    print(mapper_function(input_filename))
+    mapper_function = common.load_class(classname, module_name)    
+    user_params = parse_cli_params(args.get('--params') or [])
+
+    print(mapper_function(input_filename, **user_params))
 
 
 if __name__ == '__main__':
