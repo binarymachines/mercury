@@ -855,7 +855,7 @@ def substitute_make_vars(makeblock_expr: str, **kwargs) -> str:
 
 
 def parse_command_buffer(buffer: Blockbuffer) -> DecodedCommandBlock:
-    blocktext = '\n'.join(line.strip('\n') for line in buffer.lines if not line.startswith('#'))
+    blocktext = '\n'.join(line.strip('\n') for line in buffer.lines if not line.lstrip().startswith('#'))
     cmd_template = blocktext.replace('$(', '{').replace(')', '}')
 
     # Edge case: any awk expression found in a makefile must use a double dollar-sign;
@@ -1572,7 +1572,6 @@ def main(args):
 
     if block_type not in VALID_BLOCK_TYPES:
         raise Exception(f'Invalid block type {block_type}. Valid block types are: {", ".join(VALID_BLOCK_TYPES)}')
-
 
     if args['--find']:
         blockname = args['<blockname>']
