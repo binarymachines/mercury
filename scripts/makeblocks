@@ -855,8 +855,16 @@ def substitute_make_vars(makeblock_expr: str, **kwargs) -> str:
 
 
 def parse_command_buffer(buffer: Blockbuffer) -> DecodedCommandBlock:
-    blocktext = '\n'.join(line.strip('\n') for line in buffer.lines if not line.lstrip().startswith('#'))
+    
+    print('parsing buffer lines...', file=sys.stderr)
+    for line in buffer.lines:
+        print(f'---{line}')
+    print('_______________________')
+
+    blocktext = '\n'.join(line.strip('\n') for line in buffer.lines)
     cmd_template = blocktext.replace('$(', '{').replace(')', '}')
+
+    print(blocktext, file=sys.stderr)
 
     # Edge case: any awk expression found in a makefile must use a double dollar-sign;
     # this will be followed by a numeric digit. Replace the double dollar sign 
@@ -1331,7 +1339,10 @@ def load_blocks_from_file(fileobj, block_type):
                 continue
 
             if reading_frame_open:
-                blockbuffers[block_name].append(line.strip())
+                if line.lstrip().startswith('#'):
+                    blockbuffers[block_name].append(line)
+                else:    
+                    blockbuffers[block_name].append(line.strip())
     
     elif block_type == VAR_BLOCK:
         block_name = None
