@@ -856,15 +856,21 @@ def substitute_make_vars(makeblock_expr: str, **kwargs) -> str:
 
 def parse_command_buffer(buffer: Blockbuffer) -> DecodedCommandBlock:
     
+    '''
+    TODO: delete
     print('parsing buffer lines...', file=sys.stderr)
     for line in buffer.lines:
         print(f'---{line}')
     print('_______________________')
+    '''
 
-    blocktext = '\n'.join(line.strip('\n') for line in buffer.lines)
+    #blocktext = '\n'.join(line.strip('\n') for line in buffer.lines)
+    blocktext = buffer.data
+
     cmd_template = blocktext.replace('$(', '{').replace(')', '}')
 
-    print(blocktext, file=sys.stderr)
+    # TODO: delete
+    #print(blocktext, file=sys.stderr)
 
     # Edge case: any awk expression found in a makefile must use a double dollar-sign;
     # this will be followed by a numeric digit. Replace the double dollar sign 
