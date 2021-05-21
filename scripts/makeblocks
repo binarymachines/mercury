@@ -791,7 +791,9 @@ class Blockbuffer(object):
 
     @property
     def lines(self):
-        return [l.lstrip('#') for l in self._lines]
+        #return [l.lstrip('#') for l in self._lines]
+        # TODO: do we need to strip comment markers at all?
+        return self._lines
 
     
     @property
@@ -803,8 +805,8 @@ class Blockbuffer(object):
             return '\n'.join(line for line in self.lines if not line.startswith('#'))
 
         elif self.block_type == TARGET_BLOCK:
-            return self. _lines
-
+            # Do not strip comments
+            return self.lines
 
 
 def find_keys(cmd_template: str) -> list:
@@ -813,7 +815,6 @@ def find_keys(cmd_template: str) -> list:
         keys.add(exp.lstrip('{').rstrip('}'))
 
     return list(keys)
-
 
 
 def parse_eval_expression(expr: str) -> tuple:
