@@ -797,7 +797,7 @@ class Blockbuffer(object):
     @property
     def data(self):
         if self.block_type == CMD_BLOCK:
-            return ''.join(line for line in self.lines if not line.startswith('#')).replace('\\', '')
+            return '\n'.join(line for line in self.lines if not line.startswith('#')).replace('\\', '')
 
         elif self.block_type == VAR_BLOCK:
             return '\n'.join(line for line in self.lines if not line.startswith('#'))
