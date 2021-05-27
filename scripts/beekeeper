@@ -94,6 +94,11 @@ class APITarget(object):
 
         self.headers = headers
         self.parameters = kwargs
+        self.requests_lib_keyword_args = dict()
+
+
+    def add_request_setting(self, name, value):
+        self.requests_lib_keyword_args[name] = value
 
 
     def call(self, **kwargs):
@@ -122,7 +127,7 @@ class APITarget(object):
         # server-side error. (Ask me how I know.)
         #
         call_params = dict()
-        request_kwargs = dict()
+        request_kwargs = self.requests_lib_keyword_args
 
         for key, value in raw_params.items():
             if debug_mode:
@@ -137,7 +142,7 @@ class APITarget(object):
 
         if self.method == 'GET':
             response = requests.get(self.base_url, headers=self.headers, params=call_params, **request_kwargs)
-            
+
         elif self.method == 'POST':
             if self.headers.get('Accept') == 'application/json':
                 response = requests.post(self.base_url, headers=self.headers, json=call_params, **request_kwargs)
@@ -338,9 +343,9 @@ def load_api_target(target_name:str, yaml_config:dict, macro_defs:dict, macro_ar
     #
     raw_template_params = target_config.get('template_params', {})
     template_params = load_config_dictionary(raw_template_params, yaml_config, macro_defs, macro_args, **cli_template_parameters)
-    
     raw_url = target_config['url']
     url = None
+
     try:
         url = raw_url.format(**template_params)        
     except KeyError as err:
@@ -349,12 +354,31 @@ def load_api_target(target_name:str, yaml_config:dict, macro_defs:dict, macro_ar
 
     try:
         http_request_params = read_target_params(target_config, yaml_config, macro_defs, macro_args, **cli_request_parameters)
-        return APITarget(url,
+        target = APITarget(url,
                         target_config['method'],
                         headers,
                         processor_func,
                         **http_request_params)
+
+        #
+        # read any name-value pairs specified in the (optional) "settings" field of the target config.
+        # These n-v pairs will be passed through to our underlying call to the requests HTTP library as keyword args.
+        # For example: if you wished to turn off SSL verification on a call to an endpoint, you could do so by specifying
+        #
+        # settings:
+        #    verify: False
+        #
+        # and in our callout to the requests lib, we would pass 
+        #
+        # requests.get(<url>, <other_params>, verify=False)
+        #
+        #
+        request_lib_settings = target_config.get('settings', {})
+        for name, value in request_lib_settings.items():
+            target.add_request_setting(name, value)
                         
+        return target
+
     except Exception as err:
         raise Exception(f'An exception of type {err.__class__.__name__} was thrown while resolving beekeeper config target "{target_name}": \n{str(err)}')
 
@@ -505,6 +529,10 @@ def main(args):
 
     if debug_mode:
         print(f'#---API target {target_name} loaded.', file=sys.stderr)
+
+        print(f'#--- Requests library callthrough parameters:', file=sys.stderr)
+        print(common.jsonpretty(api_target.requests_lib_keyword_args), file=sys.stderr)
+
         print(f'#--- Request headers for API target {target_name}:', file=sys.stderr)
         print(common.jsonpretty(api_target.headers), file=sys.stderr)
 
