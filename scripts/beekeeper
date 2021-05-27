@@ -121,7 +121,9 @@ class APITarget(object):
         # being sent to an endpoint instead of actual JSON  -- causing a nonintuitive 
         # server-side error. (Ask me how I know.)
         #
-        call_params = {}
+        call_params = dict()
+        request_kwargs = dict()
+
         for key, value in raw_params.items():
             if debug_mode:
                 print(f'### Normalizing the value of request param "{key}" (value is {value})...', file=sys.stderr)
@@ -134,14 +136,15 @@ class APITarget(object):
             print('### Call parameters: %s' % call_params, file=sys.stderr)
 
         if self.method == 'GET':
-            response = requests.get(self.base_url, headers=self.headers, params=call_params)
+            response = requests.get(self.base_url, headers=self.headers, params=call_params, **request_kwargs)
+            
         elif self.method == 'POST':
             if self.headers.get('Accept') == 'application/json':
-                response = requests.post(self.base_url, headers=self.headers, json=call_params)
+                response = requests.post(self.base_url, headers=self.headers, json=call_params, **request_kwargs)
             elif self.headers.get('Content-Type') == 'application/json':
-                response = requests.post(self.base_url, headers=self.headers, json=call_params)
+                response = requests.post(self.base_url, headers=self.headers, json=call_params, **request_kwargs)
             else:
-                response = requests.post(self.base_url, headers=self.headers, data=call_params)
+                response = requests.post(self.base_url, headers=self.headers, data=call_params, **request_kwargs)
 
         if debug_mode:
             print(f'#--- Response headers from target (URL {self.base_url}):', file=sys.stderr)  
