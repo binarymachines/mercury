@@ -24,6 +24,42 @@ class Whitespace(Enum):
   space = ' '
   tab = '\t'
 
+def split_unescape(s, delim, escape='\\', unescape=True):
+    # stolen from https://stackoverflow.com/a/21882672
+    """
+    >>> split_unescape('foo,bar', ',')
+    ['foo', 'bar']
+    >>> split_unescape('foo$,bar', ',', '$')
+    ['foo,bar']
+    >>> split_unescape('foo$$,bar', ',', '$', unescape=True)
+    ['foo$', 'bar']
+    >>> split_unescape('foo$$,bar', ',', '$', unescape=False)
+    ['foo$$', 'bar']
+    >>> split_unescape('foo$', ',', '$', unescape=True)
+    ['foo$']
+    """
+    ret = []
+    current = []
+    itr = iter(s)
+    for ch in itr:
+        if ch == escape:
+            try:
+                # skip the next character; it has been escaped!
+                if not unescape:
+                    current.append(escape)
+                current.append(next(itr))
+            except StopIteration:
+                if unescape:
+                    current.append(escape)
+        elif ch == delim:
+            # split! (add current to the list and reset it)
+            ret.append(''.join(current))
+            current = []
+        else:
+            current.append(ch)
+    ret.append(''.join(current))
+    return ret
+
 def tab(num_tabs):
   return ''.join(itertools.repeat('\t', num_tabs))
   
@@ -65,7 +101,7 @@ def parse_cli_params(params_array):
     data = {}
     if len(params_array):
         params_string = params_array[0]
-        nvpair_tokens = params_string.split(',')
+        nvpair_tokens = split_unescape(params_string,',')
         for nvpair in nvpair_tokens:
             if ':' not in nvpair:
                 raise Exception('parameters passed to warp must be in the format <name:value>.')
