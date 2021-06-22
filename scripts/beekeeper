@@ -23,7 +23,7 @@ import requests
 import docopt
 from snap import snap, common
 import yaml
-
+from mercury.utils import split_unescape
 
 APICallStatus = namedtuple('APICallStatus', 'ok url status_code data')
 
@@ -405,10 +405,10 @@ def read_cli_request_params(args) -> dict:
     if args.get('--r-params'):
         raw_params = args['--r-params'][0]
         
-        nvpairs = raw_params.split(',')
+        nvpairs = split_unescape(raw_params,',')
 
         for nvpair in nvpairs:
-            tokens = nvpair.split(':')
+            tokens = split_unescape(nvpair,':')
             name = tokens[0]
             value = tokens[1]
             cli_request_parameters[name] = value
@@ -425,10 +425,10 @@ def read_cli_template_params(args) -> dict:
     if args.get('--t-params'):
         raw_params = args['--t-params'][0]
         
-        nvpairs = raw_params.split(',')
+        nvpairs = split_unescape(raw_params, ',')
 
         for nvpair in nvpairs:
-            tokens = nvpair.split(':')
+            tokens = split_unescape(nvpair,':')
             name = tokens[0]
             value = tokens[1]
             cli_template_parameters[name] = value
@@ -443,7 +443,7 @@ def read_macro_args(args):
         nvpairs = raw_args.split(',')
 
         for nvpair in nvpairs:
-            tokens = nvpair.split(':')
+            tokens = split_unescape(nvpair,':')
             name = tokens[0]
             value = tokens[1]
             macro_args[name] = value
