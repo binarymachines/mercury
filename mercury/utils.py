@@ -106,7 +106,7 @@ def parse_cli_params(params_array):
             if ':' not in nvpair:
                 raise Exception('parameters passed to warp must be in the format <name:value>.')
 
-            tokens = nvpair.split(':') 
+            tokens = split_unescape(nvpair,':') 
             key = tokens[0]
             value = tokens[1]
             data[key] = value
