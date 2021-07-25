@@ -150,12 +150,20 @@ class APITarget(object):
             
 
         elif self.method == 'POST':
+
+            print(f'#### configured file refs: {self.file_refs}')
+
             if self.headers.get('Accept') == 'application/json':
                 response = requests.post(self.base_url, headers=self.headers, json=call_params, files=self.file_refs, **request_kwargs)
+
             elif self.headers.get('Content-Type') == 'application/json':
                 response = requests.post(self.base_url, headers=self.headers, json=call_params, files=self.file_refs, **request_kwargs)
+
             else:
-                response = requests.post(self.base_url, headers=self.headers, data=call_params, files=self.file_refs, **request_kwargs)
+                print('@@@@ Calling requests with DATA kwarg, not JSON')
+                print(common.jsonpretty(call_params))
+                ## TODO: Warning: "headers kwarg removed"
+                response = requests.post(self.base_url, data=call_params, files=self.file_refs, **request_kwargs)
 
         if debug_mode:
             print(f'#--- Response headers from target (URL {self.base_url}):', file=sys.stderr)  
