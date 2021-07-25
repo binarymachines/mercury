@@ -219,7 +219,7 @@ def read_target_params(target_yaml_config: dict, global_yaml_config: dict, macro
     return params
 
 
-def read_target_files(target_yaml_config: dict, global_yaml_config: dict, macro_defs: dict, macro_args: dict, **kwargs)->list:
+def read_target_files(target_yaml_config: dict, macro_defs: dict, macro_args: dict, **kwargs)->list:
     #
     # This allows us to refer directly to files so that we can use the Requests library
     # to pass local file objects (intended as email attachments) to, say, the Mailgun API.
