@@ -403,6 +403,10 @@ def load_api_target(target_name:str, yaml_config:dict, macro_defs:dict, macro_ar
         for name, value in request_lib_settings.items():
             target.add_request_setting(name, value)
                         
+        filerefs = read_target_files(target_config, macro_defs, macro_args)
+        for ref in filerefs:
+            target.add_file_ref(ref[0], ref[1])
+        
         return target
 
     except Exception as err:
