@@ -95,10 +95,15 @@ class APITarget(object):
         self.headers = headers
         self.parameters = kwargs
         self.requests_lib_keyword_args = dict()
+        self.file_refs = []
 
 
     def add_request_setting(self, name, value):
         self.requests_lib_keyword_args[name] = value
+
+
+    def add_file_ref(self, name, file_object):
+        self.file_refs.append((name, file_object))
 
 
     def call(self, **kwargs):
@@ -142,14 +147,15 @@ class APITarget(object):
 
         if self.method == 'GET':
             response = requests.get(self.base_url, headers=self.headers, params=call_params, **request_kwargs)
+            
 
         elif self.method == 'POST':
             if self.headers.get('Accept') == 'application/json':
-                response = requests.post(self.base_url, headers=self.headers, json=call_params, **request_kwargs)
+                response = requests.post(self.base_url, headers=self.headers, json=call_params, files=self.file_refs, **request_kwargs)
             elif self.headers.get('Content-Type') == 'application/json':
-                response = requests.post(self.base_url, headers=self.headers, json=call_params, **request_kwargs)
+                response = requests.post(self.base_url, headers=self.headers, json=call_params, files=self.file_refs, **request_kwargs)
             else:
-                response = requests.post(self.base_url, headers=self.headers, data=call_params, **request_kwargs)
+                response = requests.post(self.base_url, headers=self.headers, data=call_params, files=self.file_refs, **request_kwargs)
 
         if debug_mode:
             print(f'#--- Response headers from target (URL {self.base_url}):', file=sys.stderr)  
@@ -204,13 +210,33 @@ def read_target_params(target_yaml_config: dict, global_yaml_config: dict, macro
                     raise MissingMacroArgError(argname, macro_def)
 
             value = eval_macro(macro_function_name, global_yaml_config, **macro_args)
+            
         else:
             value = common.load_config_var(raw_value)
-
         params[p['name']] = value
 
     params.update(kwargs)
     return params
+
+
+def read_target_files(target_yaml_config: dict, global_yaml_config: dict, macro_defs: dict, macro_args: dict, **kwargs)->list:
+    #
+    # This allows us to refer directly to files so that we can use the Requests library
+    # to pass local file objects (intended as email attachments) to, say, the Mailgun API.
+    #
+
+    output_tuples = []
+    file_refs = target_yaml_config.get('files')
+
+    if not file_refs:
+        return output_tuples
+
+    for ref in file_refs:
+        ref_name = ref['name']
+        ref_file = open(ref['path'], 'rb')
+        output_tuples.append(ref_name, ref_file))
+
+    return output_tuples
 
 
 def eval_macro(macro_funcname, yaml_config, **kwargs):
