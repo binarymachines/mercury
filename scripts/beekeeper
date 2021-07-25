@@ -234,10 +234,10 @@ def read_target_files(target_yaml_config: dict, global_yaml_config: dict, macro_
     for ref in file_refs:
         ref_name = ref['name']
         ref_file = open(ref['path'], 'rb')
-        output_tuples.append(ref_name, ref_file))
+        output_tuples.append((ref_name, ref_file))
 
     return output_tuples
-
+x
 
 def eval_macro(macro_funcname, yaml_config, **kwargs):
 
