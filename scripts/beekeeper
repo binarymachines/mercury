@@ -112,7 +112,8 @@ class APITarget(object):
         raw_params.update(self.parameters)
         raw_params.update(kwargs)
 
-        print('### raw call parameters: %s' % raw_params, file=sys.stderr)
+        if debug_mode:
+            print('### raw call parameters: %s' % raw_params, file=sys.stderr)
 
         # Because we are SOMETIMES required to pass JSON to an endpoint, and because
         # macros and templates ALWAYS return strings, here we "normalize" all incoming
@@ -144,14 +145,13 @@ class APITarget(object):
         
         if debug_mode:
             print('### Call parameters: %s' % call_params, file=sys.stderr)
+            print(f'### File refs:', file=sys.stderr)
+            print("\n".join(self.file_refs), file=sys.stderr)
 
         if self.method == 'GET':
             response = requests.get(self.base_url, headers=self.headers, params=call_params, **request_kwargs)
             
-
         elif self.method == 'POST':
-
-            print(f'#### configured file refs: {self.file_refs}')
 
             if self.headers.get('Accept') == 'application/json':
                 response = requests.post(self.base_url, headers=self.headers, json=call_params, files=self.file_refs, **request_kwargs)
@@ -159,15 +159,16 @@ class APITarget(object):
             elif self.headers.get('Content-Type') == 'application/json':
                 response = requests.post(self.base_url, headers=self.headers, json=call_params, files=self.file_refs, **request_kwargs)
 
-            else:
-                print('@@@@ Calling requests with DATA kwarg, not JSON')
-                print(common.jsonpretty(call_params))
-                ## TODO: Warning: "headers kwarg removed"
-                response = requests.post(self.base_url, data=call_params, files=self.file_refs, **request_kwargs)
+            else:                
+                response = requests.post(self.base_url,
+                                         data=call_params,
+                                         headers=self.headers,                                         
+                                         files=self.file_refs,
+                                         **request_kwargs)
 
         if debug_mode:
             print(f'#--- Response headers from target (URL {self.base_url}):', file=sys.stderr)  
-            print(common.jsonpretty(dict(response.headers)), file=sys.stderr)
+            print(common.jsonpretty(dict(response.headers)), file=sys.stderr)            
 
         if response.status_code == requests.codes.ok:
             if process_output_as_bytes:
@@ -582,34 +583,21 @@ def main(args):
 
     if call_status.ok:
 
-        if api_target.processor:
-            #print('#### Target processor designated.')
+        if api_target.processor:            
             print(api_target.processor.process(call_status, service_registry))
 
         elif process_output_as_bytes:
-            #print(call_status.data)
-
             output_dict = call_status._asdict()
             decoded_bindata = output_dict['data'].decode('utf-8', 'replace')
             output_dict.update({'data': decoded_bindata})
 
             print(json.dumps(output_dict))
-            # write the binary output data to the specified file
 
+            # write the binary output data to the specified file
             output_binfile = args['<filename>']
             with open(output_binfile, 'wb+') as f:
                 f.write(call_status.data)
-
-            '''
-            fp = None
-            try:
-                fp = os.fdopen(sys.stdout.fileno(), 'wb')
-                fp.write(call_status.data)
-                fp.flush()
-            finally:
-                if fp:
-                    fp.close()
-            '''
+            
         else:
             print(json.dumps(call_status._asdict()))       
     else:
