@@ -294,8 +294,6 @@ def load_config_dictionary(config_dict:dict, yaml_config:dict, macro_defs:dict, 
     #
 
     data = {}
-    if not config_dict:
-        return data
 
     for key, value in config_dict.items():
 
@@ -345,7 +343,6 @@ def load_config_dictionary(config_dict:dict, yaml_config:dict, macro_defs:dict, 
     # if the user has passed us any template variables on the command line, add those to the mix
     # (override any variables already specified)
     data.update(kwargs)
-
     return data
 
 
