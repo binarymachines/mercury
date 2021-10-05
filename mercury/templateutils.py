@@ -187,7 +187,7 @@ def resolve_env_vars_in_template(template_string):
     return result
 
 
-def process_template_input_params(param_dict, macro_module_name=None, macro_args_dict={}):
+def process_template_input_params(param_dict, macro_args_dict, macro_module_name=None):
     data = {}
     if not param_dict:
         return data
@@ -235,7 +235,7 @@ def process_template_input_params(param_dict, macro_module_name=None, macro_args
                 if not macro_module_name:
                     raise Exception('Template input params specify a macro, but no macro module name was supplied. Please check your command line.')
  
-            data[key] = eval_macro(macro_function_name, macro_module_name, **macro_args_dict)
+            data[key] = eval_macro(macro_function_name, macro_module_name, macro_args_dict)
 
         # if we have a template as the value, populate it
         elif template_rx_match:

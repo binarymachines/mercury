@@ -301,6 +301,10 @@ class DebugSession(object):
         step = self.steps[self._index]
 
         cmd = step.command_block
+
+        print(f'$$$ command template:\n{cmd.command_template}')
+        print(f'$$$ variable data: {common.jsonpretty(self.vardata)}')
+
         live_command = cmd.command_template.format(**self.vardata)
         block_script_filename = self.generate_scriptfile_name(step.name)
 
@@ -487,7 +491,11 @@ class ConsoleCLI(Cmd):
                     return
 
                 var_data = decode_blockbuffer(varbuffer, VAR_BLOCK)
+                # TODO: remove print statements
+                print('$$$ decoding blockbuffer...')
                 decoded_command = decode_blockbuffer(cmd_block, CMD_BLOCK)
+
+                print('$$$ formatting command template...')
                 live_command = decoded_command.command_template.format(**var_data)
 
                 # if the command was invoked with the "execute" option, run the command
@@ -1347,7 +1355,7 @@ def load_blocks_from_file(fileobj, block_type):
 
             if reading_frame_open:
                 if line.lstrip().startswith('#'):
-                    blockbuffers[block_name].append(line)
+                    blockbuffers[block_name].append(line.rstrip())
                 else:    
                     blockbuffers[block_name].append(line.strip())
     

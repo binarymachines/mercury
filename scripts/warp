@@ -157,7 +157,7 @@ def main(args):
         template_str = templateutils.resolve_embedded_expressions(raw_template_str, macro_module_name, **macro_args)
 
         if args.get('--macros') is not None:
-            template_params = templateutils.process_template_input_params(input_params, args['--macros'], macro_args)
+            template_params = templateutils.process_template_input_params(input_params, macro_args, args['--macros'])
         else:
             template_params = templateutils.process_template_input_params(input_params, macro_args)
  
