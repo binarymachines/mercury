@@ -156,15 +156,15 @@ def resolve_macros_in_template(input_string, macro_module_name, **kwargs):
     return input_string
 
 
-def eval_macro(macro_funcname, macro_module, **kwargs):
+def eval_macro(macro_funcname: str, macro_args: dict, macro_module_name: str):
 
     macro_func = None
     try:
-        macro_func = common.load_class(macro_funcname, macro_module)        
+        macro_func = common.load_class(macro_funcname, macro_module_name)        
     except AttributeError:
-        raise Exception(f'The macro function "{macro_funcname}" was not found in the specified macro_module {macro_module}.')
+        raise Exception(f'The macro function "{macro_funcname}" was not found in the specified macro_module {macro_module_name}.')
 
-    return macro_func(**kwargs)
+    return macro_func(**macro_args)
 
 
 def resolve_env_vars_in_template(template_string):
@@ -235,7 +235,7 @@ def process_template_input_params(param_dict, macro_args_dict, macro_module_name
                 if not macro_module_name:
                     raise Exception('Template input params specify a macro, but no macro module name was supplied. Please check your command line.')
  
-            data[key] = eval_macro(macro_function_name, macro_module_name, macro_args_dict)
+            data[key] = eval_macro(macro_function_name, macro_args_dict, macro_module_name)
 
         # if we have a template as the value, populate it
         elif template_rx_match:
