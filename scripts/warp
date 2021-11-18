@@ -168,7 +168,7 @@ def main(args):
         j2env = jinja2.Environment()
         template_mgr = common.JinjaTemplateManager(j2env)
         j2template = j2env.from_string(template_str)
-        print(j2template.render(template_params))
+        print(j2template.render(**template_params))
 
     elif template_mode == 'python':
         print(template_str.format(**template_params))
