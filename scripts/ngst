@@ -2,7 +2,7 @@
 
 '''
 Usage:
-    ngst --config <configfile> [-p] --target <ingest_target> [--datafile <datafile>] [--limit=<max_records>]           
+    ngst --config <configfile> [-p] --target <target> [--datafile <file>] [--params=<name:value>...] [--limit=<max_records>]           
     ngst --config <configfile> --list (targets | datastores | globals)
 
 Options:            
@@ -27,6 +27,7 @@ from docopt import docopt as docopt_func
 from docopt import DocoptExit
 from snap import snap, common
 from mercury import datamap as dmap
+from mercury import utils
 import yaml
 
 
@@ -77,9 +78,10 @@ class RecordBuffer(object):
 
 
 class checkpoint(ContextDecorator):
-    def __init__(self, record_buffer, **kwargs):
+    def __init__(self, record_buffer, ingest_parameters, **kwargs):
         checkpoint_interval = int(kwargs.get('interval') or 1)
 
+        self.ingest_params = ingest_parameters
         self.interval = checkpoint_interval
         self._outstanding_writes = 0
         self._total_writes = 0
@@ -108,7 +110,7 @@ class checkpoint(ContextDecorator):
     def register_write(self, **kwargs):
         self.increment_write_count()
         if self.writes_since_last_reset == self.interval:
-            self.record_buffer.flush(**kwargs)
+            self.record_buffer.flush(**self.ingest_params)
             self.reset()
 
 
@@ -117,7 +119,7 @@ class checkpoint(ContextDecorator):
 
 
     def __exit__(self, *exc):
-        self.record_buffer.writethrough()
+        self.record_buffer.writethrough(**self.ingest_params)
         return False
 
 
@@ -191,7 +193,7 @@ def initialize_record_buffer(ingest_target, datastore_registry):
 
 
 def main(args):
-    #print(common.jsonpretty(args))
+    
     config_filename = args['<configfile>']
     yaml_config = common.read_config_file(config_filename)
     project_dir = common.load_config_var(yaml_config['globals']['project_home'])
@@ -212,14 +214,18 @@ def main(args):
 
     available_ingest_targets = load_ingest_targets(yaml_config, datastore_registry)
 
-    if args['--target'] == True and args['<datafile>'] is None:
+    ingest_params = {} # optional, passed on the command line as n:v pairs
+    if args['--params']:
+        ingest_params.update(utils.parse_cli_params(args['--params']))
+        
+    if args['--target'] == True and args['<file>'] is None:
         stream_input_mode = True
-        ingest_target_name = args['<ingest_target>']
+        ingest_target_name = args['<target>']
         ingest_target = lookup_ingest_target_by_name(ingest_target_name, available_ingest_targets)
         buffer = initialize_record_buffer(ingest_target, datastore_registry)
 
         record_count = 0
-        with checkpoint(buffer, interval=ingest_target.checkpoint_interval):
+        with checkpoint(buffer, ingest_params, interval=ingest_target.checkpoint_interval):
             while True:
                 if record_count == limit:
                     break
@@ -228,15 +234,15 @@ def main(args):
                 if not len(line):
                     break
                 if not preview_mode:
-                    buffer.write(line)
+                    buffer.write(line, **ingest_params)
                 else:
                     print(line)
                 record_count += 1
 
-    elif args['<datafile>']:
+    elif args['<file>']:
         file_input_mode = True
-        input_file = args['<datafile>']        
-        ingest_target_name = args['<ingest_target>']
+        input_file = args['<file>']        
+        ingest_target_name = args['<target>']
         ingest_target = lookup_ingest_target_by_name(ingest_target_name, available_ingest_targets)
         buffer = initialize_record_buffer(ingest_target, datastore_registry)
 

@@ -41,7 +41,18 @@ def main(args):
     region = source_config['region']
     polling_interval = int(source_config['polling_interval_seconds'])
     
-    sqs = boto3.client('sqs', region_name=region)
+    print('############## SPINNING UP SQS client', file=sys.stderr)
+
+    sqs = None
+
+    auth_method = source_config['auth_method']
+    if auth_method == 'profile':
+        profile_name = source_config['profile_name'] 
+        session = boto3.Session(profile_name=profile_name)
+        sqs = session.client('sqs', region_name=region)
+    else:
+        raise Exception(f'Unsupported auth method: {auth_method}')
+    
     queue_url = common.load_config_var(source_config['queue_url'])
     msg_handler_name = source_config['handler']
     project_dir = common.load_config_var(yaml_config['globals']['project_home'])
@@ -54,7 +65,7 @@ def main(args):
     # loop forever
     
     current_time = datetime.datetime.now().isoformat()
-    print('### checking SQS queue for messages at %s...' % current_time)
+    print('### checking SQS queue for messages at %s...' % current_time, file=sys.stderr)
     while True:
         # Receive message from SQS queue
         response = sqs.receive_message(
@@ -85,22 +96,22 @@ def main(args):
         for message in inbound_msgs:
             receipt_handle = message['ReceiptHandle']
             current_time = datetime.datetime.now().isoformat()
-            print('### spawning message processor at %s...' % current_time)
+            print('### spawning message processor at %s...' % current_time, file=sys.stderr)
             
             try:                
                 p = Process(target=msg_handler_func, args=(message, receipt_handle, service_tbl))
                 p.start()
                 child_procs.append(p)
-                print('### Queued message-handling subprocess.')
+                print('### Queued message-handling subprocess.', file=sys.stderr)
                 # Delete received message from queue
                 sqs.delete_message(
                     QueueUrl=queue_url,
                     ReceiptHandle=receipt_handle
                 )
-                print('### Received and deleted message with receipt: %s' % receipt_handle)
+                print('### Received and deleted message with receipt: %s' % receipt_handle, file=sys.stderr)
             except Exception as err:
-                print('!!! Error processing message with receipt: %s' % receipt_handle)
-                print(err)
+                print('!!! Error processing message with receipt: %s' % receipt_handle, file=sys.stderr)
+                print(err, file=sys.stderr)
 
 
 if __name__ == '__main__':

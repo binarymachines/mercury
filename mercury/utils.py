@@ -79,10 +79,10 @@ def clear():
         _ = system('clear') 
 
 
-def read_stdin():
+def read_stdin(charset='utf-8'):
     for line in sys.stdin:
         if sys.hexversion < 0x03000000:
-            line = line.decode('utf-8')
+            line = line.decode(charset)
         yield line.lstrip().rstrip()
 
 
