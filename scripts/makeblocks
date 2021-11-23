@@ -10,7 +10,7 @@ Usage:
     makeblocks --type <blocktype> --list [--makefile <filename>]
     makeblocks --type <blocktype> --all [--makefile <filename>]
     makeblocks --scan [--makefile <filename>]
-    makeblocks --check <targetblock_name> [--makefile <filename>]
+    makeblocks --check <targetblock_name> [--service-cfg <configfile>] [--makefile <filename>]
     makeblocks --check [<targetblock_name>] --list [--makefile <filename>]
     makeblocks --find --type <blocktype> <blockname> [--makefile <filename>]
     makeblocks --copytarget <targetblock_name> [--makefile <filename>]
@@ -24,7 +24,7 @@ Options:
 
 #
 # makeblocks: command-line utility for managing data pipeline configurations based on the M2
-# (Mercury makefile) design pattern.
+# (Mercury makefile) pattern.
 #
 # A "Mercury" makefile is a canonical makefile, but organized and instrumented to run data pipelines.
 #
@@ -83,7 +83,8 @@ import docopt
 from docopt import docopt as docopt_func
 from docopt import DocoptExit
 from cmd import Cmd
-from snap import common
+from snap import snap, common
+from snap.common import ServiceObjectRegistry
 from snap import cli_tools as cli
 from plumbum import local
 from mercury.utils import tab, clear
@@ -180,9 +181,9 @@ class Checkpoint(object):
         else:
             return self.variable
         
-    def execute(self, value, **test_params):
+    def execute(self, value, service_registry, **test_params):
         try:
-            self.test_function(value, **test_params)
+            self.test_function(value, service_registry, **test_params)
             return CheckpointStatus(is_ok=True, message=None)
         
         except AssertionError as err:
@@ -1479,7 +1480,7 @@ def get_checkpoints_in_target_buffer(buffer: Blockbuffer, checkpoint_location_li
     return locations
 
 
-def execute_checkpoint(ckpt: Checkpoint, home_buffer: Blockbuffer, line_number) -> dict:
+def execute_checkpoint(ckpt: Checkpoint, home_buffer: Blockbuffer, line_number, svc_registry: ServiceObjectRegistry) -> dict:
 
     checkpoint_vars = {}
     # load any varblocks declared in this target
@@ -1505,7 +1506,7 @@ def execute_checkpoint(ckpt: Checkpoint, home_buffer: Blockbuffer, line_number) 
         value = vars.get(variable)
 
         #result = checkpoint_function(value, **params)
-        checkpoint_status = ckpt.execute(value, **params)
+        checkpoint_status = ckpt.execute(value, svc_registry, **params)
         
     else:
         # the checkpoint was declared with an explicit variable
@@ -1525,6 +1526,8 @@ def execute_checkpoint(ckpt: Checkpoint, home_buffer: Blockbuffer, line_number) 
     
 
 def main(args):
+
+    sys.path.append(os.getcwd())
 
     if args['--copytarget']:
 
@@ -1573,6 +1576,18 @@ def main(args):
                 print(json.dumps([{'name': c.checkpoint.name, 'line': c.line_number} for c in all_checkpoint_locations]))
 
         else:
+            svc_registry = common.ServiceObjectRegistry({})
+
+            if args['--service-cfg']:
+                configfile_name = args['<configfile>']
+
+                yaml_config = common.read_config_file(configfile_name)
+                project_dir = common.load_config_var(yaml_config['globals']['project_home'])
+                sys.path.append(project_dir)
+
+                service_tbl = snap.initialize_services(yaml_config)
+                svc_registry = common.ServiceObjectRegistry(service_tbl)
+
             target_blockbuffers = load_blocks(TARGET_BLOCK, makefile_name)
             block_name = args['<targetblock_name>']            
             buffer = target_blockbuffers.get(block_name)
@@ -1583,7 +1598,7 @@ def main(args):
             status_data = []
             for ckpt_loc in checkpoint_locations:
                 ckpt = ckpt_loc.checkpoint
-                status_data.append(execute_checkpoint(ckpt, buffer, ckpt_loc.line_number))
+                status_data.append(execute_checkpoint(ckpt, buffer, ckpt_loc.line_number, svc_registry))
 
             print(json.dumps(status_data))
 
