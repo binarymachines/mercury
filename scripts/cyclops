@@ -47,10 +47,7 @@ class Watcher:
 
         self.watch_interval = watch_interval_secs
         self.observer.daemon = True
-        #for handler in event_handlers:
-        #    self.observer.schedule(handler, self.target_directory, recursive=False)
-        #self.observer.start()
-
+       
     def add_handler(self, name, dispatcher, target_directory, recursive=False):
         self.event_handlers.append(EventHandlerContext(name=name, dispatcher=dispatcher, directory=target_directory))
         self.observer.schedule(dispatcher, target_directory, recursive)
@@ -61,8 +58,8 @@ class Watcher:
         while True:
             try:
                 if self.debug_mode:
-                    for handler_ctx in self.event_handlers:
-                        print(f'+++ event handler {handler_ctx.name} watching directory {handler_ctx.directory} for activity...')
+                    for handler_ctx in self.event_handlers:                        
+                        print(f'+++ event handler {handler_ctx.name} watching directory {handler_ctx.directory} for activity...')                        
 
                 time.sleep(self.watch_interval)
             except Exception as err:
@@ -74,12 +71,13 @@ DispatchTarget = namedtuple('DispatchTarget', 'filter_regex handler_func')
 
 
 class EventDispatcher(FileSystemEventHandler):
-    def __init__(self, service_registry:common.ServiceObjectRegistry, trigger_params: dict, preview_mode=False):
+    def __init__(self, service_registry:common.ServiceObjectRegistry, trigger_params: dict, preview_mode=False, **kwargs):
         self.services = service_registry
         self.dispatch_table = {}
         self.preview_mode = preview_mode
         self.trigger_params = trigger_params
         self.gate_function = None
+        self.debug_mode = kwargs.get('debug', False)
 
 
     def set_gate(self, function_obj):
@@ -108,20 +106,21 @@ class EventDispatcher(FileSystemEventHandler):
 
     def on_any_event(self, event):
         event_data = self.event_to_data(event)
-        if debug_mode:
+        if self.debug_mode:
             print('Detected filesystem event: %s' % event_data, file=sys.stderr)
 
         dispatch_target = self.dispatch_table.get(event.event_type)
         if not dispatch_target:
-            if debug_mode:
+            if self.debug_mode:
                 print('No dispatch target found matching inbound event type. Exiting.', file=sys.stderr)
             return
 
-        filepath = event_data['src_path']
-        filename = filepath.split(os.sep)[-1]
-        if not dispatch_target.filter_regex.match(filename):
-            if debug_mode:
-                print(f'No dispatch target found matching filter regex {dispatch_target.filter_rx_string} Exiting.', file=sys.stderr)
+        filepath = event_data['src_path']        
+        match_result = dispatch_target.filter_regex.search(filepath)
+
+        if match_result is None:
+            if self.debug_mode:
+                print(f'No dispatch target found matching filter regex "{dispatch_target.filter_regex.pattern}". Exiting.', file=sys.stderr)
             return 
 
         if not self.preview_mode:            
@@ -166,8 +165,8 @@ def build_event_dispatcher(trigger_name, yaml_config, preview_mode, **cli_params
     trigger_parameters = load_trigger_params(trigger_config, yaml_config)
     trigger_parameters.update(cli_params)
 
-    dispatcher = EventDispatcher(services, trigger_parameters, preview_mode)
-
+    dispatcher = EventDispatcher(services, trigger_parameters, preview_mode, debug=debug_mode)
+    recursion_setting = trigger_config.get('recursive', False)
     event_type = trigger_config['event_type']
     target_directory = trigger_config['parent_dir']
 
@@ -175,14 +174,14 @@ def build_event_dispatcher(trigger_name, yaml_config, preview_mode, **cli_params
         raise Exception('The target watch-directory %s either does not exist, or is not a directory. Please check your config file.' 
                         % target_directory)
 
-    filter_rx_string = trigger_config.get('filename_filter', '')
+    filter_rx_string = trigger_config.get('path_filter_regex', '')
     if filter_rx_string == '*':
         filter_rx_string = ''
     filter_regex = re.compile(filter_rx_string)
     
     dispatcher.register_event_type(event_type, filter_regex, trigger_function)
     
-    return (dispatcher, target_directory)
+    return (dispatcher, target_directory, recursion_setting)
 
 
 def load_gate_function(gate_function_name, yaml_config):
@@ -221,7 +220,7 @@ def compile_trigger_list(cmd_args: dict)-> list:
         
 
 def main(args):
-
+    global debug_mode
     debug_mode = args['--debug']
     config_filename = args['<configfile>']
     preview_mode = args['--preview'] or False
@@ -314,11 +313,12 @@ def main(args):
             disp_tuple = build_event_dispatcher(trigger_name, yaml_config, preview_mode, **input_params)
             dispatcher = disp_tuple[0]
             target_dir = disp_tuple[1]
+            recursion_bool = disp_tuple[2]
 
             if function_gates.get(trigger_name):
                 dispatcher.set_gate(function_gates[trigger_name])
             
-            watcher.add_handler(trigger_name, dispatcher, target_dir, False)
+            watcher.add_handler(trigger_name, dispatcher, target_dir, recursion_bool)
             
         watcher.run()
 
