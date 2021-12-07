@@ -79,6 +79,12 @@ class EventDispatcher(FileSystemEventHandler):
         self.dispatch_table = {}
         self.preview_mode = preview_mode
         self.trigger_params = trigger_params
+        self.gate_function = None
+
+
+    def set_gate(self, function_obj):
+        self.gate_function = function_obj
+
 
     def register_event_type(self, event_type, regex, handler_function):
         '''event_type may be one of: created, modified, ...
@@ -118,8 +124,12 @@ class EventDispatcher(FileSystemEventHandler):
                 print(f'No dispatch target found matching filter regex {dispatch_target.filter_rx_string} Exiting.', file=sys.stderr)
             return 
 
-        if not self.preview_mode:
-            dispatch_target.handler_func(event_data, self.services, **self.trigger_params)
+        if not self.preview_mode:            
+            should_run = True
+            if self.gate_function:
+                should_run = self.gate_function(event_data)
+            if should_run:
+                dispatch_target.handler_func(event_data, self.services, **self.trigger_params)
 
 
 def load_trigger_function(trigger_config, yaml_config):
@@ -173,6 +183,28 @@ def build_event_dispatcher(trigger_name, yaml_config, preview_mode, **cli_params
     dispatcher.register_event_type(event_type, filter_regex, trigger_function)
     
     return (dispatcher, target_directory)
+
+
+def load_gate_function(gate_function_name, yaml_config):
+
+    module_name = yaml_config['globals']['trigger_function_module']
+    trigger_module = __import__(module_name)
+    if not hasattr(trigger_module, gate_function_name):
+        raise Exception(f'The trigger function module "{module_name}" has no gate function "{gate_function_name}". Please check your configuration.')
+
+    return common.load_class(gate_function_name, module_name)
+
+
+def load_gates(yaml_config):
+    gates = {}
+
+    for trigger_name in yaml_config['triggers']:
+        trigger_config = yaml_config['triggers'][trigger_name]
+
+        if trigger_config.get('gate_function'):
+            gates[trigger_name] = load_gate_function(trigger_config['gate_function'], yaml_config)
+
+    return gates
 
 
 def compile_trigger_list(cmd_args: dict)-> list:
@@ -275,12 +307,17 @@ def main(args):
             print(f'+++ selected triggers: {trigger_names}', file=sys.stderr)
 
         watcher = Watcher(10, debug_mode)
+        function_gates = load_gates(yaml_config)
+
         for trigger_name in trigger_names:
 
             disp_tuple = build_event_dispatcher(trigger_name, yaml_config, preview_mode, **input_params)
             dispatcher = disp_tuple[0]
             target_dir = disp_tuple[1]
 
+            if function_gates.get(trigger_name):
+                dispatcher.set_gate(function_gates[trigger_name])
+            
             watcher.add_handler(trigger_name, dispatcher, target_dir, False)
             
         watcher.run()
