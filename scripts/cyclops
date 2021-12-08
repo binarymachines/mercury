@@ -261,7 +261,7 @@ def main(args):
         trigger_config = yaml_config['triggers'][trigger_name]
         tfunc = load_trigger_function(trigger_config, yaml_config)
         
-        trigger_parameters = load_trigger_params(trigger_config) 
+        trigger_parameters = load_trigger_params(trigger_config, yaml_config) 
         input_params.update(trigger_parameters)
 
         services = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
