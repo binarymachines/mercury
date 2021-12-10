@@ -247,7 +247,7 @@ def main(args):
         buffer = initialize_record_buffer(ingest_target, datastore_registry)
 
         record_count = 0
-        with checkpoint(buffer, interval=ingest_target.checkpoint_interval):
+        with checkpoint(buffer, ingest_params, interval=ingest_target.checkpoint_interval):
             with open(input_file) as f:
                 for line in f:
                     if record_count == limit:
