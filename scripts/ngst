@@ -48,31 +48,18 @@ class DataStore(object):
 class RecordBuffer(object):
     def __init__(self, datastore, **kwargs):        
         self.data = []
-        self.checkpoint_mgr = None        
         self.datastore = datastore
 
 
-    def writethrough(self, **kwargs):
-        '''write the contents of the record buffer out to the underlying datastore.
-        Implement in subclass.
-        '''
-        self.datastore.write(self.data, **kwargs)
-
-
-    def register_checkpoint(self, checkpoint_instance):
-        self.checkpoint_mgr = checkpoint_instance
-
-
     def flush(self, **kwargs):        
-        self.writethrough(**kwargs)
-        self.data = []
+        self.datastore.write(self.data, **kwargs)
+        self.data.clear()
 
 
-    def write(self, record, **kwargs):
+    def _write(self, record, **kwargs):
         try:
             self.data.append(record) 
-            if self.checkpoint_mgr:
-                self.checkpoint_mgr.register_write(**kwargs)          
+                  
         except Exception as err: 
             raise err
 
@@ -86,16 +73,6 @@ class checkpoint(ContextDecorator):
         self._outstanding_writes = 0
         self._total_writes = 0
         self.record_buffer = record_buffer
-        self.record_buffer.register_checkpoint(self)
-
-
-    @property
-    def total_writes(self):
-        return self._total_writes
-
-    @property
-    def writes_since_last_reset(self):
-        return self._outstanding_writes
 
 
     def increment_write_count(self):
@@ -104,12 +81,16 @@ class checkpoint(ContextDecorator):
 
 
     def reset(self):
-        self.outstanding_writes = 0
+        self._outstanding_writes = 0
 
 
-    def register_write(self, **kwargs):
+    def register_write(self, record, **kwargs):
+        self.record_buffer._write(record, **kwargs)
         self.increment_write_count()
-        if self.writes_since_last_reset == self.interval:
+
+        print(f'checkpoint write count: {self._total_writes}')
+
+        if self._outstanding_writes == self.interval:
             self.record_buffer.flush(**self.ingest_params)
             self.reset()
 
@@ -119,7 +100,7 @@ class checkpoint(ContextDecorator):
 
 
     def __exit__(self, *exc):
-        self.record_buffer.writethrough(**self.ingest_params)
+        self.record_buffer.flush(**self.ingest_params)
         return False
 
 
@@ -225,7 +206,7 @@ def main(args):
         buffer = initialize_record_buffer(ingest_target, datastore_registry)
 
         record_count = 0
-        with checkpoint(buffer, ingest_params, interval=ingest_target.checkpoint_interval):
+        with checkpoint(buffer, ingest_params, interval=ingest_target.checkpoint_interval) as ckpt:
             while True:
                 if record_count == limit:
                     break
@@ -234,7 +215,7 @@ def main(args):
                 if not len(line):
                     break
                 if not preview_mode:
-                    buffer.write(line, **ingest_params)
+                    ckpt.register_write(line, **ingest_params)
                 else:
                     print(line)
                 record_count += 1
@@ -247,13 +228,18 @@ def main(args):
         buffer = initialize_record_buffer(ingest_target, datastore_registry)
 
         record_count = 0
-        with checkpoint(buffer, ingest_params, interval=ingest_target.checkpoint_interval):
+        with checkpoint(buffer, ingest_params, interval=ingest_target.checkpoint_interval) as ckpt:
             with open(input_file) as f:
-                for line in f:
+                for raw_line in f:
                     if record_count == limit:
                         break
+
+                    line = raw_line.lstrip().rstrip()
+                    if not line:
+                        continue
+                    
                     if not preview_mode:
-                        buffer.write(line)
+                        ckpt.register_write(line, **ingest_params)
                     else:
                         print(line)
                     record_count += 1
