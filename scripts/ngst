@@ -88,7 +88,7 @@ class checkpoint(ContextDecorator):
         self.record_buffer._write(record, **kwargs)
         self.increment_write_count()
 
-        print(f'checkpoint write count: {self._total_writes}')
+        # print(f'checkpoint write count: {self._total_writes}')
 
         if self._outstanding_writes == self.interval:
             self.record_buffer.flush(**self.ingest_params)
