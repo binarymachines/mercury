@@ -4,7 +4,7 @@
 Usage:
     cyclops [-d] [-p] --config <configfile> --trigger <trigger_name> [--params=<n:v>...]
     cyclops [-d] [-p] --config <configfile> --triggers <t1>...  [--params=<n:v>...]
-    cyclops --config <configfile> --replay <trigger_name> <filename>  [--params=<n:v>...]
+    cyclops [-d] --config <configfile> --replay <trigger_name> <filename>  [--params=<n:v>...]
     cyclops --config <configfile> --list [-v]
 
 Options:
@@ -222,12 +222,18 @@ def compile_trigger_list(cmd_args: dict)-> list:
 def main(args):
     global debug_mode
     debug_mode = args['--debug']
+
+    sys.path.append(os.getcwd())
+    
     config_filename = args['<configfile>']
     preview_mode = args['--preview'] or False
     list_mode = args.get('--list') or False
     replay_mode = args.get('--replay') or False
     verbose_mode = args.get('--verbose') or False
     yaml_config = common.read_config_file(config_filename)
+
+    project_dir = common.load_config_var(yaml_config['globals']['project_home'])
+    sys.path.append(project_dir)
 
     if list_mode:
         trigger_data = []
@@ -243,10 +249,9 @@ def main(args):
         print(json.dumps(trigger_data))
         return
     
-    project_dir = common.load_config_var(yaml_config['globals']['project_home'])
-    sys.path.append(project_dir)
-
-    input_params = {}
+    input_params = {
+        'debug': debug_mode
+    }
 
     if replay_mode: # allows the user to namually fire a given trigger function
         trigger_name = args['<trigger_name>']

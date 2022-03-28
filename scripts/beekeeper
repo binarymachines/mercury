@@ -147,16 +147,30 @@ class APITarget(object):
             print('### Call parameters: %s' % call_params, file=sys.stderr)
             print(f'### File refs:', file=sys.stderr)
             print("\n".join(self.file_refs), file=sys.stderr)
+            print('### request headers:')
+            print(common.jsonpretty(self.headers))
 
         if self.method == 'GET':
             response = requests.get(self.base_url, headers=self.headers, params=call_params, **request_kwargs)
             
         elif self.method == 'POST':
+            json_mode = False
+            for key, value in self.headers.items():
+                norm_key = key.lower()
+                if norm_key in ['accept', 'content-type'] and value == 'application/json':
+                    json_mode = True
 
+            '''
             if self.headers.get('Accept') == 'application/json':
+                print('### Sending request params JSON...')
                 response = requests.post(self.base_url, headers=self.headers, json=call_params, files=self.file_refs, **request_kwargs)
 
             elif self.headers.get('Content-Type') == 'application/json':
+                print('### Sending request params JSON...')
+                response = requests.post(self.base_url, headers=self.headers, json=call_params, files=self.file_refs, **request_kwargs)
+            '''
+            if json_mode:
+                print('### Sending request params as JSON...')
                 response = requests.post(self.base_url, headers=self.headers, json=call_params, files=self.file_refs, **request_kwargs)
 
             else:                
@@ -193,6 +207,9 @@ def read_target_params(target_yaml_config: dict, global_yaml_config: dict, macro
     # (that is, HTTP request params). Any command-line params will override parameter values
     # specified in the config file.
     #
+
+    print(f'@@@@@@@@   received macro defs: {macro_defs}')
+
     params = {}
     config_params = target_yaml_config.get('request_params')
 
@@ -200,13 +217,34 @@ def read_target_params(target_yaml_config: dict, global_yaml_config: dict, macro
         return params
 
     for p in config_params:
+
+        print(f'@@@@ processing request parameter: {p}')
+
         raw_value = p['value']
 
         macro_rx_match = MACRO_RX.match(str(raw_value))
         template_rx_match = TEMPLATE_RX.match(str(raw_value))
 
         if macro_rx_match:
-            macro_function_name = str(raw_value).lstrip(MACRO_PREFIX).rstrip(MACRO_SUFFIX)
+            macro_expression = macro_rx_match.string
+            print(f'@@@@@@@  Found a macro. Expression: {macro_expression}')
+
+            print(f'@@@ macro prefix: {MACRO_PREFIX}.')
+            print(f'@@@ macro suffix: {MACRO_SUFFIX}')
+
+            # There appears to be a bug in the Python lib; this no longer works at the time of this note (2/17/2002):
+            #
+            # macro_function_name = macro_expression.lstrip(MACRO_PREFIX).rstrip(MACRO_SUFFIX)
+            #
+            # for some reason, we need to strip '~macro' and the '[' off the front of the string in separate 
+            # operations. If we try to lstrip() them together, we end up truncating the first few letters of the
+            # macro name. --DT binarymachineshop@gmail.com
+
+            macro_function_name = macro_expression.lstrip('~macro').lstrip('[').rstrip(']')
+
+
+
+            print(f'@@@@@@@@ RESOLVED macro to function name: {macro_function_name}')
 
             # is this macro registered?
             macro_def = macro_defs.get(macro_function_name)
@@ -428,6 +466,7 @@ def load_macro_defs(yaml_config):
         
         mdefs[name] = MacroDefinition(name, *macro_arg_names)
     
+    print(mdefs)
     return mdefs
 
 

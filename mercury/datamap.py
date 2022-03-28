@@ -586,9 +586,11 @@ class RecordTransformerBuilder(object):
         return klass(service_object_registry)
 
 
-    def build(self):
-        service_object_dict = snap.initialize_services(self._transform_config)
-        so_registry = common.ServiceObjectRegistry(service_object_dict)
+    def build(self, so_registry=None):
+
+        if not so_registry:
+            service_object_dict = snap.initialize_services(self._transform_config)
+            so_registry = common.ServiceObjectRegistry(service_object_dict)
 
         datasource_name = self._transform_config['maps'][self._map_name]['lookup_source']
         datasource = self.load_datasource(datasource_name, self._transform_config, so_registry)
