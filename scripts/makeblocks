@@ -82,6 +82,7 @@ from mercury.utils import read_stdin
 import docopt
 from docopt import docopt as docopt_func
 from docopt import DocoptExit
+import jinja2
 from cmd import Cmd
 from snap import snap, common
 from snap.common import ServiceObjectRegistry
@@ -108,6 +109,8 @@ TEMPLATE_VAR_RX = re.compile(r'\{[a-zA-Z0-9_\-]+\}')
 
 AWK_EXPR_RX = re.compile(r'\$\$[0-9]{1}\s+')
 
+QUOTED_EXP_RX = re.compile(r'\'([A-Za-z0-9_\./\\-]*)\'')
+
 CHECKPOINT_RX = \
 re.compile(
     r'\+checkpoint:[a-zA-Z0-9_-]*\[(var|val)=[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+){0,1}[\s]+test=[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+([\s]+\?[a-zA-Z0-9_-]+=[a-zA-Z0-9_-]+)*\]'
@@ -128,6 +131,15 @@ BLK_SCRIPT_TEMPLATE = '''
 
 DEBUG_STATE_ENDED = 'ended'
 DEBUG_STATE_RUNNING = 'running'
+
+
+def parse_makeshell(input_string):
+    output_tokens = []
+
+    quoted_string_regions = [match for match in QUOTED_EXP_RX.finditer(input_string)]
+    
+    
+    return output_tokens
 
 
 class TimingBlock(object):
@@ -306,10 +318,20 @@ class DebugSession(object):
         print(f'$$$ command template:\n{cmd.command_template}')
         print(f'$$$ variable data: {common.jsonpretty(self.vardata)}')
 
-        live_command = cmd.command_template.format(**self.vardata)
+        j2env = jinja2.Environment()
+        template_mgr = common.JinjaTemplateManager(j2env)
+        j2template = j2env.from_string(cmd.command_template)
+        live_command = j2template.render(**self.vardata)
+
+        # live_command = cmd.command_template.format(**self.vardata)
         block_script_filename = self.generate_scriptfile_name(step.name)
 
         print(f'+++ Generating tempfile: {block_script_filename}...')
+
+        #j2env = jinja2.Environment()
+        #template_mgr = common.JinjaTemplateManager(j2env)
+        #j2template = j2env.from_string(command_block.command_template)
+        
         with open(block_script_filename, 'w') as f:
             f.write(BLK_SCRIPT_TEMPLATE.format(command=live_command))
 
@@ -497,7 +519,11 @@ class ConsoleCLI(Cmd):
                 decoded_command = decode_blockbuffer(cmd_block, CMD_BLOCK)
 
                 print('$$$ formatting command template...')
-                live_command = decoded_command.command_template.format(**var_data)
+                j2env = jinja2.Environment()
+                j2template = j2env.from_string(decoded_command.command_template)
+                live_command = j2template.render(**var_data)
+                
+                # live_command = decoded_command.command_template.format(**var_data)
 
                 # if the command was invoked with the "execute" option, run the command
                 if args['-x']:
@@ -847,7 +873,10 @@ def parse_eval_expression(expr: str) -> tuple:
             cmd_output = shell_cmd(*shell_cmd_params)
             return key, cmd_output.strip()
         else:
-            cmd_output = shell_cmd(*shell_cmd_params)
+
+            print(shell_command_str)
+
+            #cmd_output = shell_cmd(*shell_cmd_params)
             return key, cmd_output.strip()
 
     else:
@@ -877,7 +906,10 @@ def parse_command_buffer(buffer: Blockbuffer) -> DecodedCommandBlock:
     #blocktext = '\n'.join(line.strip('\n') for line in buffer.lines)
     blocktext = buffer.data
 
-    cmd_template = blocktext.replace('$(', '{').replace(')', '}')
+    # Single curly brackets may collide with other valid expressions in our commands;
+    # use double-curlies, and render the resulting template using jinja2
+    #
+    cmd_template = blocktext.replace('$(', '{{').replace(')', '}}')
 
     # TODO: delete
     #print(blocktext, file=sys.stderr)
@@ -1529,6 +1561,9 @@ def main(args):
 
     sys.path.append(os.getcwd())
 
+    j2env = jinja2.Environment()
+    template_mgr = common.JinjaTemplateManager(j2env)
+
     if args['--copytarget']:
 
         makefile_name = args.get('<filename>') or 'Makefile'
@@ -1661,11 +1696,16 @@ def main(args):
             if args['--decode']: 
                 if args['--stdin']:
                     # receive parameter values as JSON from standard input
-                    template_params = receive_params_from_stdin()                                                            
-                    print(command_block.command_template.format(**template_params))
+                    template_params = receive_params_from_stdin() 
+
+                    template_mgr = common.JinjaTemplateManager(j2env)
+                    j2template = j2env.from_string(command_block.command_template)
+                    print(j2template.render(**template_params))                                                         
+                    
+                    # print(command_block.command_template.format(**template_params))
                     
                 elif args['--interactive']:
-                    # prompt the user to supply the template parameters
+                    # TODO: prompt the user to supply the template parameters
                     template_params = {}
                     for key in command_block.param_list:
                         value = input(f'What is the value for {key} ?: ')
@@ -1673,7 +1713,12 @@ def main(args):
                             template_params[key] = value
                         else:
                             template_params[key] = '{%s}' % key
-                    print(command_block.command_template.format(**template_params))
+
+                    template_mgr = common.JinjaTemplateManager(j2env)
+                    j2template = j2env.from_string(command_block.command_template)
+                    print(j2template.render(**template_params))                    
+                    
+                    # print(command_block.command_template.format(**template_params))
                 else:
                     # print the decoded template without trying to render it into a runnable command
                     print(command_block.command_template)
