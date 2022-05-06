@@ -111,7 +111,8 @@ AWK_EXPR_RX = re.compile(r'\$\$[0-9]{1}\s+')
 
 #QUOTED_EXP_RX = re.compile(r'\'([A-Za-z0-9_\./\\-]*)\'')
 
-QUOTED_EXP_RX = re.compile(r'\'([\s\S^\n]+?)\'')
+SINGLE_QUOTED_EXP_RX = re.compile(r'\'([\s\S^\n]+?)\'')
+DOUBLE_QUOTED_EXP_RX = re.compile(r'\"([\s\S^\n]+?)\"')
 
 CHECKPOINT_RX = \
 re.compile(
@@ -139,7 +140,7 @@ def surrounding_quoted_region(match: re.Match, quoted_regions: list):
 
     match_index = match.start()
     for region in quoted_regions:
-        if match_index >= region.start() and match_index <= region.end():
+        if match_index > region.start() and match_index < region.end():
             return region
 
 
@@ -149,30 +150,41 @@ def parse_makeshell(input_string):
     shell_command_str = input_string.lstrip('$(shell').rstrip(')').strip()
     quoted_string_regions = []
     
-    for match in QUOTED_EXP_RX.finditer(shell_command_str):
+    for match in SINGLE_QUOTED_EXP_RX.finditer(shell_command_str):
         quoted_string_regions.append(match)
+
+    if not len(quoted_string_regions):
+        for match in DOUBLE_QUOTED_EXP_RX.finditer(shell_command_str):
+            quoted_string_regions.append(match)
+
     
-    print(quoted_string_regions)
+    # print(quoted_string_regions)
 
     current_index = 0
     whitespace_iterator = re.finditer(' ', shell_command_str)
 
     for ws_match in whitespace_iterator:
         # if the space is inside a quoted string in the command, do not split the string
-
+        #
         enclosing_region = surrounding_quoted_region(ws_match, quoted_string_regions)
 
         if enclosing_region:
             token = shell_command_str[enclosing_region.start():enclosing_region.end()]
-            output_tokens.append(token)
+            if len(token):
+                output_tokens.append(token)
             current_index = enclosing_region.end()
-            #next(whitespace_iterator)
+            
         else:
             token = shell_command_str[current_index:ws_match.start()]
-            output_tokens.append(token)
+            if len(token):
+                output_tokens.append(token)
             current_index = ws_match.end()
+
+    # because we're counting whitespace, we will be one command token short -- add that now
+
+    final_cmd_token = shell_command_str[current_index:]
+    output_tokens.append(final_cmd_token)
     
-    print(common.jsonpretty(output_tokens))
     return output_tokens
 
 
@@ -887,34 +899,30 @@ def find_keys(cmd_template: str) -> list:
 
 
 def parse_eval_expression(expr: str) -> tuple:
-    raw_line = expr.lstrip('$(eval').rstrip(')')
+
+    raw_line = expr
+    if expr.startswith('$(eval') and expr.endswith(')'):
+        raw_line = expr.lstrip('$(eval')[0:-1]
 
     index = raw_line.find('=')
     key = raw_line[0:index].strip()        
     var_expression = raw_line[index+1:].strip()
 
     if var_expression.startswith('$(shell'):
-        shell_command_str = var_expression.lstrip('$(shell').rstrip(')').strip()
-        cmd_tokens = shell_command_str.split(' ')
+        cmd_tokens = parse_makeshell(var_expression)
         shell_cmd = local[cmd_tokens[0]]    
         shell_cmd_params = cmd_tokens[1:]
 
-        print(parse_makeshell(var_expression))
-
         if 'curl' in cmd_tokens[0]:
-            #from sh import curl
-            #cmd_output = curl(*cmd_tokens)
+            from sh import curl
+            cmd_output = curl(*cmd_tokens)
 
             shell_cmd = local['curl']
             cmd_output = shell_cmd(*shell_cmd_params)
             return key, cmd_output.strip()
         else:
-
-            print(shell_command_str)
-
-            #cmd_output = shell_cmd(*shell_cmd_params)
+            cmd_output = shell_cmd(*shell_cmd_params)
             return key, cmd_output.strip()
-
     else:
         return key, var_expression
 
@@ -931,24 +939,12 @@ def substitute_make_vars(makeblock_expr: str, **kwargs) -> str:
 
 def parse_command_buffer(buffer: Blockbuffer) -> DecodedCommandBlock:
     
-    '''
-    TODO: delete
-    print('parsing buffer lines...', file=sys.stderr)
-    for line in buffer.lines:
-        print(f'---{line}')
-    print('_______________________')
-    '''
-
-    #blocktext = '\n'.join(line.strip('\n') for line in buffer.lines)
     blocktext = buffer.data
 
     # Single curly brackets may collide with other valid expressions in our commands;
     # use double-curlies, and render the resulting template using jinja2
     #
     cmd_template = blocktext.replace('$(', '{{').replace(')', '}}')
-
-    # TODO: delete
-    #print(blocktext, file=sys.stderr)
 
     # Edge case: any awk expression found in a makefile must use a double dollar-sign;
     # this will be followed by a numeric digit. Replace the double dollar sign 
@@ -1005,8 +1001,7 @@ def parse_target_buffer(buffer: Blockbuffer) -> dict:
                             output['dependencies'].append(tok.strip('\\').strip())
                         else:
                             output['dependencies'].append(tok)
-            
-        
+
         elif continuing_decl:
             if line[-1] == '\\':
                 
