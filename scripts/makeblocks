@@ -109,7 +109,9 @@ TEMPLATE_VAR_RX = re.compile(r'\{[a-zA-Z0-9_\-]+\}')
 
 AWK_EXPR_RX = re.compile(r'\$\$[0-9]{1}\s+')
 
-QUOTED_EXP_RX = re.compile(r'\'([A-Za-z0-9_\./\\-]*)\'')
+#QUOTED_EXP_RX = re.compile(r'\'([A-Za-z0-9_\./\\-]*)\'')
+
+QUOTED_EXP_RX = re.compile(r'\'([\s\S]+?)\'')
 
 CHECKPOINT_RX = \
 re.compile(
@@ -136,8 +138,13 @@ DEBUG_STATE_RUNNING = 'running'
 def parse_makeshell(input_string):
     output_tokens = []
 
-    quoted_string_regions = [match for match in QUOTED_EXP_RX.finditer(input_string)]
+    shell_command_str = input_string.lstrip('$(shell').rstrip(')').strip()
+    quoted_string_regions = []
     
+    for match in QUOTED_EXP_RX.finditer(shell_command_str):
+        quoted_string_regions.append(match)
+    
+    print(quoted_string_regions)
     
     return output_tokens
 
@@ -864,6 +871,8 @@ def parse_eval_expression(expr: str) -> tuple:
         cmd_tokens = shell_command_str.split(' ')
         shell_cmd = local[cmd_tokens[0]]    
         shell_cmd_params = cmd_tokens[1:]
+
+        print(parse_makeshell(var_expression))
 
         if 'curl' in cmd_tokens[0]:
             #from sh import curl
