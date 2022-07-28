@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    datetimecalc --days <num_days> (--before | --from) (today | now)  
+'''
+
+'''+mdoc+
+
+datetimecalc yields a single date or datetime value <num_days> days into the future or the past.
+The --before option is past-looking; the --from option is future-looking. So that
+
+
+datetimecalc --days 1 --before today
+
+gives yesterday's date, and
+
+datetimecalc --days 1 --after today
+
+gives tomorrow's date.
+
+
+Pass: 
+
+today 
+
+as the last parameter and it will yield a date; pass: 
+
+now 
+
+and it will yield a datetime.
+
+'''
+
+
+import os, sys
+import datetime
+import docopt
+
+
+def main(args):  
+
+    if args['today']:
+        now = datetime.date.today()
+    elif args['now']:
+        now = datetime.datetime.now()
+
+    date_offset = int(args['<num_days>'])
+    
+    if args['--before']:
+        target_date = now - datetime.timedelta(hours = 24 * date_offset)
+
+    elif args['--from']:
+        target_date = now + datetime.timedelta(hours = 24 * date_offset)
+
+    print(str(target_date))
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

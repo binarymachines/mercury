@@ -1,0 +1,57 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    collapsr --listfile <file>
+    collapsr -s
+
+Options:
+    -s --stdin    read records from standard input
+'''
+
+'''+mdoc+
+
+collapsr takes a list of values from <file> or standard input and collapses them
+down to a set of unique values. (Think SELECT DISTINCT, but for textfiles.)
+
+'''
+
+import os, sys
+import docopt
+from mlog import mlog, mlog_err
+from mercury.utils import read_stdin
+
+
+def read_input_lines(args):
+
+    if args['--stdin']:
+        for raw_line in read_stdin():
+            line = raw_line.strip()
+            if not line:
+                continue
+            yield(line)
+
+    elif args['--listfile']:
+        with open(args['<file>'], 'r') as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                yield(line)
+
+def main(args):
+
+    unique_strings = set()
+    current_count = 0
+
+    for line in read_input_lines(args):
+        unique_strings.add(line)
+
+        if len(unique_strings) > current_count:
+            print(line)
+            current_count += 1
+        
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

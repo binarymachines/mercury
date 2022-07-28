@@ -39,6 +39,13 @@ test:
 test_teamcity:	test_env
 	PYTHONPATH=./tests $(VIRTUALENV_ROOT)/$(VIRTUALENV_NAME)/bin/python -m teamcity.unittestpy discover -t . ./tests -v
 
+
+build-docs:
+	ls scripts > tempdata/script_list.txt
+	cat tempdata/script_list.txt | xargs -I {} cp scripts/{} tempdata/{}.py
+	./extract_cmd_syntax.py --dir scripts --list tempdata/script_list.txt
+	
+
 version:
 	python mark_version.py > version.py && cp version.py scripts/mercury-version && chmod u+x scripts/mercury-version
 
@@ -122,6 +129,8 @@ pip-compile: FORCE
 	${COMPOSE} run --rm mercury /bin/sh -c \
 		"pip-compile --rebuild --generate-hashes --output-file conf/deps/requirements.txt conf/deps/requirements-unpinned.txt && \
 		chown ${HOST_UID}:${HOST_GID} conf/deps/requirements.txt"
+
+
 
 
 FORCE:  # https://www.gnu.org/software/make/manual/html_node/Force-Targets.html#Force-Targets

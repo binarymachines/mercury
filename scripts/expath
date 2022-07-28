@@ -1,0 +1,54 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    expath --listfile <file>
+    expath -s
+
+Options:
+    -s --stdin    read records from standard input
+'''
+
+''' +mdoc+
+
+expath (extract path) takes a list of fully-qualified file references 
+(from <file> if the --listfile option is set, or from standard input if -s is set)
+and yields the paths only, stripping away the filename and the trailing slash.
+
+The input path(s) need not be valid; that is, they CAN point to nonexistent files.
+
+'''
+
+import os, sys
+import docopt
+from mlog import mlog, mlog_err
+from mercury.utils import read_stdin
+
+
+def read_input_lines(args):
+
+    if args['--stdin']:
+        for raw_line in read_stdin():
+            line = raw_line.strip()
+            if not line:
+                continue
+            yield(line)
+
+    elif args['--listfile']:
+        with open(args['<file>'], 'r') as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                yield(line)
+
+def main(args):
+
+    for line in read_input_lines(args):
+        print(os.path.dirname(line))
+        
+    
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

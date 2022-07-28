@@ -1,0 +1,197 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    cfilter [-d <delim>] --accept-to <filename> --filter <module.function> <source_file> [--params=<name:value>...] [--limit=<limit>]
+    cfilter [-d <delim>] --reject-to <filename> --filter <module.function> <source_file> [--params=<name:value>...] [--limit=<limit>]
+    cfilter --config <configfile> --setup <setup_name> --source <source_file> [--params=<name:value>...] [--limit=<limit>]
+
+Options:
+    -d  --delimiter set the delimiter to the specified character (comma is default)
+'''
+
+'''+mdoc+
+
+cfilter (CSV filter) filters a source CSV file <source_file> by processing each record through 
+a filter function specified by <module.function>. 
+
+The filter function's signature is:
+
+filter_func(record: dict, line: str, service_registry=None, **filter_args) -> bool
+
+where <line> is the raw CSV record and <record> is its dictionary form. The filter function is only passed a 
+service registry iff cfilter is called with the --config option set; then the service registry will contain
+live instances of all service objects specified in <configfile>.
+
+
+if the filter function returns True, the record will be deemed as ACCEPTED. If False, the record will be deemed as REJECTED.
+
+When the --accept-to option is set, ACCEPTED records are written to <filename> and REJECTED records are written to standard out.
+
+When the --reject-to option is set, REJECTED records are written to <filename> and ACCEPTED records are written to standard out.
+
+The source CSV file must contain a header; if it does not, cfilter's behavior is undefined.
+
+'''
+
+
+import os, sys
+import re
+import json
+import csv
+from collections import namedtuple
+from xmlrpc.client import boolean
+import docopt
+
+from snap import snap, common
+from mercury.utils import open_in_place, parse_cli_params
+
+ACCEPT_TO_FILE_MODE = 'accept'
+REJECT_TO_FILE_MODE = 'reject'
+
+CSVRecord = namedtuple('CSVRecord', 'data line')
+
+
+class CSVRecordFilter(object):
+    def __init__(self, delimiter, service_registry=None, **kwargs):
+        self.service_registry = service_registry
+        filter_func_name = kwargs['filter_func']
+        self.delimiter = delimiter
+        self.target_filename = kwargs['file_target']
+        self.filter_mode = kwargs['mode']
+        self.filter_function = common.load_class(filter_func_name,
+                                                 kwargs['filter_module'])
+
+        if not self.filter_mode in [ACCEPT_TO_FILE_MODE, REJECT_TO_FILE_MODE]:
+            raise Exception('"%s" is not a valid filter mode.' % self.filter_mode)
+
+
+    def read_file_header(self, filename):
+        with open_in_place(filename, 'r') as f:
+            return f.readline().strip()
+
+
+    def read_records(self, filename):
+        with open_in_place(filename, 'r') as csvsrc:
+            csvreader = csv.DictReader(csvsrc, delimiter=self.delimiter)
+            with open_in_place(filename, 'r') as linesrc:
+                next(linesrc)
+                for record in csvreader:
+                    yield CSVRecord(data=record, line=next(linesrc))
+
+
+    def process_file(self, src_filename, limit=-1, **kwargs):
+        hdr = self.read_file_header(src_filename)
+        with open_in_place(self.target_filename, 'a') as f:
+            print(hdr)
+            f.write(hdr)
+
+            record_count = 0
+            if self.filter_mode == ACCEPT_TO_FILE_MODE:
+                for record in self.read_records(src_filename):
+                    if record_count == limit:
+                        break
+                    if self.filter_function(record.data, record.line, self.delimiter, self.service_registry, **kwargs):
+                        f.write(record.line)
+                        f.write('\n')
+                    else:
+                        print(record.line.strip())
+
+                    record_count += 1
+
+            if self.filter_mode == REJECT_TO_FILE_MODE:
+                for record in self.read_records(src_filename):
+                    if record_count == limit:
+                        break
+                    if self.filter_function(record.data, record.line, self.delimiter, self.service_registry, **kwargs):
+                        print(record.line.strip())
+                    else:
+                        f.writeline(record.line)
+                        #f.write('\n')
+
+                    record_count += 1
+
+
+def load_datafilters(yaml_config):
+    filter_module_name = yaml_config['globals']['filter_module']
+
+    service_registry = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
+
+    filters = {}
+    for setup_name in yaml_config['setups']:
+        filter_params = yaml_config['setups'][setup_name]
+        filter_params['filter_module'] = filter_module_name
+        delimiter = filter_params.pop('delimiter')
+        filters[setup_name] = CSVRecordFilter(delimiter, service_registry, **filter_params)
+
+    return filters
+
+
+def main(args):
+
+    configfile_mode = False
+    if args['--config']:
+        configfile_mode = True
+
+    stream_mode = False
+    if not args.get('<source_file>'):
+        stream_mode = True
+
+    if configfile_mode:
+        configfile = args['<configfile>']
+        yaml_config = common.read_config_file(configfile)
+
+        common.load_config_var(yaml_config['globals']['project_home'])
+        datafilters = load_datafilters(yaml_config)
+
+        target_filter_name = args['<setup_name>']
+
+        if not datafilters.get(target_filter_name):
+            raise Exception('No filter registered under the name %s. Please check your config.' % target_filter_name)
+
+        target_filter = datafilters[target_filter_name]
+
+    else:
+        source_file = args['<source_file>']
+
+        if args['--accept-to']:
+            filter_mode = ACCEPT_TO_FILE_MODE
+        else:
+            filter_mode = REJECT_TO_FILE_MODE
+
+        qualified_func_name = args['<module.function>']
+        tokens = qualified_func_name.split('.')
+        if len(tokens) != 2:
+            raise Exception('The --filter parameter must be of the format "<module>.<function>".')
+
+        module_name = tokens[0]
+        function_name = tokens[1]
+
+        delimiter = ','
+        if args['--delimiter']:
+            delimiter = args['<delim>']
+
+        target_filter = CSVRecordFilter(delimiter,
+                                        filter_func=function_name,
+                                        filter_module=module_name,
+                                        file_target=args['<filename>'],
+                                        mode=filter_mode)
+
+    # has the user passed us explicit template parameters?
+    input_params = {}
+    raw_params = ''
+    if args.get('--params'):
+        raw_param_str = args['--params']
+        input_params = parse_cli_params(raw_param_str)
+
+    if not stream_mode:
+        max_records = -1
+        limit_param = args.get('--limit')
+        if limit_param is not None:
+            max_records = int(limit_param)
+        target_filter.process_file(args['<source_file>'], max_records, **input_params)
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

@@ -1,0 +1,92 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    j2df --datafile <filename>
+    j2df --datafile <filename> --keys
+    j2df --datafile <filename> --converter <module.function> [--params=<n,v>...] 
+    j2df -s --converter <module.function> 
+
+Options:
+    -s --stdin  read data from standard input
+'''
+
+'''+mdoc+
+
+j2df (JSONto DataFrame) converts a single JSON object to a DataFrame. 
+It will read its source JSON data from <filename> if the --datafile option is set,
+or from standard input if the --stdin option is set.
+
+The conversion is performed by <module.function> when the --converter option is set.
+
+The --keys option will simply list the keys in the JSON object.
+
+With only the --datafile option set, j2df will print out the source JSON data and exit.
+
+'''
+
+from datetime import date, datetime
+import json
+import sys
+from typing import Any, Tuple
+from mercury.utils import read_stdin
+import docopt
+import pandas as pd
+from snap import common
+from mercury import utils
+
+
+def main(args):
+
+    frame = None
+    jsondata = None
+
+    if args['--datafile']:
+        filedata = None
+        with open(args['<filename>'], 'r') as f:
+            filedata = f.read()
+
+        jsondata = json.loads(filedata)
+
+        print(f'### Initial JSON array from CSM data contains {len(jsondata)} records. ###', file=sys.stderr)
+        
+
+    elif args['--stdin']:
+        jsondata = []
+        for line in read_stdin():
+            record = json.loads(line)
+            jsondata.append(record)
+
+    frame = pd.json_normalize(jsondata)
+
+    if args['--converter']:
+        designator = args['<module.function>']
+        tokens = designator.split('.')
+        if len(tokens) != 2:
+            raise Exception(f'Bad designator format {designator}. Format must be <module.function>')
+
+        processor_module_name = tokens[0]
+        processor_funcname = tokens[1]
+        processor_function = common.load_class(processor_funcname, processor_module_name)
+
+        params = {}
+        if args['--params']:
+            params.update(utils.parse_cli_params(args['--segment-params']))
+
+        output_data = processor_function(frame, **params)
+
+        print(output_data)
+        
+    elif args['--keys']:
+        for k in frame.keys():
+            print(k)
+    else:
+        frame = pd.json_normalize(jsondata)
+        print(frame)
+
+
+if __name__ == "__main__":
+    args = docopt.docopt(__doc__)
+    main(args)
+
+        

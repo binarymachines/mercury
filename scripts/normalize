@@ -1,0 +1,52 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    normalize --datafile <file>
+    normalize -s
+
+Options:
+    -s --stdin  read data from standard input
+'''
+
+'''+mdoc+
+
+normalize takes a set of lines (from a file or standard input) and performs two transforms
+on each line:
+
+replaces whitespace with underscores; and
+changes uppercase chars to lowercase.
+
+'''
+
+
+from datetime import date, datetime
+import json
+import sys
+from typing import Any, Tuple
+from mercury.utils import read_stdin
+import docopt
+from snap import common
+from mercury import utils
+
+
+def normalize(line: str)->str:
+    return line.lower().replace(' ', '_')
+
+
+def main(args):
+
+    filename = args['<file>']
+    with open(filename, 'r') as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line:
+                continue
+            print(normalize(line))
+
+
+if __name__ == "__main__":
+    args = docopt.docopt(__doc__)
+    main(args)
+
+        

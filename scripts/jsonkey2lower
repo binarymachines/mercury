@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    jsonkey2lower --datafile <filename> [--limit <limit>]
+    jsonkey2lower -s [--limit <limit>]
+
+Options:
+    -s --stdin  read data from standard input
+'''
+
+'''+mdoc+
+
+jsonkey2lower processes a collection of JSON records (one per line), either from <filename>
+if the --datafile option is set, or from standard input if the --stdin option is set,
+and outputs a transformed recordset in which all the keys are lowercase.
+
+'''
+
+import json
+import sys
+from mercury.utils import read_stdin
+import docopt
+
+
+def main(args):
+
+    limit = -1
+    if args['--limit']:
+        limit = int(args['<limit>'])
+
+    if args['--datafile']:
+        
+        record_count = 0
+        with open(args['<filename>'], 'r') as f:
+            for raw_line in f:
+                if record_count == limit:
+                    break
+                line = raw_line.strip()
+                if not line:
+                    continue
+                jsonrec = json.reads(line)
+
+                output_rec = {}
+                for key, value in jsonrec.items():
+                    output_key = key.lower().replace(' ', '_')
+                    output_rec[output_key] = value
+
+                abbr_val = output_rec.pop('333_abbr')
+                output_rec['abbr_333'] = abbr_val
+                
+                print(json.dumps(output_rec))
+                record_count += 1
+
+    elif args['--stdin']:
+        
+        record_count = 0
+        for raw_line in read_stdin():
+            if record_count == limit:
+                break
+
+            line = raw_line.rstrip().lstrip()
+            if not line:
+                continue
+            jsonrec = json.loads(line)
+            output_rec = {}
+            for key, value in jsonrec.items():
+                output_key = key.lower().replace(' ', '_')
+                output_rec[output_key] = value
+
+            abbr_val = output_rec.pop('333_abbr')
+            output_rec['abbr_333'] = abbr_val
+            print(json.dumps(output_rec))
+            record_count += 1
+
+
+if __name__ == "__main__":
+    args = docopt.docopt(__doc__)
+    main(args)

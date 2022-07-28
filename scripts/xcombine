@@ -1,0 +1,94 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    xcombine --listfiles=<file1>... --delimiter <delim> [--working-dir <dir>]
+'''
+
+''' +mdoc+
+
+xcombine (cross-combine) takes a number of lists (of equal length) as input, and returns 
+a single list of CSV records representing all the combinations of the input fields.
+
+So that given three input files:
+
+file1.txt
+A,B,C
+1,2,3
+
+file2.txt
+D,E,F
+4,5,6
+
+file3.txt
+G,H,I
+7,8,9
+
+and the command:
+
+xcombine --listfiles file1.txt,file2.txt,file3.txt --delimiter ','
+
+The output will be:
+
+A,B,C,D,E,F,G,H,I
+A,B,C,D,E,F,7,8,9
+A,B,C,4,5,6,G,H,I
+A,B,C,4,5,6,7,8,9
+1,2,3,D,E,F,G,H,I
+1,2,3,D,E,F,7,8,9
+1,2,3,4,5,6,G,H,I
+1,2,3,4,5,6,7,8,9
+
+
+'''
+
+
+import os, sys
+import itertools as it
+import docopt
+
+
+def load_lists(filenames, working_dir=None):
+
+    lists = []
+    for filename in filenames:
+        if working_dir:
+            filepath = os.path.join(working_dir, filename)
+        else:
+            filepath = filename
+        with open(filepath, 'r') as f:
+            lines = []
+            for raw_line in f:
+                line = raw_line.strip()
+                if not len(line):
+                    continue
+                lines.append(line)
+            lists.append(lines)
+    return lists
+
+
+def cross_combine(lists):
+    index_list = lists[0]
+    for value in index_list:
+        for tpl in it.product([value], *lists[1:]):
+            yield(tpl)
+
+
+def main(args):
+
+    filenames = args['--listfiles'][0].split(',')
+
+    working_directory = None
+    if args['--working-dir']:
+        working_directory = args['<dir>']
+
+    delimiter = args['<delim>']
+
+    lists = load_lists(filenames, working_directory)
+    for tpl in cross_combine(lists):
+        print(delimiter.join(tpl))
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

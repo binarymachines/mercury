@@ -1,0 +1,67 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    countup --from <start_number> --to <number> [--zpad <length>]
+    countup --to <number> [-z] [--zpad <length>]
+    countup -s [-z] [--from <start_number>] [--zpad <length>]
+
+Options:
+    -z --zero-based  count from zero instead of one
+    -s --stdin  count the number of lines sent via stdin
+'''
+
+'''+mdoc+
+
+countup emits a list of consecutive integers (one per line) from zero or <start_number>
+to <number>, inclusive. The integers can be optionally zero-padded by passing the optional
+
+--zpad <length>
+
+parameter.
+
+Running countup with the -s (--stdin) parameter will cause it to emit a consecutive integer 
+for each line sent to countup via standard input, starting with zero or <start_number>. This makes
+it easy to (for example) generate ROWIDs, or line numbers for a text file.
+
+'''
+
+import os, sys
+import docopt
+from mercury.utils import read_stdin
+
+def main(args):
+
+    if args['--zero-based']:
+        count = 0
+    elif args['--from']:
+        count = int(args['<start_number>'])
+    else:
+        count = 1
+
+    num_digits = 0
+    if args['--zpad']:
+        num_digits = int(args['<length>'])
+
+    if args['<number>']:
+        target_number = int(args['<number>'])
+        while True:
+            if count > target_number:
+                break
+
+            count_str = str(count)
+            padding_str = ''
+            if len(count_str) < num_digits:
+                padding_str = '0' * (num_digits - len(count_str))
+            
+            print(f'{padding_str}{count}')
+            count += 1
+
+    if args['--stdin']:
+        for line in read_stdin():
+            print(count)
+            count += 1
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

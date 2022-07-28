@@ -12,11 +12,14 @@ Options:
 import os, sys
 import json
 import docopt
+from collections import namedtuple
 
 
+DocEntry = namedtuple('DocEntry', 'syntax manual')
 
 
 def main(args):
+  
     pass
 
 

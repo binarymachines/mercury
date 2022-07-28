@@ -7,6 +7,15 @@ Usage:
     s3-fgate.py --gate-module <module> --service_module <svc-module> --gate-function <func> --format (csv | json) <s3_uri> [--delimiter=<delimiter>] [--limit=<limit>]
 '''
 
+'''+mdoc+
+
+s3-fgate (S3 file gate) scans the files in a given S3 path, runs a user-defined "gate function" against each entry,
+and prints the contents of the S3 file if the gate function returns True.
+
+### Under Construction
+
+'''
+
 
 import os, sys
 import re

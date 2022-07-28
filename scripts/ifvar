@@ -1,0 +1,64 @@
+#!/usr/bin/env python
+
+'''
+Usage: 
+    ifvar <env_var> --str <output_string> [--argprefix]
+    ifvar <env_var> --token <vartoken> --t <output_string> [--argprefix]
+    ifvar <env_var> --expr <py_expr> 
+
+Options:
+    -t --template   Use the output string as a template, subbing in the specified var if present
+    -a --argprefix  Prepend a double-dash to the output string
+'''
+
+
+'''+mdoc+
+
+ifvar prints a value to standard out if the environment variable <env_var> is set.
+
+if the --str option is set, it will print <output_string> (preceded with a double-dash if
+--argprefix is passed as well).
+
+if --token is set, it will print the template <output_string>, interpolating the value of
+the specified env var for <vartoken> in the template. So if the env var HOME is set,
+the command
+
+ifvar HOME --token % --t %/bin
+
+will yield:
+
+<your home directory>/bin
+
+if --expr is set, it will execute the quoted python expression <py_expr>.
+
+'''
+
+import os, sys
+import docopt
+
+
+def main(args):
+    env_var = os.getenv(args['<env_var>'])
+    arg_prefix = '--' if args['--argprefix'] else ''
+
+    if env_var:
+        output_template = args['<output_string>']
+        if args['--token']:
+            var_token = args['<vartoken>']
+            output_string = output_template.replace(var_token, env_var)
+
+        elif args['--expr']:
+            eval(args['<py_expr>'])
+            return
+        else:
+            output_string = output_template
+
+        output = arg_prefix + output_string.strip("'")
+        print(output)
+    else:
+        print('')
+
+
+if __name__ == '__main__': 
+    args = docopt.docopt(__doc__)
+    main(args)

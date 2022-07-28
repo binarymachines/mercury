@@ -1,0 +1,76 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    csvstack --listfile <filename> 
+    csvstack --files <file1>...
+'''
+
+'''+mdoc+
+
+csvstack concatenates a list of CSV files to standard output, only printing the header of the first
+file in the list.
+
+In --listfiles mode, it will read data from each CSV file listed in <filename>.
+In --files mode, it will read data from each CSV file passed on the command line as a comma-separated list
+(no spaces).
+
+Note that csvstack assumes that each file will contain a single-line header. It is agnostic 
+with respect to delimiters.
+
+'''
+
+
+import os, sys
+import csv
+import docopt
+
+
+def main(args):
+    
+    filename_list = []
+    
+    if args['--files']:
+        list_string = args['<file1>'][0]
+        for name in list_string.split(','):
+            filename_list.append(name)
+
+    elif args['--listfile']:
+        list_file = args['<filename>']
+        with open(list_file, 'r') as f:
+
+            for raw_line in f:
+                filename = raw_line.strip()
+                if not filename:
+                    continue
+
+                filename_list.append(filename)
+
+    is_initial_file = True
+    for filename in filename_list:        
+        with open(filename, 'r') as f:            
+            if is_initial_file:
+
+                for raw_line in f:
+                    line = raw_line.strip()
+                    if not len(line):
+                        continue
+
+                    print(line)
+                is_initial_file = False
+
+            else:
+                _ = f.readline()
+                while True:
+                    raw_line = f.readline()
+                    line = raw_line.strip()
+                    
+                    if not line:
+                        break
+
+                    print(line)                     
+                     
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

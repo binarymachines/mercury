@@ -1,0 +1,44 @@
+#!/usr/bin/env python
+
+
+'''
+Usage:
+    svctest --config <configfile> 
+    svctest --config <configfile> --testfunc <module.function> [--params=n,v...]
+'''
+
+import os, sys
+from snap import snap, common
+from mercury import utils
+import docopt
+
+
+def main(args):
+
+    sys.path.append(os.getcwd())
+    configfile_name = args['<configfile>']
+
+    yaml_config = common.read_config_file(configfile_name)
+    service_registry = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
+
+    if args['--testfunc']:
+        qualified_func_name = args['<module.function>']
+        tokens = qualified_func_name.split('.')
+        if len(tokens) != 2:
+            raise Exception('The --testfunc parameter must be of the form "module.function".')
+
+        module_name = tokens[0]
+        function_name = tokens[1]
+
+        # load_class() is poorly named. It will load any object from a module, 
+        # not just a class. My apologies. --DT
+        #
+        test_function = common.load_class(function_name, module_name)
+        
+        func_params = utils.parse_cli_params(args['--params'])
+        result = test_function(service_registry, **func_params)
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)
