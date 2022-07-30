@@ -36,6 +36,7 @@ test_env:
 test:
 	PYTHONPATH=./tests MERCURY_HOME=`pwd` pipenv run python -m unittest discover -t . ./tests -v
 
+
 test_teamcity:	test_env
 	PYTHONPATH=./tests $(VIRTUALENV_ROOT)/$(VIRTUALENV_NAME)/bin/python -m teamcity.unittestpy discover -t . ./tests -v
 
@@ -43,7 +44,7 @@ test_teamcity:	test_env
 build-docs:
 	ls scripts > tempdata/script_list.txt | xargs -I {} cp scripts/{} tempdata/{}.py
 	
-	./extract_cmd_syntax.py --dir scripts --list tempdata/script_list.txt > tempdata/doc_registry.json
+	./extract_cmd_docs.py --dir scripts --list tempdata/script_list.txt > tempdata/doc_registry.json
 
 	cat tempdata/doc_registry.json \
 	| scripts/warp --j2 --template-file=templates/mercury_docs.py.j2 -s \
@@ -53,8 +54,10 @@ build-docs:
 version:
 	python mark_version.py > version.py && cp version.py scripts/mercury-version && chmod u+x scripts/mercury-version
 
-build-dist:
+
+build-dist: build-docs
 	python setup.py sdist bdist_wheel
+
 
 build-testdist:
 	python test_setup.py sdist bdist_wheel

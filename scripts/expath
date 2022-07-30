@@ -9,7 +9,8 @@ Options:
     -s --stdin    read records from standard input
 '''
 
-''' +mdoc+
+''' 
++mdoc+
 
 expath (extract path) takes a list of fully-qualified file references 
 (from <file> if the --listfile option is set, or from standard input if -s is set)

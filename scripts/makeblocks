@@ -22,52 +22,56 @@ Options:
     -c --console        run makeblocks in an interactive console session
 '''
 
-#
-# makeblocks: command-line utility for managing data pipeline configurations based on the M2
-# (Mercury makefile) pattern.
-#
-# A "Mercury" makefile is a canonical makefile, but organized and instrumented to run data pipelines.
-#
-# An M2 data pipeline is a make target organized into a variable block and 1-N command blocks.
-# Variable and command blocks can be instrumented, with formatted comments, such that we can isolate
-# and inspect the blocks, load and inspect make variables, and resolve make-variable references
-# in command blocks.
-#
-# Make targets can also be instrumented in this way, allowing us to step-debug data pipelines.
-#
-# There are four types of logical structures we can define in the comments of an M2 makefile:
-# targetblocks, varblocks, cmdblocks, and checkpoints. A targetblock is defined at the top of
-# (immediately before) a make target with the syntax:
-#
-# +open-targetblock
-#
-# and must be closed at the end of the make target with:
-#
-# +close-targetblock
-#
-# (A targetblock is implicitly named; its name is always the name of the make target it encloses.)
-#
-# A varblock is defined inside a make target and *explicitly* named, with
-#
-# +open-varblock(blockname)
-# <make var declarations>
-# +close-varblock
-#
-# A cmdblock is defined (also inside a make target) with
-#
-# +open-cmdblock(blockname)
-# <1-N commands>
-# +close-varblock
-#
-# A checkpoint may either be named, or anonymous. An anonymous checkpoint is defined with
-#
-# +checkpoint:[var=<varblock_name>.<variable_name> test=<python_module>.<test_function>]
-#
-# and a named checkpoint is defined with
-#
-# +checkpoint:<checkpoint_name>[var=<varblock_name>.<variable_name> test=<python_module>.<test_function>]
-#
-#
+'''
++mdoc+
+
+makeblocks: command-line utility for managing data pipeline configurations based on the M2
+(Mercury makefile) pattern.
+
+A "Mercury" makefile is a canonical makefile, but organized and instrumented to run data pipelines.
+
+An M2 data pipeline is a make target organized into a variable block and 1-N command blocks.
+Variable and command blocks can be instrumented, with formatted comments, such that we can isolate
+and inspect the blocks, load and inspect make variables, and resolve make-variable references
+in command blocks.
+
+Make targets can also be instrumented in this way, allowing us to step-debug data pipelines.
+
+There are four types of logical structures we can define in the comments of an M2 makefile:
+targetblocks, varblocks, cmdblocks, and checkpoints. A targetblock is defined at the top of
+(immediately before) a make target with the syntax:
+
++open-targetblock
+
+and must be closed at the end of the make target with:
+
++close-targetblock
+
+(A targetblock is implicitly named; its name is always the name of the make target it encloses.)
+
+A varblock is defined inside a make target and *explicitly* named, with
+
++open-varblock(blockname)
+<make var declarations>
++close-varblock
+
+A cmdblock is defined (also inside a make target) with
+
++open-cmdblock(blockname)
+<1-N commands>
++close-varblock
+
+A checkpoint may either be named, or anonymous. An anonymous checkpoint is defined with
+
++checkpoint:[var=<varblock_name>.<variable_name> test=<python_module>.<test_function>]
+
+and a named checkpoint is defined with
+
++checkpoint:<checkpoint_name>[var=<varblock_name>.<variable_name> test=<python_module>.<test_function>]
+
++mdoc+
+'''
+
 
 import os, sys
 import re
@@ -121,7 +125,7 @@ TIMING_BLOCK = 'timer'
 VALID_BLOCK_TYPES = [CMD_BLOCK, VAR_BLOCK, TARGET_BLOCK, TIMING_BLOCK]
 
 BLK_SCRIPT_TEMPLATE = '''
-#!/bin/bash
+!/bin/bash
 
 {command}
 '''
@@ -232,7 +236,7 @@ def parse_checkpoint_expression(checkpoint_string: str) -> Checkpoint:
     var_name = var_token.split('=')[1]
     test_name = test_token.split('=')[1]
 
-    # now read the (optional) parameters
+     now read the (optional) parameters
     if len(body_tokens) > 2:
         for token in body_tokens[2:]:
             if not token.startswith('?'):
@@ -355,7 +359,7 @@ class ConsoleCLI(Cmd):
         }
 
         self.workspace = {
-            'sessions':{}  # DebugSession objects
+            'sessions':{}   DebugSession objects
         }
 
     @contextmanager
@@ -365,15 +369,15 @@ class ConsoleCLI(Cmd):
         yield args, None            
 
       except DocoptExit as e:
-        # The DocoptExit is thrown when the args do not match.
-        # We print a message to the user and the usage block.
+         The DocoptExit is thrown when the args do not match.
+         We print a message to the user and the usage block.
 
         error_msg = '\nPlease specify one or more valid command parameters.\n%s\n' % e
         yield None, error_msg
 
       except SystemExit as e:
-        # The SystemExit exception prints the usage for --help
-        # We do not need to do the print here.
+         The SystemExit exception prints the usage for --help
+         We do not need to do the print here.
         raise
 
 
@@ -492,14 +496,14 @@ class ConsoleCLI(Cmd):
                     return
 
                 var_data = decode_blockbuffer(varbuffer, VAR_BLOCK)
-                # TODO: remove print statements
+                 TODO: remove print statements
                 print('$$$ decoding blockbuffer...')
                 decoded_command = decode_blockbuffer(cmd_block, CMD_BLOCK)
 
                 print('$$$ formatting command template...')
                 live_command = decoded_command.command_template.format(**var_data)
 
-                # if the command was invoked with the "execute" option, run the command
+                 if the command was invoked with the "execute" option, run the command
                 if args['-x']:
                     block_script_filename = self.generate_scriptfile_name(blockname)
 
@@ -514,12 +518,12 @@ class ConsoleCLI(Cmd):
 
                     print('\n+++ Done.\n')
 
-                # otherwise, print the populated command template
+                 otherwise, print the populated command template
                 else:
                     print(live_command)
             else:
-                # show the command block, transformed into a Python-style template
-                # (if it references make variables)
+                 show the command block, transformed into a Python-style template
+                 (if it references make variables)
 
                 decoded_command = decode_blockbuffer(cmd_block, CMD_BLOCK)
                 print(decoded_command.command_template)
@@ -544,8 +548,8 @@ class ConsoleCLI(Cmd):
                 return
 
             blkstring = args['<varblock_name>']
-            # when inspecting a var block, users have the option of using dot notation ("blockname.varname")
-            # to get at a single variable in the block
+             when inspecting a var block, users have the option of using dot notation ("blockname.varname")
+             to get at a single variable in the block
 
             tokens = blkstring.split('.')
             if len(tokens) == 1:
@@ -641,7 +645,7 @@ class ConsoleCLI(Cmd):
                     if should_continue.lower() == 'y':
                         continue
                     else:
-                        # save the session -- we can resume it later
+                         save the session -- we can resume it later
                         self.workspace['sessions'][session_id] = session
                         break
             else:
@@ -679,16 +683,16 @@ class ConsoleCLI(Cmd):
                 target_block = parse_target_buffer(blockbuffer)
                 block_content = '\n'.join(target_block['body'])
 
-                # scan the body of the target block
+                 scan the body of the target block
                 virtual_file = StringIO(block_content)
 
-                # Ideally there should be only one varblock defined within a target, 
-                # but it is legal to define more than one. If there should be more than one,
-                # their contents will be merged in a single dictionary here. This means that
-                # if variable V_X is defined in varblock-a and varblock-b, the value of V_X
-                # in varblock-b will appear in the dictionary below if varblock-b lexically 
-                # follows varblock-a in the makefile.
-                # 
+                 Ideally there should be only one varblock defined within a target, 
+                 but it is legal to define more than one. If there should be more than one,
+                 their contents will be merged in a single dictionary here. This means that
+                 if variable V_X is defined in varblock-a and varblock-b, the value of V_X
+                 in varblock-b will appear in the dictionary below if varblock-b lexically 
+                 follows varblock-a in the makefile.
+                 
                 vardata = {}
                 varbuffers = load_blocks_from_file(virtual_file, VAR_BLOCK)
                 for name, buffer in varbuffers.items():
@@ -697,13 +701,13 @@ class ConsoleCLI(Cmd):
                 print(f'\n+++ Variable data found in target block:\n')
                 print(common.jsonpretty(vardata))
 
-                # create a session object to store context
-                #
+                 create a session object to store context
+                
                 session = DebugSession(target_name, self.generate_scriptfile_name, **vardata)
                
-                # we are re-scanning the target's content for command-type blocks,
-                # so reset the filepointer to the beginning
-                #                 
+                 we are re-scanning the target's content for command-type blocks,
+                 so reset the filepointer to the beginning
+                                 
                 virtual_file.seek(0, 0)
                 cmdbuffers = load_blocks_from_file(virtual_file, CMD_BLOCK)
 
@@ -728,7 +732,7 @@ class ConsoleCLI(Cmd):
                     if should_continue.lower() == 'y':
                         continue
                     else:
-                        # save the session -- we can resume it later
+                         save the session -- we can resume it later
                         print(f'\n+++ Saving debug session with ID ({target_name}). Continue it at any time by issuing the "resume" command.\n')
                         self.workspace['sessions'][target_name] = session
                         break
@@ -747,7 +751,7 @@ class ConsoleCLI(Cmd):
         ''' 
         with self.docopt_parse(self.usage_string_for_lsvar, *cmd_args) as (args, error):
             if not error:
-                #blockbuffers = load_blocks(VAR_BLOCK, self.makefile_name)
+                blockbuffers = load_blocks(VAR_BLOCK, self.makefile_name)
                 blockbuffers = self.data['var_blocks']
                 for key, value in blockbuffers.items():
                     print(key)
@@ -800,21 +804,21 @@ class Blockbuffer(object):
 
     @property
     def lines(self):
-        #return [l.lstrip('#') for l in self._lines]
-        # TODO: do we need to strip comment markers at all?
+        return [l.lstrip('') for l in self._lines]
+         TODO: do we need to strip comment markers at all?
         return self._lines
 
     
     @property
     def data(self):
         if self.block_type == CMD_BLOCK:
-            return '\n'.join(line for line in self.lines if not line.startswith('#')).replace('\\', '')
+            return '\n'.join(line for line in self.lines if not line.startswith('')).replace('\\', '')
 
         elif self.block_type == VAR_BLOCK:
-            return '\n'.join(line for line in self.lines if not line.startswith('#'))
+            return '\n'.join(line for line in self.lines if not line.startswith(''))
 
         elif self.block_type == TARGET_BLOCK:
-            # Do not strip comments
+             Do not strip comments
             return self.lines
 
 
@@ -840,8 +844,8 @@ def parse_eval_expression(expr: str) -> tuple:
         shell_cmd_params = cmd_tokens[1:]
 
         if 'curl' in cmd_tokens[0]:
-            #from sh import curl
-            #cmd_output = curl(*cmd_tokens)
+            from sh import curl
+            cmd_output = curl(*cmd_tokens)
 
             shell_cmd = local['curl']
             cmd_output = shell_cmd(*shell_cmd_params)
@@ -874,25 +878,25 @@ def parse_command_buffer(buffer: Blockbuffer) -> DecodedCommandBlock:
     print('_______________________')
     '''
 
-    #blocktext = '\n'.join(line.strip('\n') for line in buffer.lines)
+    blocktext = '\n'.join(line.strip('\n') for line in buffer.lines)
     blocktext = buffer.data
 
     cmd_template = blocktext.replace('$(', '{').replace(')', '}')
 
-    # TODO: delete
-    #print(blocktext, file=sys.stderr)
+     TODO: delete
+    print(blocktext, file=sys.stderr)
 
-    # Edge case: any awk expression found in a makefile must use a double dollar-sign;
-    # this will be followed by a numeric digit. Replace the double dollar sign 
-    # with a single one
-    #
+     Edge case: any awk expression found in a makefile must use a double dollar-sign;
+     this will be followed by a numeric digit. Replace the double dollar sign 
+     with a single one
+    
     for match in AWK_EXPR_RX.finditer(cmd_template):
         ref = cmd_template[match.span()[0]:match.span()[1]]
         cmd_template = cmd_template.replace(ref, ref[1:])
 
-    # Environment variables are referenced in make targets using a double dollar sign;
-    # replace with a single one
-    #
+     Environment variables are referenced in make targets using a double dollar sign;
+     replace with a single one
+    
     for match in MAKE_ENV_VAR_RX.finditer(cmd_template):
         ref = cmd_template[match.span()[0]:match.span()[1]]
         cmd_template = cmd_template.replace(ref, ref[1:])
@@ -931,7 +935,7 @@ def parse_target_buffer(buffer: Blockbuffer) -> dict:
                 for tok in non_name_tokens:
                     tok = tok.strip()
                     if len(tok):
-                        # is it an intentional break at the end?
+                         is it an intentional break at the end?
                         if tok[-1] == '\\':
                             continuing_decl = True
                             output['dependencies'].append(tok.strip('\\').strip())
@@ -966,15 +970,15 @@ def parse_target_buffer(buffer: Blockbuffer) -> dict:
 
 def parse_variable_buffer(buffer: Blockbuffer) -> dict:
 
-    block_text = '\n'.join(line.strip('\n') for line in buffer.lines if not line.startswith('#'))
+    block_text = '\n'.join(line.strip('\n') for line in buffer.lines if not line.startswith(''))
     raw_var_decl_lines = []
     output = {}
 
     for line in block_text.split('\n'):        
         if line.startswith('$(eval'):
             
-            # resolve references to environment variables
-            #
+             resolve references to environment variables
+            
             env_vars = {}
 
             for match in re.finditer(AWK_EXPR_RX, line):
@@ -986,10 +990,10 @@ def parse_variable_buffer(buffer: Blockbuffer) -> dict:
 
                 var_ref = line[match.span()[0]:match.span()[1]]
 
-                # In a makefile, env vars are referenced with a double dollar sign--strip it out
+                 In a makefile, env vars are referenced with a double dollar sign--strip it out
                 env_var_name = var_ref.lstrip('$$')
 
-                # try to resolve it and fail if we cannot
+                 try to resolve it and fail if we cannot
                 env_var_value = os.getenv(env_var_name)
                 if not env_var_value:
                     raise common.MissingEnvironmentVarException(env_var_name)
@@ -1001,9 +1005,9 @@ def parse_variable_buffer(buffer: Blockbuffer) -> dict:
             
             raw_var_decl_lines.append(line)
 
-    # first, distinguish between the var declaration lines which themselves refer 
-    # to another Makefile variable ("dirty") and those which do not ("clean")
-    #
+     first, distinguish between the var declaration lines which themselves refer 
+     to another Makefile variable ("dirty") and those which do not ("clean")
+    
     clean_var_decl_lines = []
     dirty_var_decl_lines = []
 
@@ -1016,12 +1020,12 @@ def parse_variable_buffer(buffer: Blockbuffer) -> dict:
         else:            
             clean_var_decl_lines.append(eval_expr)
 
-    # populate a dictionary with the "clean" variable declarations
-    #
+     populate a dictionary with the "clean" variable declarations
+    
     root_variable_values = {}
     for line in clean_var_decl_lines:
-        # resolve references to environment variables
-        #
+         resolve references to environment variables
+        
         env_vars = {}
 
         for match in re.finditer(AWK_EXPR_RX, line):
@@ -1033,10 +1037,10 @@ def parse_variable_buffer(buffer: Blockbuffer) -> dict:
 
             var_ref = line[match.span()[0]:match.span()[1]]
 
-            # In a makefile, env vars are referenced with a double dollar sign--strip it out
+             In a makefile, env vars are referenced with a double dollar sign--strip it out
             env_var_name = var_ref.lstrip('$$')
 
-            # try to resolve it and fail if we cannot
+             try to resolve it and fail if we cannot
             env_var_value = os.getenv(env_var_name)
             if not env_var_value:
                 raise common.MissingEnvironmentVarException(env_var_name)
@@ -1051,9 +1055,9 @@ def parse_variable_buffer(buffer: Blockbuffer) -> dict:
 
     output.update(root_variable_values)
 
-    # if we found any "root variable values" (variables which do not depend on the value
-    # of others), satisfy the "dirty" variable refs which depend on them
-    #
+     if we found any "root variable values" (variables which do not depend on the value
+     of others), satisfy the "dirty" variable refs which depend on them
+    
     var_decl_lines = []
     for eval_exp in dirty_var_decl_lines:
         decl = substitute_make_vars(eval_exp, **root_variable_values)
@@ -1114,9 +1118,9 @@ def find_block_errors(block_markers: list, block_type: str):
 
     for m in block_markers:
         if previous_marker:
-            # Report possible overlapping blocks (a block which is opened before the previous block
-            # was closed, is said to overlap its predecessor)
-            #
+             Report possible overlapping blocks (a block which is opened before the previous block
+             was closed, is said to overlap its predecessor)
+            
             if m.mark_type == BLOCK_OPEN and previous_marker.mark_type != BLOCK_CLOSE:
                 err_clauses = []
                 err_clauses.append(f'({previous_marker.name}) opened at line {previous_marker.line_number}')
@@ -1138,13 +1142,13 @@ def find_block_errors(block_markers: list, block_type: str):
     '''
 
     for block_name, markers in blocktbl.items():
-        # Report blocks which were opened but never closed
-        # 
+         Report blocks which were opened but never closed
+         
         if len(markers) < 2:
             errors.append(f'Unterminated {markers[0].block_type} block ({block_name}) at line {markers[0].line_number}')
 
-        # Report blocks which were opened or closed more than once
-        #
+         Report blocks which were opened or closed more than once
+        
         if len(markers) >= 2:            
             num_opens = 0
             num_closes = 0
@@ -1197,16 +1201,16 @@ def scan_makefile(makefile_name, **kwargs) -> dict:
         for line in f:
             line_num += 1
 
-            # Do this at the top of the for loop
+             Do this at the top of the for loop
 
-            # This condition will be True if we have already seen an +open-targetblock marker in the file.
-            # We have to place this logic outside of the marker-detection code segment because of how target-type
-            # blocks are named. Unlike var and cmd blocks, the name of a target block is never on the same line
-            # as the block-declaration; its name is the name of the make target which the block encloses.
-            #
+             This condition will be True if we have already seen an +open-targetblock marker in the file.
+             We have to place this logic outside of the marker-detection code segment because of how target-type
+             blocks are named. Unlike var and cmd blocks, the name of a target block is never on the same line
+             as the block-declaration; its name is the name of the make target which the block encloses.
+            
             if target_block_reading_frame_open:                
-                if line[0].isalpha and ':' in line: # detect the start of a make target
-                    if not line[0] in  ['\t', '$', '#']:  
+                if line[0].isalpha and ':' in line:  detect the start of a make target
+                    if not line[0] in  ['\t', '$', '']:  
                         tokens = line.split(':')
                         block_name = tokens[0]
                         target_block_name = block_name
@@ -1264,13 +1268,13 @@ def scan_makefile(makefile_name, **kwargs) -> dict:
 
             match_open_expr = OPEN_TARGET_BLOCK_RX.search(line)
             if match_open_expr:
-                target_block_start_line = line_num      # save the line number; we'll need it later
+                target_block_start_line = line_num       save the line number; we'll need it later
                 target_block_reading_frame_open = True
                 num_target_blocks += 1
 
-                # We cannot create a BlockMarker yet, because unlike other block types,
-                # a target-block's name is not declared on the same line as the marker;
-                # the block name is always the name of the make target it encloses.
+                 We cannot create a BlockMarker yet, because unlike other block types,
+                 a target-block's name is not declared on the same line as the marker;
+                 the block name is always the name of the make target it encloses.
 
                 continue
 
@@ -1355,7 +1359,7 @@ def load_blocks_from_file(fileobj, block_type):
                 continue
 
             if reading_frame_open:
-                if line.lstrip().startswith('#'):
+                if line.lstrip().startswith(''):
                     blockbuffers[block_name].append(line.rstrip())
                 else:    
                     blockbuffers[block_name].append(line.strip())
@@ -1401,13 +1405,13 @@ def load_blocks_from_file(fileobj, block_type):
                 continue
 
             if reading_frame_open:
-                # we rely on this flag because statements inside the block may also have colons --
-                # only the first statement matching the subsequent if predicate will be read as 
-                # a declaration of an actual make target
-                #
+                 we rely on this flag because statements inside the block may also have colons --
+                 only the first statement matching the subsequent if predicate will be read as 
+                 a declaration of an actual make target
+                
                 if not target_declaration_found:
                     if line[0].isalpha and ':' in line:
-                        # this line is an actual make target declaration
+                         this line is an actual make target declaration
 
                         tokens = line.split(':')
                         block_name = tokens[0]
@@ -1454,13 +1458,13 @@ def decode_blockbuffer(buffer: Blockbuffer, block_type: str):
 
 
 def load_blockbuffer(buffer: Blockbuffer, block_type: str):
-    blocktext = '\n'.join(line.strip('\n') for line in buffer.lines if not line.startswith('#'))
+    blocktext = '\n'.join(line.strip('\n') for line in buffer.lines if not line.startswith(''))
 
     if block_type == VAR_BLOCK:
         return blocktext
     
     elif block_type == CMD_BLOCK:
-        # change the $(varname) Makefile var expression syntax to Python-style {varname} template sytax
+         change the $(varname) Makefile var expression syntax to Python-style {varname} template sytax
         command_block = parse_command_buffer(buffer)
         return command_block
 
@@ -1483,7 +1487,7 @@ def get_checkpoints_in_target_buffer(buffer: Blockbuffer, checkpoint_location_li
 def execute_checkpoint(ckpt: Checkpoint, home_buffer: Blockbuffer, line_number, svc_registry: ServiceObjectRegistry) -> dict:
 
     checkpoint_vars = {}
-    # load any varblocks declared in this target
+     load any varblocks declared in this target
 
     buffer_contents = '\n'.join(home_buffer.lines)
     virtual_file = StringIO(buffer_contents)
@@ -1492,10 +1496,10 @@ def execute_checkpoint(ckpt: Checkpoint, home_buffer: Blockbuffer, line_number, 
     checkpoint_function = ckpt.test_function
     params = ckpt.parameters
 
-    # if the checkpoint variable was specified with respect to a variable block
-    # (using the syntax <blockname.variable_name>),
-    # load the named variable
-    #
+     if the checkpoint variable was specified with respect to a variable block
+     (using the syntax <blockname.variable_name>),
+     load the named variable
+    
     if ckpt.varblock_name:
         source_varblock = varblocks.get(ckpt.varblock_name)
         if not source_varblock:
@@ -1505,13 +1509,13 @@ def execute_checkpoint(ckpt: Checkpoint, home_buffer: Blockbuffer, line_number, 
         variable = ckpt.variable
         value = vars.get(variable)
 
-        #result = checkpoint_function(value, **params)
+        result = checkpoint_function(value, **params)
         checkpoint_status = ckpt.execute(value, svc_registry, **params)
         
     else:
-        # the checkpoint was declared with an explicit variable
+         the checkpoint was declared with an explicit variable
         value = ckpt.variable
-        #result = checkpoint_function(value)
+        result = checkpoint_function(value)
         checkpoint_status = ckpt.execute(value, **params)
 
     return {
@@ -1606,9 +1610,9 @@ def main(args):
 
     block_type = args['<blocktype>']
 
-    # Because of the way we load makefile blocks, the <blockbuffers> data structure
-    # will contain all blocks of a single type.
-    #
+     Because of the way we load makefile blocks, the <blockbuffers> data structure
+     will contain all blocks of a single type.
+    
     blockbuffers = load_blocks(block_type, args.get('<filename>') or None)
 
     if block_type not in VALID_BLOCK_TYPES:
@@ -1655,17 +1659,17 @@ def main(args):
                 print(buffer.data)
     
         elif block_type == CMD_BLOCK:
-            # change the $(varname) Makefile var expression syntax to Python-style {varname} template sytax
+             change the $(varname) Makefile var expression syntax to Python-style {varname} template sytax
             command_block = parse_command_buffer(buffer)
 
             if args['--decode']: 
                 if args['--stdin']:
-                    # receive parameter values as JSON from standard input
+                     receive parameter values as JSON from standard input
                     template_params = receive_params_from_stdin()                                                            
                     print(command_block.command_template.format(**template_params))
                     
                 elif args['--interactive']:
-                    # prompt the user to supply the template parameters
+                     prompt the user to supply the template parameters
                     template_params = {}
                     for key in command_block.param_list:
                         value = input(f'What is the value for {key} ?: ')
@@ -1675,10 +1679,10 @@ def main(args):
                             template_params[key] = '{%s}' % key
                     print(command_block.command_template.format(**template_params))
                 else:
-                    # print the decoded template without trying to render it into a runnable command
+                     print the decoded template without trying to render it into a runnable command
                     print(command_block.command_template)
 
-            # print the original command block without converting Makefile variable expressions
+             print the original command block without converting Makefile variable expressions
             else:
                 print('\n'.join(buffer.lines))
 

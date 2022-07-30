@@ -16,12 +16,17 @@ from snap import common
 
 CUTOUTS = [
     'mdoc',
+    'mercury-version',
     'bqexport', 
     'bqexport-view', 
     'bqstream-dl', 
-    'couchtalk', 
+    'combinatr',
+    'couchtalk',
+    'csvreorder', 
     'dfproc', 
     'j2df', 
+    'j2spectrum',
+    'mkspectrumdb',
     'nullbytefilter',
     's3-fgate',
     'rsexport',

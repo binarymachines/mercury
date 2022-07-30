@@ -5,7 +5,8 @@ Usage:
     datetimecalc --days <num_days> (--before | --from) (today | now)  
 '''
 
-'''+mdoc+
+'''
++mdoc+
 
 datetimecalc yields a single date or datetime value <num_days> days into the future or the past.
 The --before option is past-looking; the --from option is future-looking. So that

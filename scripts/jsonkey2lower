@@ -9,12 +9,14 @@ Options:
     -s --stdin  read data from standard input
 '''
 
-'''+mdoc+
+'''
++mdoc+
 
 jsonkey2lower processes a collection of JSON records (one per line), either from <filename>
 if the --datafile option is set, or from standard input if the --stdin option is set,
 and outputs a transformed recordset in which all the keys are lowercase.
 
++mdoc+
 '''
 
 import json

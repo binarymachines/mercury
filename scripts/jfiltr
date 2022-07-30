@@ -10,7 +10,8 @@ Options:
     -c  --csv  process records as CSV
 '''
 
-'''+mdoc+
+'''
++mdoc+
 
 jfilter (JSON filter) filters a source JSON file <source_file> by processing each record through 
 a filter function specified by <module.function>. 
