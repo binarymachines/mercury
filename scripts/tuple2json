@@ -7,6 +7,26 @@ Usage:
 
 '''
 
+'''
++mdoc+
+
+tuple2json takes a list of tuples (represented as CSV records with the specified delimiter) and turns them 
+into a list of corresponding key:value JSON records whose keys are the comma-separated, ORDERED list of names
+passed to the --keys parameter.
+
+If the --datafile option is set, tuple2json reads its input records from the <file> parameter; if not, 
+it reads them from standard input. 
+
+tuple2json assumes a headlerless CSV file; it depends solely on the keys passed to it. If you are transforming a CSV
+file which contains a header, you must either remove it before passing the data, or use the --skip parameter; 
+otherwise the first record it generates will be a nonsense record. 
+
+tuple2json is often used in conjunction with tuplegen to turn a set of lists into a single JSONL file.
+
++mdoc+
+'''
+
+
 import os, sys
 import json
 import docopt

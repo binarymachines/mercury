@@ -2,8 +2,7 @@
 
 '''
 Usage:
-  mdoc --list
-  mdoc -s <search_exp>
+  mdoc -l  
   mdoc <command>
 
 Options:
@@ -26,31 +25,26 @@ def main(args):
   if args['--list']:
     print('\n'.join(mercury_docs.SCRIPT_NAMES))
 
-
-  elif args['--search']:
-    raw_search_exp = args['<search_exp>']
-    if raw_search_exp.endswith('?'):
-      search_exp = raw_search_exp.rstrip('?')
+  else:
+    command = args['<command>']
+    if command.endswith('?'):
+      search_exp = command.rstrip('?')
       for name in mercury_docs.SCRIPT_NAMES:
         if name.startswith(search_exp):
           print(name)
     
-    elif raw_search_exp.startswith('?'):
-      search_exp = raw_search_exp.lstrip('?')
+    elif command.startswith('?'):
+      search_exp = command.lstrip('?')
       for name in mercury_docs.SCRIPT_NAMES:
         if name.endswith(search_exp):
           print(name)
 
     else:
-      if raw_search_exp in mercury_docs.SCRIPT_NAMES:
-        print(getattr(mercury_docs, raw_search_exp))
-
-
-  else:
-    command = args['<command>']
-    if hasattr(mercury_docs, command):
-      print(getattr(mercury_docs, command))
-
+      if command in mercury_docs.SCRIPT_NAMES:
+        print(mercury_docs.DOC_REGISTRY[command])
+      else:
+        print(f"""
+        \nThere is no Mercury command "{command}".\nAppend "?" to a string to list all commands which start with that string.\nPrepend "?" to a string to list all commands which end with that string.\n""")
 
 if __name__ == '__main__':
   args = docopt.docopt(__doc__)

@@ -5,10 +5,8 @@ import os, sys
 
 SCRIPT_NAMES = [{{script_name_array}}]
 
+DOC_REGISTRY = {
 {% for spec in docspecs %}
-
-{{ spec.script_name }} = """
-{{ spec.doc }}
-"""
-
+    "{{ spec.script_name }}": """{{ spec.doc }}""",
 {% endfor %}
+}

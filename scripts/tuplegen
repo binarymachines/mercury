@@ -6,6 +6,21 @@ Usage:
 
 '''
 
+'''
++mdoc+
+
+tuplegen generates a (headless) set of CSV records using the specified delimiter, from the ORDERED list of files
+passed to the --listfiles parameter. tuplegen will not generate a CSV header; if you wish to use it to generate
+a CSV file containing a header, you must ensure that the first line in each listfile is the column name.
+
+The source listfiles passed into tuplegen may be of different lengths; the gaps will simply be zero-length.
+
+tuplegen is often used in conjunction with tuple2json to turn a set of lists into a single JSONL file.
+
++mdoc+
+'''
+
+
 import os, sys
 import json
 import docopt

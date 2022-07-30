@@ -84,7 +84,6 @@ def main(args):
                 banner = MERCURY_BANNER.format(script=script_name)
 
                 fulldoc = f'{MERCURY_BORDER}\n\n{banner}\n{MERCURY_BORDER}\n{syntax}{help_text}\n'
-                #print(fulldoc)
 
                 doc_registry.append(
                     {
@@ -93,7 +92,16 @@ def main(args):
                     }
                 )
             else:
-                print(f'WARNING: odd number of +mdoc+ tags detected in Mercury script {scriptfile.rstrip(".py")}. Emitting only usage string.',
+                script_name = scriptfile.split('.')[0]
+                script_list.append(script_name)
+                fulldoc = f'{MERCURY_BORDER}\n\n{banner}\n{MERCURY_BORDER}\n{syntax}\n'
+                doc_registry.append(
+                    {
+                    'script_name': script_name,
+                    'doc': fulldoc
+                    }
+                )
+                print(f'WARNING: odd number of +mdoc+ tags detected in Mercury script {script_name}. Emitting only usage string.',
                       file=sys.stderr)
 
     script_array_decl = str(',\n'.join(["'" + s + "'" for s in script_list]))

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-'''Usage:
+'''
+Usage:
             xfile --config <configfile> --delimiter <delimiter> --map <map_name> <datafile> [--limit <max_records>]
             xfile --config <configfile> --delimiter <delimiter> --map <map_name> -s [--limit <max_records>]
             xfile --config <configfile> --json --map <map_name> <datafile> [--limit <max_records>]

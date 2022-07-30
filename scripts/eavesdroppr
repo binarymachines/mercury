@@ -12,7 +12,7 @@ Options:
 '''
 
 '''
-+mdoc
++mdoc+
 
 eavesdroppr: command-line utility for "eavesdropping" on PostgreSQL databases.
 This is a code generator and dependency injector for observing Postgres changes
