@@ -30,6 +30,7 @@ When the --accept-to option is set, ACCEPTED records are written to <filename> a
 
 When the --reject-to option is set, REJECTED records are written to <filename> and ACCEPTED records are written to standard out.
 
++mdoc+
 '''
 
 import os, sys

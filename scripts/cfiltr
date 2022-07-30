@@ -10,7 +10,8 @@ Options:
     -d  --delimiter set the delimiter to the specified character (comma is default)
 '''
 
-'''+mdoc+
+'''
++mdoc+
 
 cfilter (CSV filter) filters a source CSV file <source_file> by processing each record through 
 a filter function specified by <module.function>. 
@@ -32,6 +33,7 @@ When the --reject-to option is set, REJECTED records are written to <filename> a
 
 The source CSV file must contain a header; if it does not, cfilter's behavior is undefined.
 
++mdoc+
 '''
 
 

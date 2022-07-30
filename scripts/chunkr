@@ -9,7 +9,8 @@ Options:
     -t --target-dir  send chunked datafiles to this directory
 '''
 
-'''+mdoc+
+'''
++mdoc+
 
 chunkr splits a list of strings and divides it into N chunks, where N is specified by 
 
@@ -29,6 +30,7 @@ by the optional <outdir> parameter.
 
 The optional limit=<N> parameter limits it to processing N input records.
 
++mdoc+
 '''
 
 

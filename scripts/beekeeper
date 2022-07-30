@@ -11,9 +11,37 @@ Options:
     -b --bytes      return request data as bytes (as opposed to string)    
 '''
 
-#
-#  beekeeper: command-line utility for interacting with HTTP API's
-#
+'''
++mdoc+
+
+beekeeper is a command-line utility for interacting with HTTP API's.
+It is driven by a YAML configuration file whose core metaphor is the <target>. 
+
+Beekeeper targets are defined in the following structure within the YAML file:
+
+targets:
+    <target_name>:
+      url: <url_endpoint>
+      method: <http_method>
+      headers: ## optional                                  
+          <header_name>: <header_value>
+          ...
+
+      request_params:
+        - name: <parameter_name>
+          value: <parameter_value>
+        ...
+
+So that issuing the command
+
+beekeeper --config <yamlfile> --target <target_name>
+
+will issue the corresponding HTTP request to the designated URL in the configuration.
+A request can have an arbitrary number of header fields and request parameters.
+
++mdoc+
+'''
+
 
 import os, sys
 import re

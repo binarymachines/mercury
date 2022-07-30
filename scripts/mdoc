@@ -2,28 +2,57 @@
 
 '''
 Usage:
-  mercman --list
-  mercman <command>
+  mdoc --list
+  mdoc -s <search_exp>
+  mdoc <command>
 
 Options:
   -l --list       show the available man pages
+  -s --search     search for a script name
 '''
 
 import os, sys
 import json
 import docopt
 from collections import namedtuple
+from mercury import mercury_docs
 
 
 DocEntry = namedtuple('DocEntry', 'syntax manual')
 
 
 def main(args):
-  
-    pass
+
+  if args['--list']:
+    print('\n'.join(mercury_docs.SCRIPT_NAMES))
+
+
+  elif args['--search']:
+    raw_search_exp = args['<search_exp>']
+    if raw_search_exp.endswith('?'):
+      search_exp = raw_search_exp.rstrip('?')
+      for name in mercury_docs.SCRIPT_NAMES:
+        if name.startswith(search_exp):
+          print(name)
+    
+    elif raw_search_exp.startswith('?'):
+      search_exp = raw_search_exp.lstrip('?')
+      for name in mercury_docs.SCRIPT_NAMES:
+        if name.endswith(search_exp):
+          print(name)
+
+    else:
+      if raw_search_exp in mercury_docs.SCRIPT_NAMES:
+        print(getattr(mercury_docs, raw_search_exp))
+
+
+  else:
+    command = args['<command>']
+    if hasattr(mercury_docs, command):
+      print(getattr(mercury_docs, command))
 
 
 if __name__ == '__main__':
-    args = docopt.docopt(__doc__)
-    main(args)
+  args = docopt.docopt(__doc__)
+  main(args)
 

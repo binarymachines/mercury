@@ -9,11 +9,13 @@ Options:
     -s --stdin    read records from standard input
 '''
 
-'''+mdoc+
+'''
++mdoc+
 
 collapsr takes a list of values from <file> or standard input and collapses them
 down to a set of unique values. (Think SELECT DISTINCT, but for textfiles.)
 
++mdoc+
 '''
 
 import os, sys

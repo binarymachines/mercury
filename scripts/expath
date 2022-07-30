@@ -17,6 +17,7 @@ and yields the paths only, stripping away the filename and the trailing slash.
 
 The input path(s) need not be valid; that is, they CAN point to nonexistent files.
 
++mdoc+
 '''
 
 import os, sys

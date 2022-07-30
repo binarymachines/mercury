@@ -13,6 +13,14 @@ Options:
     -v --verbose        show event trigger details
 '''
 
+'''+mdoc
+
+cyclops is a filesystem watcher. Based on the configuration file, it will run in an infinite loop
+and wait for a specified change to happen to a watched file or directory, then pass the
+change notification to a user-defined handler function.
+
++mdoc+'''
+
 
 import os
 import sys

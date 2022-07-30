@@ -11,7 +11,8 @@ Options:
     -s --stdin  read data from standard input
 '''
 
-'''+mdoc+
+'''
++mdoc+
 
 j2df (JSONto DataFrame) converts a single JSON object to a DataFrame. 
 It will read its source JSON data from <filename> if the --datafile option is set,
@@ -23,6 +24,7 @@ The --keys option will simply list the keys in the JSON object.
 
 With only the --datafile option set, j2df will print out the source JSON data and exit.
 
++mdoc+
 '''
 
 from datetime import date, datetime

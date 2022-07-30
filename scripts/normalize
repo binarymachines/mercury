@@ -14,9 +14,10 @@ Options:
 normalize takes a set of lines (from a file or standard input) and performs two transforms
 on each line:
 
-replaces whitespace with underscores; and
-changes uppercase chars to lowercase.
+- replaces whitespace with underscores; and
+- changes uppercase chars to lowercase.
 
++mdoc+
 '''
 
 

@@ -1,0 +1,14 @@
+#!/usr/bin/env python
+
+
+import os, sys
+
+SCRIPT_NAMES = [{{script_name_array}}]
+
+{% for spec in docspecs %}
+
+{{ spec.script_name }} = """
+{{ spec.doc }}
+"""
+
+{% endfor %}

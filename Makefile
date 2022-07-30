@@ -41,10 +41,14 @@ test_teamcity:	test_env
 
 
 build-docs:
-	ls scripts > tempdata/script_list.txt
-	cat tempdata/script_list.txt | xargs -I {} cp scripts/{} tempdata/{}.py
-	./extract_cmd_syntax.py --dir scripts --list tempdata/script_list.txt
+	ls scripts > tempdata/script_list.txt | xargs -I {} cp scripts/{} tempdata/{}.py
 	
+	./extract_cmd_syntax.py --dir scripts --list tempdata/script_list.txt > tempdata/doc_registry.json
+
+	cat tempdata/doc_registry.json \
+	| scripts/warp --j2 --template-file=templates/mercury_docs.py.j2 -s \
+	> mercury/mercury_docs.py
+
 
 version:
 	python mark_version.py > version.py && cp version.py scripts/mercury-version && chmod u+x scripts/mercury-version

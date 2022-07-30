@@ -6,7 +6,8 @@ Usage:
     csvstack --files <file1>...
 '''
 
-'''+mdoc+
+'''
++mdoc+
 
 csvstack concatenates a list of CSV files to standard output, only printing the header of the first
 file in the list.
@@ -18,6 +19,7 @@ In --files mode, it will read data from each CSV file passed on the command line
 Note that csvstack assumes that each file will contain a single-line header. It is agnostic 
 with respect to delimiters.
 
++mdoc+
 '''
 
 

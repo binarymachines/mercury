@@ -12,10 +12,12 @@ Options:
     -n --no-echo  do not echo the incoming document in the emitted status msg
 '''
 
-'''+mdoc+
+'''
++mdoc+
 
 couchtalk is a command-line client for inserting records into a Couchbase (NOSQL database) instance.
 
++mdoc+
 '''
 
 import os, sys

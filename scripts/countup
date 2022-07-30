@@ -11,7 +11,8 @@ Options:
     -s --stdin  count the number of lines sent via stdin
 '''
 
-'''+mdoc+
+'''
++mdoc+
 
 countup emits a list of consecutive integers (one per line) from zero or <start_number>
 to <number>, inclusive. The integers can be optionally zero-padded by passing the optional
@@ -24,6 +25,7 @@ Running countup with the -s (--stdin) parameter will cause it to emit a consecut
 for each line sent to countup via standard input, starting with zero or <start_number>. This makes
 it easy to (for example) generate ROWIDs, or line numbers for a text file.
 
++mdoc+
 '''
 
 import os, sys

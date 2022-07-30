@@ -7,7 +7,8 @@ Usage:
     fgate.py --gate-module <module> --service_module <svc-module> --gate-function <func> --format (csv | json) <source_file> [--delimiter=<delimiter>]
 '''
 
-'''
+'''+mdoc+
+
 fgate (file gate): a data utility for all-or-nothing validation of a datafile.
 
 fgate is intended to run against a source datafile (supported formats are csv and json). The user
@@ -17,6 +18,8 @@ contents, returning True if the file should pass (a "GO" condition) and False if
 
 In the case of a GO condition, fgate will emit the name of the datafile to standard out. In the case
 of a NO-GO condition, fgate will return an empty string.
+
++mdoc+
 '''
 
 

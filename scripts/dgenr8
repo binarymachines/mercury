@@ -10,9 +10,14 @@ Usage:
     dgenr8 --generator <module.function> --csv --delimiter <delimiter> --columns <columns>... [--limit=<limit>]
 '''
 
-# dgenr8 (dimension table generator): generates SQl insert statements or CSV records 
-# to populate OLAP star-schema dimension tables
+'''
++mdoc+
 
+dgenr8 (dimension table generator) generates SQl insert statements or CSV records 
+to populate OLAP star-schema dimension tables.
+
++mdoc+
+'''
 
 import os, sys
 from collections import namedtuple
