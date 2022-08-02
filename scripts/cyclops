@@ -151,6 +151,20 @@ def load_trigger_function(trigger_config, yaml_config):
     return common.load_class(trigger_funcname, module_name)
 
 
+def load_backcheck_function(trigger_config, yaml_config):
+
+    backcheck_funcname= trigger_config.get('backcheck_function')
+    if not backcheck_funcname:
+        return None
+
+    module_name = yaml_config['globals']['trigger_function_module']
+    trigger_module = __import__(module_name)
+    if not hasattr(trigger_module, backcheck_funcname):
+        raise Exception('The function module "%s" has no backcheck-function "%s". Please check your configuration.' 
+                        % (module_name, backcheck_funcname))
+    return common.load_class(backcheck_funcname, module_name)
+
+
 def load_trigger_params(trigger_config, yaml_config):
     params = {}
 
@@ -174,6 +188,8 @@ def build_event_dispatcher(trigger_name, yaml_config, preview_mode, **cli_params
     trigger_function = load_trigger_function(trigger_config, yaml_config)
     trigger_parameters = load_trigger_params(trigger_config, yaml_config)
     trigger_parameters.update(cli_params)
+
+    backcheck_function = load_backcheck_function(trigger_config, yaml_config)
 
     dispatcher = EventDispatcher(services, trigger_parameters, preview_mode, debug=debug_mode)
     recursion_setting = trigger_config.get('recursive', False)
