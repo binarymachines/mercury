@@ -41,6 +41,6 @@ snap-micro==0.9.98
 sqlalchemy-utils==0.36.8
 sqlalchemy==1.4.0
 teamcity-messages==1.21
-urllib3==1.25.3
+urllib3==1.26.5
 watchdog==0.9.0
 werkzeug==0.15.4
