@@ -46,9 +46,11 @@ A request can have an arbitrary number of header fields and request parameters.
 import os, sys
 import re
 import json
+import time
 from collections import namedtuple
 import requests
 import docopt
+from mercury.utils import retry_on_fail
 from snap import snap, common
 import yaml
 from mercury.utils import split_unescape
@@ -124,6 +126,7 @@ class APITarget(object):
         self.parameters = kwargs
         self.requests_lib_keyword_args = dict()
         self.file_refs = []
+        self.max_retries = 0
 
 
     def add_request_setting(self, name, value):
@@ -132,6 +135,10 @@ class APITarget(object):
 
     def add_file_ref(self, name, file_object):
         self.file_refs.append((name, file_object))
+
+
+    def set_max_retries(self, retry_count):
+        self.max_retries = int(retry_count)
 
 
     def call(self, **kwargs):
@@ -435,6 +442,9 @@ def load_api_target(target_name:str, yaml_config:dict, macro_defs:dict, macro_ar
                         processor_func,
                         **http_request_params)
 
+        if target_config.get('max_retries'):
+            target.set_max_retries(target_config['max_retries'])
+
         #
         # read any name-value pairs specified in the (optional) "settings" field of the target config.
         # These n-v pairs will be passed through to our underlying call to the requests HTTP library as keyword args.
@@ -529,6 +539,10 @@ def read_macro_args(args):
     return macro_args
 
 
+def pause():
+    time.sleep(1)
+
+
 def main(args):
 
     # we may run in a mode that simply lists API targets
@@ -619,7 +633,11 @@ def main(args):
     global process_output_as_bytes
     process_output_as_bytes = args['--bytes']
 
-    call_status = api_target.call(**cli_request_params)
+    call_status = None
+    with retry_on_fail(api_target.call, api_target.max_retries, pause, **cli_request_params) as retry_context:
+        call_status = retry_context.result
+
+    #call_status = api_target.call(**cli_request_params)
 
     if call_status.ok:
 
