@@ -15,9 +15,13 @@ Usage:
             -p, --passthrough   :passthrough mode (do not transform records)
 '''
 
-#
-# xfile: command line utility for extracting and transforming CSV data
-#
+'''
++mdoc+
+
+ xfile: command line utility for extracting and transforming CSV data
+
++mdoc+
+'''
 
 
 import docopt

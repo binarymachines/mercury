@@ -11,9 +11,13 @@
             -p   --preview      in expression mode, show the generated lambda
 '''
 
-#
-# filtr: command line utility for filtering record streams
-#
+'''
++mdoc+
+
+filtr: command line utility for filtering record streams
+
++mdoc+
+'''
 
 import os, sys
 import csv

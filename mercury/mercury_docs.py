@@ -279,7 +279,7 @@ with respect to delimiters.
 
     "cyclops": """______________________________________________
 
-+++  Mercury script: csvstack +++
++++  Mercury script: cyclops +++
 ______________________________________________
 
 Usage:
@@ -292,6 +292,12 @@ Options:
     -d --debug          emit debugging information
     -p --preview        show filesystem events, but do not execute the trigger task
     -v --verbose        show event trigger details
+
+
+cyclops is a filesystem watcher. Based on the configuration file, it will run in an infinite loop
+and wait for a specified change to happen to a watched file or directory, then pass the
+change notification to a user-defined handler function.
+
 
 """,
 
@@ -485,7 +491,7 @@ of a NO-GO condition, fgate will return an empty string.
 
     "filtr": """______________________________________________
 
-+++  Mercury script: fgate +++
++++  Mercury script: filtr +++
 ______________________________________________
 Usage:
             filtr -x <expression> [--datafile <datafile>] [--skip <skip_count> ] [--limit=<max_records>]
@@ -497,11 +503,15 @@ Usage:
    Options:
             -p   --preview      in expression mode, show the generated lambda
 
+
+filtr: command line utility for filtering record streams
+
+
 """,
 
     "get-awssecret": """______________________________________________
 
-+++  Mercury script: fgate +++
++++  Mercury script: filtr +++
 ______________________________________________
 
 Usage:
@@ -513,7 +523,7 @@ Usage:
 
     "ifthen": """______________________________________________
 
-+++  Mercury script: fgate +++
++++  Mercury script: filtr +++
 ______________________________________________
 
 Usage:
@@ -900,7 +910,7 @@ and a named checkpoint is defined with
 ______________________________________________
 
 Usage:
-    manifold [-d] --write --param-generator <module.generator-function> [--inputs=<name:value>...]
+    manifold [-d] --write --param-generator <module.generator_function> [--inputs=<name:value>...]
     manifold [-d] --read [-n] <paramfile> --warpcmd <command> --outfile-prefix <prefix> --outfile-suffix <suffix>
     manifold [-d] --read [-n] <paramfile> --warpfile <file> --outfile-prefix <prefix> --outfile-suffix <suffix>
 
@@ -968,18 +978,45 @@ Usage:
 
     "mergr": """______________________________________________
 
-+++  Mercury script: manifold +++
++++  Mercury script: mergr +++
 ______________________________________________
 
 Usage:
     mergr --files=<filename>... --keys=<key>...
 
 
+
+mergr: command-line utility for merging lists and emitting JSON records
+
+
+Given file1.txt with content: 
+
+one
+two
+three
+
+and file2.txt with content:
+
+blue
+red
+green
+
+issuing the command:   
+
+mergr --files=file1.txt,file2.txt --keys=number,color
+
+would yield the JSON output:
+
+{"number": "one", "color": "blue"}
+{"number": "two", "color": "red"}
+{"number": "three", "color": "green"}
+
+
 """,
 
     "mkcfg": """______________________________________________
 
-+++  Mercury script: manifold +++
++++  Mercury script: mergr +++
 ______________________________________________
 
 Usage:
@@ -994,7 +1031,7 @@ Options:
 
     "ngst": """______________________________________________
 
-+++  Mercury script: manifold +++
++++  Mercury script: mergr +++
 ______________________________________________
 
 Usage:
@@ -1134,18 +1171,26 @@ Usage:
 
     "repeat": """______________________________________________
 
-+++  Mercury script: normalize +++
++++  Mercury script: repeat +++
 ______________________________________________
 
 Usage:
     repeat --count <num_times> [--str <string>]
     repeat --linecount <file> [--str <string>]
 
+
+repeat emits the designated string some number of times.
+if the --count parameter is used, it will repeat <num_times> times.
+
+If the --linecount parameter is used, it will repeat as many times as there are lines in
+<file>.
+
+
 """,
 
     "seesv": """______________________________________________
 
-+++  Mercury script: normalize +++
++++  Mercury script: repeat +++
 ______________________________________________
 Usage:
             seesv --xform=<transform_file> --xmap=<transform_map>  <datafile>
@@ -1162,7 +1207,7 @@ Usage:
 
     "segmentr": """______________________________________________
 
-+++  Mercury script: normalize +++
++++  Mercury script: repeat +++
 ______________________________________________
 
 Usage:
@@ -1174,18 +1219,23 @@ Usage:
 
     "sqs-consume": """______________________________________________
 
-+++  Mercury script: normalize +++
++++  Mercury script: sqs-consume +++
 ______________________________________________
 
 Usage:
     sqs-consume --config <configfile> --source <source_name>
     sqs-consume --version
 
+
+sqs-consume connects to an Amazon SQS queue, pulls messages down from that queue, and forwards
+each message to a user-defined handler function.
+
+
 """,
 
     "string2rec": """______________________________________________
 
-+++  Mercury script: normalize +++
++++  Mercury script: sqs-consume +++
 ______________________________________________
 
 Usage:
@@ -1196,7 +1246,7 @@ Usage:
 
     "svctest": """______________________________________________
 
-+++  Mercury script: normalize +++
++++  Mercury script: sqs-consume +++
 ______________________________________________
 
 Usage:
@@ -1292,18 +1342,53 @@ Options:
 
     "xcombine": """______________________________________________
 
-+++  Mercury script: tuplegen +++
++++  Mercury script: xcombine +++
 ______________________________________________
 
 Usage:
     xcombine --listfiles=<file1>... --delimiter <delim> [--working-dir <dir>]
 
+
+xcombine (cross-combine) takes a number of lists (of equal length) as input, and returns 
+a single list of CSV records representing all the combinations of the input fields.
+
+So that given three input files:
+
+file1.txt
+A,B,C
+1,2,3
+
+file2.txt
+D,E,F
+4,5,6
+
+file3.txt
+G,H,I
+7,8,9
+
+and the command:
+
+xcombine --listfiles file1.txt,file2.txt,file3.txt --delimiter ','
+
+The output will be:
+
+A,B,C,D,E,F,G,H,I
+A,B,C,D,E,F,7,8,9
+A,B,C,4,5,6,G,H,I
+A,B,C,4,5,6,7,8,9
+1,2,3,D,E,F,G,H,I
+1,2,3,D,E,F,7,8,9
+1,2,3,4,5,6,G,H,I
+1,2,3,4,5,6,7,8,9
+
+
 """,
 
     "xfile": """______________________________________________
 
-+++  Mercury script: tuplegen +++
++++  Mercury script: xfile +++
 ______________________________________________
+
 Usage:
             xfile --config <configfile> --delimiter <delimiter> --map <map_name> <datafile> [--limit <max_records>]
             xfile --config <configfile> --delimiter <delimiter> --map <map_name> -s [--limit <max_records>]
@@ -1317,21 +1402,26 @@ Usage:
             -s, --stream        :streaming mode (read fron stdin)
             -p, --passthrough   :passthrough mode (do not transform records)
 
+
+ xfile: command line utility for extracting and transforming CSV data
+
+
 """,
 
     "xlseer": """______________________________________________
 
-+++  Mercury script: tuplegen +++
++++  Mercury script: xfile +++
 ______________________________________________
+
 Usage:
-            xlseer <excel_file> sheets
-            xlseer <excel_file> --sheet=<sheet> --row=<rownum>
-            xlseer <excel_file> --sheet=<sheet> --rows=<x:y> [--delimiter=<delimiter_char>]
-            xlseer <excel_file> --sheet=<sheet> --col=<col_id>
-            xlseer <excel_file> --sheet=<sheet> --cols=<col_ids> [--delimiter=<delimiter_char>]
-            xlseer <excel_file> --sheet=<sheet> --cell=<cell_id>
-            xlseer <excel_file> --sheet=<sheet> --cells=<cell_range>
-            xlseer -i <init_file>
+    xlseer <excel_file> sheets
+    xlseer <excel_file> --sheet=<sheet> --row=<rownum>
+    xlseer <excel_file> --sheet=<sheet> --rows=<x:y> [--delimiter=<delimiter_char>]
+    xlseer <excel_file> --sheet=<sheet> --col=<col_id>
+    xlseer <excel_file> --sheet=<sheet> --cols=<col_ids> [--delimiter=<delimiter_char>]
+    xlseer <excel_file> --sheet=<sheet> --cell=<cell_id>
+    xlseer <excel_file> --sheet=<sheet> --cells=<cell_range>
+    xlseer -i <init_file>
 
 """,
 

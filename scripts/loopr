@@ -143,7 +143,7 @@ def main(args):
                                 
                     print(post_cmd(*post_cmd_args), file=sys.stderr)
 
-    else:  args['--json'] is True, which means read every incoming line as a JSON record
+    else:  # args['--json'] is True, which means read every incoming line as a JSON record
 
         for record in generate_json_records_from_file(input_filename, limit):
             

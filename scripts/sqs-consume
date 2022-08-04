@@ -6,11 +6,13 @@ Usage:
     sqs-consume --version
 '''
 
-''' +mdoc+
+'''
++mdoc+
 
 sqs-consume connects to an Amazon SQS queue, pulls messages down from that queue, and forwards
 each message to a user-defined handler function.
 
++mdoc+
 '''
 
 

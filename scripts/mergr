@@ -12,6 +12,7 @@ import docopt
 from snap import common
 
 '''
++mdoc+
 
 mergr: command-line utility for merging lists and emitting JSON records
 
@@ -38,7 +39,7 @@ would yield the JSON output:
 {"number": "two", "color": "red"}
 {"number": "three", "color": "green"}
 
-
++mdoc+
 '''
 
 def generate_merged_records(filenames: list, keys: list):

@@ -42,7 +42,8 @@ test_teamcity:	test_env
 
 
 build-docs:
-	ls scripts > tempdata/script_list.txt | xargs -I {} cp scripts/{} tempdata/{}.py
+	ls scripts > tempdata/script_list.txt 
+	cat tempdata/script_list.txt | xargs -I {} cp scripts/{} tempdata/{}.py
 	
 	./extract_cmd_docs.py --dir scripts --list tempdata/script_list.txt > tempdata/doc_registry.json
 
@@ -55,7 +56,7 @@ version:
 	python mark_version.py > version.py && cp version.py scripts/mercury-version && chmod u+x scripts/mercury-version
 
 
-build-dist: build-docs
+build-dist:
 	python setup.py sdist bdist_wheel
 
 

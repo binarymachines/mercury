@@ -6,7 +6,8 @@ Usage:
     repeat --linecount <file> [--str <string>]
 '''
 
-'''+mdoc+
+'''
++mdoc+
 
 repeat emits the designated string some number of times.
 if the --count parameter is used, it will repeat <num_times> times.
@@ -14,6 +15,7 @@ if the --count parameter is used, it will repeat <num_times> times.
 If the --linecount parameter is used, it will repeat as many times as there are lines in
 <file>.
 
++mdoc+
 '''
 
 
