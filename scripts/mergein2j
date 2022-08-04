@@ -1,0 +1,127 @@
+#!/usr/bin/env python
+
+
+'''
+Usage:
+    mergein2j --from-csv <csvfile> --delimiter <delim> --column <colname> --into <jsonfile> [--limit=<limit>]
+    mergein2j --from-csv <csvfile> --delimiter <delim> --colmap <mapfile> --into <jsonfile> [--limit=<limit>]
+    mergein2j --from-csv <csvfile> --delimiter <delim> --keys=<key>... --into <jsonfile> [--limit=<limit>] 
+    mergein2j --from-list <listfile> --key <key> --into <jsonfile> [--limit=<limit>]
+    
+'''
+
+import os, sys
+import json
+from collections import namedtuple
+from snap import snap, common
+from mercury import utils
+from mercury import datamap
+import docopt
+
+ColumnMap = namedtuple('ColumnMap', 'src_column target_column')
+
+
+def scan_jsonfile(filename):
+    with open(filename, 'r') as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line:
+                continue
+            record = json.loads(line)
+            yield record
+
+
+def list_output_generator(filename):
+    with open(filename, 'r') as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line:
+                yield None
+            yield line
+
+
+def load_column_maps(filename):
+
+    colmaps = []
+    with open(filename, 'r') as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line:
+                continue
+
+            maptokens = line.split(':')
+            if len(maptokens) != 2:
+                raise Exception(f'Error in mapfile {filename}: format must be <src_name>:<target:name>')
+            
+            colmaps.append(ColumnMap(src_column=maptokens[0], target_column=maptokens[1]))                
+
+    return colmaps
+
+
+def main(args):
+
+    sys.path.append(os.getcwd())
+    delimiter = args['<delim>']
+    limit = int(args.get('--limit') or -1)
+    
+    json_target_filename = args['<jsonfile>']
+
+    if args['--from-csv']:
+        csv_source_filename = args['<csvfile>']
+        source_generator = datamap.csvfile_record_generator(filename=csv_source_filename, delimiter=delimiter)
+
+        mappings = []
+
+        if args['--column']:
+            source_column = args['<colname>']
+            target_column = source_column
+            
+        elif args['--colmap']:
+            mappings = load_column_maps(args['<mapfile>'])
+
+        elif args['--keys']:
+            keys = args['--keys'][0].split(',')
+            for k in keys:
+                mappings.append(ColumnMap(src_column=k, target_column=k))
+
+        record_count = 0
+        
+        for json_record in scan_jsonfile(json_target_filename):
+            csv_record = next(source_generator)
+
+            if record_count == limit:
+                break
+
+            if args['--column']:
+                json_record[target_column] = csv_record[source_column]
+
+            elif args['--colmap'] or args['--keys']:
+                for m in mappings:
+                    try:
+                        json_record[m.target_column] = csv_record[m.src_column]
+                    except KeyError as err:
+                        raise Exception(f'CSV sourcefile {csv_source_filename} contains no column "{m.src_column}"')
+
+            print(json.dumps(json_record))
+            record_count += 1
+    
+    elif args['--from-list']:
+        list_filename = args['<listfile>']
+        source_generator = list_output_generator(list_filename)
+        record_count = 0
+
+        for json_record in scan_jsonfile(json_target_filename):
+
+            if record_count == limit:
+                break
+            value = next(source_generator)
+            name = args['<key>']
+            json_record[name] = value
+    
+            print(json.dumps(json_record))
+            record_count += 1
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

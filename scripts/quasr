@@ -20,6 +20,7 @@ import docopt
 from collections import namedtuple
 from snap import snap, common
 from mercury import journaling as jrnl
+from uuid import UUID
 
 
 PARAM_DELIMITER = ':'
@@ -28,6 +29,7 @@ PARAM_TOKEN_DELIMITER = ','
 integer_rx = re.compile(r'^[0-9]+$')
 float_rx = re.compile(r'^[0-9]*.[0-9]+$')
 string_rx = re.compile(r'^[a-zA-Z0-9_]+$')
+uuid_rx = re.compile(r'^[a-f0-9]{8}-?[a-f0-9]{4}-?4[a-f0-9]{3}-?[89ab][a-f0-9]{3}-?[a-f0-9]{12}\Z', re.I)
 
 
 TypeFormat = namedtuple('TypeFormat', 'class_object regex')
@@ -35,7 +37,8 @@ TypeFormat = namedtuple('TypeFormat', 'class_object regex')
 type_formats = {
     'str': TypeFormat(class_object=str, regex=string_rx),
     'float': TypeFormat(class_object=float, regex=float_rx),
-    'int': TypeFormat(class_object=int, regex=integer_rx)
+    'int': TypeFormat(class_object=int, regex=integer_rx),
+    'uuid': TypeFormat(class_object=UUID, regex=uuid_rx)
 }
 
 Slot = namedtuple('Slot', 'name datatype')
@@ -76,8 +79,17 @@ class QaSqlNode(object):
                 raise Exception('No input slot "%s" registered with this QA node.')
 
             if value.__class__.__name__ != input_slot.datatype:
-                raise Exception('The input parameter "%s" does not match the registered slot type "%s".' 
-                                % (name, input_slot.datatype))
+                can_convert = True
+                type_format = type_formats.get(input_slot.datatype)
+                print(f'attempting to convert input value {value} to type {type_format.class_object}...')
+                try:
+                    type_format.class_object(str(value))
+                except:
+                    can_convert = False
+
+                if not can_convert:
+                    raise Exception('The input parameter "%s" is not compatible with the registered slot type "%s".' 
+                                    % (name, input_slot.datatype))
 
     def validate_outputs(self, **kwargs):
         for slot_name, output_slot in self.output_slots.items():
@@ -331,7 +343,7 @@ def main(args):
         
         job_params = job_runner.convert_input_params(jobname, **input_params)
         print('### job parameters:',  file=sys.stderr)
-        print(common.jsonpretty(job_params), file=sys.stderr)
+        print(job_params, file=sys.stderr)
 
         if preview_mode:
             job_runner._lookup_node(jobname).validate_input_types(**input_params)

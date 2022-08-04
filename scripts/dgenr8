@@ -10,9 +10,33 @@ Usage:
     dgenr8 --generator <module.function> --csv --delimiter <delimiter> --columns <columns>... [--limit=<limit>]
 '''
 
-# dgenr8 (dimension table generator): generates SQl insert statements or CSV records 
-# to populate OLAP star-schema dimension tables
+'''
++mdoc+
 
+dgenr8 (dimension table generator) generates SQl insert statements or CSV records 
+to populate OLAP star-schema dimension tables.
+
+When the --plugin-module option is set, dgenr8 will load the python module designated by <module>
+and look for a user-defined function called "line_array_generator". This function takes no arguments and should
+be an actual Python generator yielding, per-call, an array of N ORDERED values corresponding to the N columns in the 
+dimension table you wish to populate.
+
+The value-arrays yielded by the generator will be used to create either:
+
+- a SQL insert statement per array (if the --sql option is set),
+- one bulk SQL insert statement (if the --sql-multi option is set), or
+- a CSV file containing all the generated values.
+
+Use the --dim-table option to set the name of the table to be populated in the generated SQL. 
+
+No matter which option is used, the comma-separated list of dim-table column names will be used so that the 
+emitted script represents a data structure compatible with the table's structure. The user is responsible to 
+ensure that the value-arrays yielded by the line_array_generator function properly match the designated
+column-order.
+
+
++mdoc+
+'''
 
 import os, sys
 from collections import namedtuple

@@ -36,14 +36,28 @@ test_env:
 test:
 	PYTHONPATH=./tests MERCURY_HOME=`pwd` pipenv run python -m unittest discover -t . ./tests -v
 
+
 test_teamcity:	test_env
 	PYTHONPATH=./tests $(VIRTUALENV_ROOT)/$(VIRTUALENV_NAME)/bin/python -m teamcity.unittestpy discover -t . ./tests -v
+
+
+build-docs:
+	ls scripts > tempdata/script_list.txt | xargs -I {} cp scripts/{} tempdata/{}.py
+	
+	./extract_cmd_docs.py --dir scripts --list tempdata/script_list.txt > tempdata/doc_registry.json
+
+	cat tempdata/doc_registry.json \
+	| scripts/warp --j2 --template-file=templates/mercury_docs.py.j2 -s \
+	> mercury/mercury_docs.py
+
 
 version:
 	python mark_version.py > version.py && cp version.py scripts/mercury-version && chmod u+x scripts/mercury-version
 
-build-dist:
+
+build-dist: build-docs
 	python setup.py sdist bdist_wheel
+
 
 build-testdist:
 	python test_setup.py sdist bdist_wheel
@@ -122,6 +136,8 @@ pip-compile: FORCE
 	${COMPOSE} run --rm mercury /bin/sh -c \
 		"pip-compile --rebuild --generate-hashes --output-file conf/deps/requirements.txt conf/deps/requirements-unpinned.txt && \
 		chown ${HOST_UID}:${HOST_GID} conf/deps/requirements.txt"
+
+
 
 
 FORCE:  # https://www.gnu.org/software/make/manual/html_node/Force-Targets.html#Force-Targets

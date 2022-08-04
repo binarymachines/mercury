@@ -2,7 +2,7 @@
 
 '''
 Usage:
-    manifold [-d] --write --param-generator <module.generator-function> [--inputs=<name:value>...]
+    manifold [-d] --write --param-generator <module.generator_function> [--inputs=<name:value>...]
     manifold [-d] --read [-n] <paramfile> --warpcmd <command> --outfile-prefix <prefix> --outfile-suffix <suffix>
     manifold [-d] --read [-n] <paramfile> --warpfile <file> --outfile-prefix <prefix> --outfile-suffix <suffix>
 
@@ -10,6 +10,42 @@ Options:
     -n --noindex   Do not automatically generate index numbers for outfile names
     -d --debug     Run manifold in debug mode
 '''
+
+'''
++mdoc+
+
+manifold generates (or consumes) JSON records. 
+
+In --write mode, manifold generates a list of JSON records by calling the user-defined logic in
+<module.generator_function>. 
+
+That function must follow the pattern:
+
+
+def function_name(**kwargs) -> dict:
+    ...
+
+
+and must be a Pythonic generator which yields a dictionary. 
+
+Any (comma-separated) name:value pairs passed to manifold as part of the --inputs option will be passed
+to the generator function as keyword arguments.
+
+
+In --read mode, manifold reads a list of JSON records (one per line) from <paramfile> and uses each record
+to populate the warp template specified either by <command> (if --warpcmd is set) or <file> if --warpfile is set.
+
+In --write mode, manifold sends its outputs directly to standard out. 
+
+But in --read mode, because it generates an entire populated template per input-record, it will 
+write its outputs to N files where N is the number of JSONL records it reads from <paramfile>.
+Each output file is named according to the pattern:
+
+<prefix>{generated number from 1 to N}<suffix>
+
++mdoc+
+'''
+
 
 
 import os, sys
@@ -31,7 +67,7 @@ def main(args):
 
     if args['--write']:
 
-        qualified_name = args['<module.generator-function>']
+        qualified_name = args['<module.generator_function>']
         tokens = qualified_name.split('.')
         if len(tokens) != 2:
             raise Exception('The --param-generator argument must be of the form "module.funcname".')

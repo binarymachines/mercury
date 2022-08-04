@@ -1,0 +1,216 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    qanon [-d] --config <configfile> --job <job> [--limit=<limit>]
+
+Options:
+    -d --debug  Run in debug mode
+'''
+
+import os, sys
+import json
+from collections import namedtuple
+from abc import ABC, abstractmethod
+import docopt
+from snap import snap, common
+from datetime import datetime, date
+
+debug_mode = False
+
+def sqla_record_to_dict(self, sqla_record, *fields):
+
+    result = {}
+    for f in fields:
+        result[f] = getattr(sqla_record, f)
+
+    return result
+
+
+class RecordSource(ABC):
+    def __init__(self, service_registry, **kwargs):
+        self._services = service_registry
+
+    @abstractmethod
+    def records(self, **kwargs):
+        '''This method must be a Pythonic generator
+        '''
+        pass
+
+    def lookup_service(self, service_name: str) -> object:
+        return self._services.lookup(service_name)
+
+
+class Job(object):
+    def __init__(self, source: RecordSource, field_spec_table: dict, source_params: dict):
+        self.record_source = source
+        self.field_specs = field_spec_table
+        self.source_params = source_params
+
+    def run(self):
+
+        for rec in self.record_source.records(**self.source_params):
+                        
+            output_record = {}
+            output_record.update(rec)
+            
+            for field_name, field_spec in self.field_specs.items():
+                if rec.get(field_name) is not None:                               
+                    output_record[field_name] = field_spec.scrambler.scramble(field_name, rec)
+
+            yield output_record
+            
+
+
+class Scrambler(ABC):
+    def __init__(self, service_registry, **kwargs):
+        self._services = service_registry
+
+
+    @abstractmethod
+    def scramble(self, field_name: str, input_record: dict, **kwargs) -> object:
+        pass
+
+    def lookup_service(self, service_name: str) -> object:
+        return self._services.lookup(service_name)
+
+
+def load_scramblers(yaml_config: dict, scrambler_module_name: str, service_registry) -> dict:
+
+    scrambler_tbl = dict()
+    config_segment = yaml_config['scramblers']
+
+    for scrambler_name in config_segment.keys():
+        param_list = config_segment[scrambler_name].get('init_params') or []
+
+        scrambler_init_params = {}
+        for nvpair in param_list:
+            name = nvpair['name']
+            value = nvpair['value']
+            scrambler_init_params[name] = value
+
+        scrambler_classname = config_segment[scrambler_name]['classname']
+        scrambler_class = common.load_class(scrambler_classname, scrambler_module_name)
+
+        scrambler_instance = scrambler_class(service_registry)
+        scrambler_tbl[scrambler_name] = scrambler_instance
+
+    return scrambler_tbl
+
+
+def load_sources(yaml_config: dict, recordsource_module_name: str, service_registry) -> dict:
+
+    recordsource_tbl = dict()
+    config_segment = yaml_config['sources']
+
+    for source_name in config_segment.keys():
+        param_list = config_segment[source_name].get('init_params') or []
+
+        source_init_params = {}
+
+        for nvpair in param_list:
+            name = nvpair['name']
+            value = nvpair['value']
+            if value[0] == '$':
+                value = common.load_config_var(nvpair['value'])
+                
+            source_init_params[name] = value
+
+        recordsource_classname = config_segment[source_name]['classname']
+        recordsource_class = common.load_class(recordsource_classname, recordsource_module_name)
+        recordsource_instance = recordsource_class(service_registry)
+
+        recordsource_tbl[source_name] = (recordsource_instance, source_init_params)
+    
+    return recordsource_tbl
+
+
+FieldSpec = namedtuple('FieldSpec', 'name scrambler scrambler_params')
+
+def load_jobs(yaml_config: dict, service_registry) -> dict:
+
+    jobs_tbl = {}
+
+    scrambler_module_name = yaml_config['globals']['scrambler_module']
+    recordsource_module_name = yaml_config['globals']['recordsource_module']
+
+    scrambler_tbl = load_scramblers(yaml_config, scrambler_module_name, service_registry)
+    recordsource_tbl = load_sources(yaml_config, recordsource_module_name, service_registry)
+
+    jobs_segment = yaml_config['jobs']
+
+    for job_name, job_config in jobs_segment.items():
+        field_specs = {}
+        source_name = job_config['recordsource']
+        source_config = yaml_config['sources'].get(source_name)
+
+        if not source_config:
+            raise Exception(f'No recordsource registered under the alias {source_name}.')
+
+        for field_config in job_config['fields']:
+
+            for field_name, field_config in field_config.items():
+                scrambler_alias = field_config['scrambler']['alias']
+                sparams = {}
+                
+                for nvpair in field_config['scrambler'].get('params') or []:
+                    if nvpair['value'][0] == '$':
+                        value = common.load_config_var(nvpair['value'])
+                    else:
+                        value = nvpair['value']
+
+                    sparams[nvpair['name']] = value
+                                
+                scrambler = scrambler_tbl.get(scrambler_alias)
+                if not scrambler:
+                    raise Exception(f'No scrambler registered under the alias {scrambler_alias}.')
+
+                field_specs[field_name] = FieldSpec(name=field_name, scrambler=scrambler, scrambler_params=sparams)
+
+        record_source_tuple = recordsource_tbl.get(source_name)
+        if not record_source_tuple:
+            raise Exception(f'No record source registered under the alias "{source_name}."')
+
+        jobs_tbl[job_name] = Job(record_source_tuple[0], field_specs, record_source_tuple[1])
+
+    return jobs_tbl
+
+def json_serial(obj):
+     """JSON serializer for objects not serializable by default json code"""
+
+     if isinstance(obj, (datetime, date)):
+         return obj.isoformat()
+     raise TypeError ("Type %s not serializable" % type(obj))    
+
+
+def main(args):
+    global debug_mode
+    if args['--debug']:
+        debug_mode = True
+
+
+    # add the current directory to our PYTHONPATH, 
+    # so that we can load modules from this location dynamically
+    sys.path.append(os.getcwd())
+
+    config_file = args['<configfile>']
+    yaml_config = common.read_config_file(config_file)
+    project_dir = common.load_config_var(yaml_config['globals']['project_home'])
+    sys.path.append(project_dir)
+
+    service_registry = common.ServiceObjectRegistry(snap.initialize_services(yaml_config))
+
+    jobs_tbl = load_jobs(yaml_config, service_registry)
+    job_name = args['<job>']
+    job = jobs_tbl.get(job_name)
+
+    if not job:
+        raise Exception(f'No data-scrambling job "{job_name}" registered. Please check your configfile.')
+    
+    records = []
+    for record in job.run():
+        print(json.dumps(record, default=json_serial))
+    
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

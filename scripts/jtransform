@@ -1,0 +1,68 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    jtransform --config <configfile> --map <map_name> --datafile <jsonfile> 
+    jtransform --config <configfile> --map <map_name> -s
+    jtransform --config <configfile> --list
+
+Options:
+    -s --stdin  read JSON records from standard input
+'''
+
+
+import os, sys
+import docopt
+import json
+from snap import snap, common
+from mercury.utils import read_stdin
+from xfile_utils import *
+from mlog import mlog
+
+
+def transform_record(input_record, transformer, service_registry):
+    output_record = {}
+
+    for i in range(1, len(input_record)):
+        record_to_transform = input_record[i]
+        output_record = transformer.transform(record_to_transform)
+        yield output_record
+
+
+def main(args):
+
+    sys.path.append(os.getcwd())
+    map_name = args['<map_name>']
+    configfile = args['<configfile>']
+    yaml_config = common.read_config_file(configfile)
+
+    service_registry = snap.initialize_services(yaml_config)
+    transformer = load_transform_map(map_name, configfile)
+
+    if args['--stdin']:
+        for raw_line in read_stdin():
+            line = raw_line.strip()
+            if not line:
+                continue
+
+            json_record = json.loads(line)
+
+            for outrec in transform_record(json_record, transformer, service_registry):
+                print(json.dumps(outrec))
+
+    if args['--datafile']:
+        filename = args['<jsonfile>']
+        with open(filename, 'r') as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line:
+                    continue
+
+                json_record = json.loads(line)
+                for outrec in transform_record(json_record, transformer, service_registry):
+                    print(json.dumps(outrec))
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)

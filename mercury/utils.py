@@ -6,6 +6,7 @@ import itertools
 from enum import Enum
 import re
 from contextlib import contextmanager
+from mercury.journaling import ContextDecorator
 from snap import common
 
 
@@ -95,6 +96,67 @@ def open_in_place(filename: str, open_mode: str):
 
     with open(filepath, open_mode) as f:
         yield f
+
+
+class RetryContext(object):
+    def __init__(self, success: bool, data: object):
+        self.is_ok = success
+        self.result = data
+
+
+class retry_on_fail(ContextDecorator):
+    def __init__(self, target_function, num_retries: int, retry_hook=None, **func_args):
+        
+        self.max_retries = num_retries
+        self.target_function = target_function
+        self.retry_hook = retry_hook
+        self.target_function_args = func_args
+        self.result = None
+
+
+    def __enter__(self):
+
+        num_retries = 0
+        while num_retries < self.max_retries:
+            self.result = self.call_target(**self.target_function_args)
+
+        return self
+        
+
+    def __exit__(self, typ, val, exc_traceback):        
+        return self
+
+
+class retry_on_exception(ContextDecorator):
+    def __init__(self, target_function, num_retries: int, retry_hook=None, *func_args):
+        
+        self.max_retries = num_retries
+        self.target_function = target_function
+        self.retry_hook = retry_hook
+        self.target_function_args = func_args
+        self.data = None
+        self.is_ok = False
+
+
+    def __enter__(self):
+        num_retries = 0
+        
+        while num_retries < self.max_retries:            
+            try:
+                self.data = self.target_function(*self.target_function_args)                
+                self.is_ok = True
+                break
+            except Exception as err:
+                print('exception thrown inside retry context, retrying...')
+                num_retries += 1
+                if self.retry_hook:
+                    self.retry_hook()
+
+        return self
+
+
+    def __exit__(self, typ, val, exc_traceback):        
+        return self
 
 
 def parse_cli_params(params_array):

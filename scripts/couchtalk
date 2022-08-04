@@ -1,0 +1,154 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    couchtalk --userid <user@host> --pw <password> --to <bucket.collection> -i --jstr <json_string> [-n] [--keygen <module.func>]
+    couchtalk --userid <user@host> --pw <password> --to <bucket.collection> -i --jfile <json_file> [-n] [--keygen <module.func>]
+    couchtalk --userid <user@host> --pw <password> --to <bucket.collection> -i -s [-n] [--keygen <module.func>]
+
+Options:
+    -i --insert  insert mode
+    -s --stdin   read inbound data from standard input
+    -n --no-echo  do not echo the incoming document in the emitted status msg
+'''
+
+'''
++mdoc+
+
+couchtalk is a command-line client for inserting records into a Couchbase (NOSQL database) instance.
+
++mdoc+
+'''
+
+import os, sys
+import json
+import docopt
+import uuid
+from mercury.utils import read_stdin
+# needed for any cluster connection
+from couchbase.cluster import Cluster, ClusterOptions
+from couchbase.auth import PasswordAuthenticator
+
+# needed to support SQL++ (N1QL) query
+from couchbase.cluster import QueryOptions
+
+
+INSERT = 'insert_mode'
+DELETE = 'delete_mode'
+UPSERT = 'upsert_mode'
+
+def main(args):
+
+    user_host_string = args['<user@host>']
+    uhs_tokens =user_host_string.split('@')
+
+    if len(uhs_tokens) != 2:
+        raise Exception('The --userid parameter must be in the format "username@hostname".')
+
+
+    user = uhs_tokens[0]
+    hostname = uhs_tokens[1]
+    password = args['<password>']
+    bucket_name_str = args['<bucket.collection>']
+    bucket_name_tokens = bucket_name_str.split('.')
+    target_collection = None
+
+    status = {}
+
+    try:
+        # get a reference to the designated Couchbase cluster
+        cluster = Cluster(f'couchbase://{hostname}',
+                          ClusterOptions(PasswordAuthenticator(user, password)))
+
+        if len(bucket_name_tokens) == 1:
+            bucket_name = bucket_name_str
+            bucket = cluster.bucket(bucket_name)        
+            target_collection = bucket.default_collection()
+
+        elif len(bucket_name_tokens) == 3:
+            bucket_name = bucket_name_tokens[0]
+            scope_id = bucket_name_tokens[1]
+            collection_name = bucket_name_tokens[2]
+
+            bucket = cluster.bucket(bucket_name)
+            target_collection = bucket.scope(scope_id).collection(collection_name)
+
+        else:
+            raise Exception('The document location format must be either "bucketname" or "bucket.collection.scope"')
+
+    except Exception as err:
+        status['ok'] = False
+        status['error'] = str(err)
+        status['error_type'] = err.__class__.__name__
+
+        print(json.dumps(status))
+        return
+
+    mode = None
+
+    if args['--to']:
+        mode = INSERT
+        doc_mode = None
+        status = {}
+        try:
+
+            if args['--jstr']:
+                doc_mode = True
+                json_doc = json.loads(args['<json_string>'])
+            
+            elif args['--jfile']:
+                doc_mode = True
+                filename = args['<json_file>']
+                with open(filename, 'r') as f:
+                    json_doc = json.loads(f.read())
+
+            elif args['--stdin']:
+                doc_mode = False
+
+
+            if doc_mode:
+                if args['--keygen']:
+                    # call external function to generate document key
+                    pass
+                else:
+                    key = str(uuid.uuid4())
+
+                target_collection.insert(str(key), json_doc)
+                status['ok'] = True
+                status['key'] = key
+                status['document'] = json_doc
+
+            else: # stream mode
+                if args['--keygen']:
+                    # call external function to generate document key
+                    pass
+                else:
+                    key = str(uuid.uuid4())
+
+                for raw_line in read_stdin():                
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    
+                    record = json.loads(line)
+                    target_collection.insert(key, record)
+                    status['ok'] = True
+                    status['key'] = key
+                    status['document'] = record
+
+                    print(json.dumps(status))
+
+        except Exception as err:
+
+            status['ok'] = False
+            status['error'] = str(err)
+            status['error_type'] = err.__class__.__name__
+            print(json.dumps(status))
+
+    
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)
+
+
+

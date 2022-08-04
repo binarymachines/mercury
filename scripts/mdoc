@@ -1,0 +1,52 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+  mdoc -l  
+  mdoc <command>
+
+Options:
+  -l --list       show the available man pages
+  -s --search     search for a script name
+'''
+
+import os, sys
+import json
+import docopt
+from collections import namedtuple
+from mercury import mercury_docs
+
+
+DocEntry = namedtuple('DocEntry', 'syntax manual')
+
+
+def main(args):
+
+  if args['--list']:
+    print('\n'.join(mercury_docs.SCRIPT_NAMES))
+
+  else:
+    command = args['<command>']
+    if command.endswith('?'):
+      search_exp = command.rstrip('?')
+      for name in mercury_docs.SCRIPT_NAMES:
+        if name.startswith(search_exp):
+          print(name)
+    
+    elif command.startswith('?'):
+      search_exp = command.lstrip('?')
+      for name in mercury_docs.SCRIPT_NAMES:
+        if name.endswith(search_exp):
+          print(name)
+
+    else:
+      if command in mercury_docs.SCRIPT_NAMES:
+        print(mercury_docs.DOC_REGISTRY[command])
+      else:
+        print(f"""
+        \nThere is no Mercury command "{command}".\nAppend "?" to a string to list all commands which start with that string.\nPrepend "?" to a string to list all commands which end with that string.\n""")
+
+if __name__ == '__main__':
+  args = docopt.docopt(__doc__)
+  main(args)
+

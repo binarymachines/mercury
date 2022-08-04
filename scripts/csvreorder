@@ -126,26 +126,20 @@ def load_sequencer(setup_name, yaml_config):
 def load_generators(setup_name, yaml_config):
 
     # we are popping items off the config here, which would introduce side effects -- let's use a copy
+    #
     config_data = copy.deepcopy(yaml_config)
     generators = {}
     generator_module_name = config_data['globals'].get('generator_module')
 
     target_setup = config_data['setups'][setup_name]
-    #print(f'############# TARGET: {target_setup}')
     
     for column_def in target_setup['columns']:
         if isinstance(column_def, dict):
             fieldname, settings = column_def.popitem()
-
-            #print(f'######## FIELD NAME: {fieldname}')
-            #print(f'######## FIELD SETTINGS: {settings}')
-
             generator_name = settings.get('generator')
 
             if not generator_name:
                 continue
-
-            #print(f'found generator: {generator_name}')
             
             if not generator_module_name:
                 raise Exception(f'The setup {setup_name} uses a generator, but no generator_module was specified in the "globals" section.')
@@ -164,22 +158,15 @@ def load_generators(setup_name, yaml_config):
     return generators
 
 
-'''
-def rowid_counter(start_value: int, increment: int) -> int:    
-    counter_value = start_value
-    
-    while True:
-        yield counter_value
-        counter_value += increment
-'''
 
 def main(args):
-    #print(args)
-    #return
+
     sys.path.append(os.getcwd())
     
     mode = None
+
     # are we doing a straight reorder? Or are we doing type conversions?
+    #
     if args['--output-field-list']:
         mode = 'simple'
     elif args['--config']:
@@ -190,8 +177,10 @@ def main(args):
     limit = int(args.get('--limit') or -1)    
 
     # "simple" mode: load an actual Python list of field names from a module and reorder based on that
+    #
     if mode == 'simple':
         # load field-order list
+        #
         list_designator = args['<module.list-object>']
         tokens = list_designator.split('.')
 
@@ -202,9 +191,11 @@ def main(args):
         list_name = tokens[1]
 
         # Any day now I'm going to rename this function, which loads ANY OBJECT (not just classes) -DT
+        #
         field_order_list = common.load_class(list_name, module_name) 
         
         # emit CSV header
+        #
         print(field_delimiter.join(field_order_list))
         
         with open(source_filename, 'r') as source_file:
@@ -212,9 +203,11 @@ def main(args):
             for record in reader:
                 input_record = dict(record)                
                 # for each record, reorder based on designated field sequence
+                #
                 print(field_delimiter.join(reorder_fields(input_record, field_order_list)))
                 
     # "advanced" mode: load YAML config file and reorder data according to designated setup
+    #
     else:
         config_filename = args['<configfile>']
         setup_name = args['<setup>']
@@ -223,6 +216,7 @@ def main(args):
         sequencer = load_sequencer(setup_name, yaml_config)
 
         # emit header
+        #
         print(sequencer.output_header(field_delimiter))
 
         with open(source_filename, 'r') as source_file:
@@ -236,3 +230,4 @@ def main(args):
 if __name__ == '__main__':
     args = docopt.docopt(__doc__)
     main(args)
+

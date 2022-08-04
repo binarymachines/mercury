@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 
-'''Usage:
-            xlseer <excel_file> sheets
-            xlseer <excel_file> --sheet=<sheet> --row=<rownum>
-            xlseer <excel_file> --sheet=<sheet> --rows=<x:y> [--delimiter=<delimiter_char>]
-            xlseer <excel_file> --sheet=<sheet> --col=<col_id>
-            xlseer <excel_file> --sheet=<sheet> --cols=<col_ids> [--delimiter=<delimiter_char>]
-            xlseer <excel_file> --sheet=<sheet> --cell=<cell_id>
-            xlseer <excel_file> --sheet=<sheet> --cells=<cell_range>
-            xlseer -i <init_file>
+'''
+Usage:
+    xlseer <excel_file> sheets
+    xlseer <excel_file> --sheet=<sheet> --row=<rownum>
+    xlseer <excel_file> --sheet=<sheet> --rows=<x:y> [--delimiter=<delimiter_char>]
+    xlseer <excel_file> --sheet=<sheet> --col=<col_id>
+    xlseer <excel_file> --sheet=<sheet> --cols=<col_ids> [--delimiter=<delimiter_char>]
+    xlseer <excel_file> --sheet=<sheet> --cell=<cell_id>
+    xlseer <excel_file> --sheet=<sheet> --cells=<cell_range>
+    xlseer -i <init_file>
 '''
 
 

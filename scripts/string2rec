@@ -1,0 +1,58 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    string2rec --str <string> --transformer <module.transform_func> [--params=<n,v>...]
+    string2rec --listfile <filename> --transformer <module.function> [--params=<n,v>...] [--limit=<limit>]
+'''
+
+import os, sys
+import json
+from collections import namedtuple
+from snap import snap, common
+from mercury import utils
+from mercury import datamap
+import docopt
+
+
+def main(args):
+    sys.path.append(os.getcwd())
+
+    func_designator = args['<module.transform_func>']
+    tokens = func_designator.split('.')
+    if len(tokens) != 2:
+        raise Exception('the --transformer arg must be of the format <module.func>.')
+
+    module_name = tokens[0]
+    funcname = tokens[1]
+    transform_function = common.load_class(funcname, module_name)
+    
+    params = {}
+    if args['--params']:
+        params.update(utils.parse_cli_params(args['--params']))
+
+    if args['--str']:
+        input_string = args['<string>']
+        output_record = transform_function(input_string, **params)
+        print(json.dumps(output_record))
+
+    elif args['--listfile']:
+        limit = -1
+        if args['--limit']:
+            limit = int(args['--limit'])
+
+        listfile = args['<file>']
+        with open(listfile, 'r') as f:
+
+            record_count = 0
+            for line in f:
+                if record_count == limit:
+                    break
+                output_record = transform_function(line, **params)
+                print(json.dumps(output_record))
+                record_count += 1
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)
+

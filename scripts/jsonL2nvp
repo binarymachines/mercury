@@ -1,0 +1,82 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    jsonL2nvp --datafile <file> --key <key_field> --value <value_field>
+    jsonL2nvp -s --key <key_field> --value <value_field>
+
+Options:
+    -s --stdin  read data from standard input
+'''
+
+'''
++mdoc+
+
+jsonL2nvp (JSONL to name-value pairs) transforms a set of JSONL records into an array of name/value pairs 
+where name = source_record[<key_field>] and value = source_record[<value_field>].
+
+So that if we start with a sample.json file containing:
+
+{"first_name": "John", "last_name": "Smith"}
+{"first_name":"Bob", "last_name":"Barker"}
+
+and issue the command:
+
+jsonL2nvp --datafile sample.json --key first_name --value last_name
+
+we will receive the output:
+
+[{"John": "Smith"}, {"Bob": "Barker"}]
+
+jsonL2nvp reads its input records from <file> if the --datafile option is set, and
+from standard input if the --stdin option is set.
+
++mdoc+
+'''
+
+import json
+import sys
+from mercury.utils import read_stdin
+import docopt
+from snap import common
+from mercury import utils
+
+
+def main(args):
+
+    array_data = []
+    key_field_name = args['<key_field>']
+    value_field_name = args['<value_field>']
+
+    if args['--stdin']:
+        for line in read_stdin():
+            input_record = json.loads(line)
+
+            key = input_record[key_field_name]
+            value = input_record[value_field_name]
+            array_data.append({
+                key: value
+            })
+
+    else:
+        filename = args['<file>']
+        with open(filename, 'r') as f:
+            for raw_line in f:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                
+                input_record = json.loads(line)
+
+                key = input_record[key_field_name]
+                value = input_record[value_field_name]
+                array_data.append({
+                    key: value
+                })
+
+    print(json.dumps(array_data))
+
+
+if __name__ == "__main__":
+    args = docopt.docopt(__doc__)
+    main(args)

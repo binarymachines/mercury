@@ -11,16 +11,46 @@ Options:
     -b --bytes      return request data as bytes (as opposed to string)    
 '''
 
-#
-#  beekeeper: command-line utility for interacting with HTTP API's
-#
+'''
++mdoc+
+
+beekeeper is a command-line utility for interacting with HTTP API's.
+It is driven by a YAML configuration file whose core metaphor is the <target>. 
+
+Beekeeper targets are defined in the following structure within the YAML file:
+
+targets:
+    <target_name>:
+      url: <url_endpoint>
+      method: <http_method>
+      headers: ## optional                                  
+          <header_name>: <header_value>
+          ...
+
+      request_params:
+        - name: <parameter_name>
+          value: <parameter_value>
+        ...
+
+So that issuing the command
+
+beekeeper --config <yamlfile> --target <target_name>
+
+will issue the corresponding HTTP request to the designated URL in the configuration.
+A request can have an arbitrary number of header fields and request parameters.
+
++mdoc+
+'''
+
 
 import os, sys
 import re
 import json
+import time
 from collections import namedtuple
 import requests
 import docopt
+from mercury.utils import retry_on_fail
 from snap import snap, common
 import yaml
 from mercury.utils import split_unescape
@@ -96,6 +126,7 @@ class APITarget(object):
         self.parameters = kwargs
         self.requests_lib_keyword_args = dict()
         self.file_refs = []
+        self.max_retries = 0
 
 
     def add_request_setting(self, name, value):
@@ -104,6 +135,10 @@ class APITarget(object):
 
     def add_file_ref(self, name, file_object):
         self.file_refs.append((name, file_object))
+
+
+    def set_max_retries(self, retry_count):
+        self.max_retries = int(retry_count)
 
 
     def call(self, **kwargs):
@@ -147,8 +182,8 @@ class APITarget(object):
             print('### Call parameters: %s' % call_params, file=sys.stderr)
             print(f'### File refs:', file=sys.stderr)
             print("\n".join(self.file_refs), file=sys.stderr)
-            print('### request headers:')
-            print(common.jsonpretty(self.headers))
+            print('### request headers:', file=sys.stderr)
+            print(common.jsonpretty(self.headers), file=sys.stderr)
 
         if self.method == 'GET':
             response = requests.get(self.base_url, headers=self.headers, params=call_params, **request_kwargs)
@@ -160,17 +195,7 @@ class APITarget(object):
                 if norm_key in ['accept', 'content-type'] and value == 'application/json':
                     json_mode = True
 
-            '''
-            if self.headers.get('Accept') == 'application/json':
-                print('### Sending request params JSON...')
-                response = requests.post(self.base_url, headers=self.headers, json=call_params, files=self.file_refs, **request_kwargs)
-
-            elif self.headers.get('Content-Type') == 'application/json':
-                print('### Sending request params JSON...')
-                response = requests.post(self.base_url, headers=self.headers, json=call_params, files=self.file_refs, **request_kwargs)
-            '''
             if json_mode:
-                print('### Sending request params as JSON...')
                 response = requests.post(self.base_url, headers=self.headers, json=call_params, files=self.file_refs, **request_kwargs)
 
             else:                
@@ -208,8 +233,6 @@ def read_target_params(target_yaml_config: dict, global_yaml_config: dict, macro
     # specified in the config file.
     #
 
-    print(f'@@@@@@@@   received macro defs: {macro_defs}')
-
     params = {}
     config_params = target_yaml_config.get('request_params')
 
@@ -217,9 +240,6 @@ def read_target_params(target_yaml_config: dict, global_yaml_config: dict, macro
         return params
 
     for p in config_params:
-
-        print(f'@@@@ processing request parameter: {p}')
-
         raw_value = p['value']
 
         macro_rx_match = MACRO_RX.match(str(raw_value))
@@ -227,11 +247,7 @@ def read_target_params(target_yaml_config: dict, global_yaml_config: dict, macro
 
         if macro_rx_match:
             macro_expression = macro_rx_match.string
-            print(f'@@@@@@@  Found a macro. Expression: {macro_expression}')
-
-            print(f'@@@ macro prefix: {MACRO_PREFIX}.')
-            print(f'@@@ macro suffix: {MACRO_SUFFIX}')
-
+            
             # There appears to be a bug in the Python lib; this no longer works at the time of this note (2/17/2002):
             #
             # macro_function_name = macro_expression.lstrip(MACRO_PREFIX).rstrip(MACRO_SUFFIX)
@@ -241,10 +257,6 @@ def read_target_params(target_yaml_config: dict, global_yaml_config: dict, macro
             # macro name. --DT binarymachineshop@gmail.com
 
             macro_function_name = macro_expression.lstrip('~macro').lstrip('[').rstrip(']')
-
-
-
-            print(f'@@@@@@@@ RESOLVED macro to function name: {macro_function_name}')
 
             # is this macro registered?
             macro_def = macro_defs.get(macro_function_name)
@@ -430,6 +442,9 @@ def load_api_target(target_name:str, yaml_config:dict, macro_defs:dict, macro_ar
                         processor_func,
                         **http_request_params)
 
+        if target_config.get('max_retries'):
+            target.set_max_retries(target_config['max_retries'])
+
         #
         # read any name-value pairs specified in the (optional) "settings" field of the target config.
         # These n-v pairs will be passed through to our underlying call to the requests HTTP library as keyword args.
@@ -463,10 +478,8 @@ def load_macro_defs(yaml_config):
     macro_config_section = yaml_config.get('macros') or {}
     for name, mdef in macro_config_section.items():
         macro_arg_names = mdef.get('arg_names') or []
-        
         mdefs[name] = MacroDefinition(name, *macro_arg_names)
     
-    print(mdefs)
     return mdefs
 
 
@@ -526,6 +539,10 @@ def read_macro_args(args):
     return macro_args
 
 
+def pause():
+    time.sleep(1)
+
+
 def main(args):
 
     # we may run in a mode that simply lists API targets
@@ -541,7 +558,8 @@ def main(args):
     project_home = common.load_config_var(yaml_config['globals']['project_home'])
 
     # add the project home to our PYTHONPATH
-    sys.path.append(os.path.join(os.getcwd(), project_home))
+    sys.path.append(os.getcwd())
+    sys.path.append(project_home)
 
     configured_targets = yaml_config['targets']
     if list_mode:
@@ -615,7 +633,11 @@ def main(args):
     global process_output_as_bytes
     process_output_as_bytes = args['--bytes']
 
-    call_status = api_target.call(**cli_request_params)
+    call_status = None
+    with retry_on_fail(api_target.call, api_target.max_retries, pause, **cli_request_params) as retry_context:
+        call_status = retry_context.result
+
+    #call_status = api_target.call(**cli_request_params)
 
     if call_status.ok:
 

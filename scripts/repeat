@@ -1,0 +1,52 @@
+#!/usr/bin/env python
+
+'''
+Usage:
+    repeat --count <num_times> [--str <string>]
+    repeat --linecount <file> [--str <string>]
+'''
+
+'''+mdoc+
+
+repeat emits the designated string some number of times.
+if the --count parameter is used, it will repeat <num_times> times.
+
+If the --linecount parameter is used, it will repeat as many times as there are lines in
+<file>.
+
+'''
+
+
+import os, sys
+import docopt
+from mercury import utils
+
+
+def main(args):  
+
+    if args['--count']:
+        repeats = int(args['<num_times>'])
+
+    elif args['--linecount']:
+        filename = args['<file>']
+        repeats = int(os.popen("wc -l " + filename).read().strip().split()[0])
+    
+    
+    if args['--str']:
+        output_string = args['<string>'].strip()
+        for i in range(repeats):
+            print(output_string)
+
+    else: # read the string from stdin
+        for line in utils.read_stdin():
+            output_string = line
+            break
+
+        for i in range(repeats):
+            print(output_string)
+
+
+
+if __name__ == '__main__':
+    args = docopt.docopt(__doc__)
+    main(args)
