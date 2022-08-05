@@ -58,6 +58,7 @@ def main(args):
     sys.path.append(os.path.join(os.getcwd(), 'tempdata'))
     sys.path.append(os.path.join(os.getcwd(), 'mercury'))
 
+
     script_list = []
     doc_registry = []
 
@@ -66,7 +67,7 @@ def main(args):
             continue
         else:
             script_path = os.path.join(script_dir, scriptfile)
-            
+            script_name = scriptfile.split('.')[0]
             module_text = None
             module = __import__(scriptfile)
             syntax = module.__doc__
@@ -81,37 +82,25 @@ def main(args):
             if len(mdoc_tags) == 2:
                 start = mdoc_tags[0].span()[1]
                 end = mdoc_tags[1].span()[0]
-
                 help_text = module_text[start:end]
-                script_name = scriptfile.split('.')[0]
-                script_list.append(script_name)
-
-                banner = MERCURY_BANNER.format(script=script_name)
-
-                fulldoc = f'{MERCURY_BORDER}\n\n{banner}\n{MERCURY_BORDER}\n{syntax}{help_text}\n'
-
-                doc_registry.append(
-                    {
-                    'script_name': script_name,
-                    'doc': fulldoc
-                    }
-                )
             else:
-                script_name = scriptfile.split('.')[0]
-                script_list.append(script_name)
-                fulldoc = f'{MERCURY_BORDER}\n\n{banner}\n{MERCURY_BORDER}\n{syntax}\n'
-                doc_registry.append(
-                    {
-                    'script_name': script_name,
-                    'doc': fulldoc
-                    }
-                )
+                help_text = ''
                 print(f'WARNING: odd number of +mdoc+ tags detected in Mercury script {script_name}. Emitting only usage string.',
                       file=sys.stderr)
 
+            script_list.append(script_name)
+            banner = MERCURY_BANNER.format(script=script_name)
+            fulldoc = f'{MERCURY_BORDER}\n\n{banner}\n{MERCURY_BORDER}\n{syntax}{help_text}\n'
+
+            doc_registry.append(
+                {
+                'script_name': script_name,
+                'doc': fulldoc
+                }
+            )
+            
     script_array_decl = str(',\n'.join(["'" + s + "'" for s in script_list]))
     
-
     print(json.dumps({
         'docspecs': doc_registry,
         'script_name_array': script_array_decl

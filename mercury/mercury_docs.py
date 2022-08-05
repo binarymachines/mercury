@@ -107,7 +107,7 @@ A request can have an arbitrary number of header fields and request parameters.
 
     "bqviewtblcreate": """______________________________________________
 
-+++  Mercury script: beekeeper +++
++++  Mercury script: bqviewtblcreate +++
 ______________________________________________
 
 Usage:  
@@ -119,7 +119,7 @@ Usage:
 
     "bqviewtblscan": """______________________________________________
 
-+++  Mercury script: beekeeper +++
++++  Mercury script: bqviewtblscan +++
 ______________________________________________
 
 Usage:  
@@ -455,7 +455,7 @@ The input path(s) need not be valid; that is, they CAN point to nonexistent file
 
     "ffilter": """______________________________________________
 
-+++  Mercury script: expath +++
++++  Mercury script: ffilter +++
 ______________________________________________
 
 Usage:
@@ -511,7 +511,7 @@ filtr: command line utility for filtering record streams
 
     "get-awssecret": """______________________________________________
 
-+++  Mercury script: filtr +++
++++  Mercury script: get-awssecret +++
 ______________________________________________
 
 Usage:
@@ -523,7 +523,7 @@ Usage:
 
     "ifthen": """______________________________________________
 
-+++  Mercury script: filtr +++
++++  Mercury script: ifthen +++
 ______________________________________________
 
 Usage:
@@ -575,7 +575,7 @@ if --expr is set, it will execute the quoted python expression <py_expr>.
 
     "j2sqlgen": """______________________________________________
 
-+++  Mercury script: ifvar +++
++++  Mercury script: j2sqlgen +++
 ______________________________________________
 
      Usage:  
@@ -774,7 +774,7 @@ This will simply give us the contents of sample.json.
 
     "jsonrec2csv": """______________________________________________
 
-+++  Mercury script: jsonLscan +++
++++  Mercury script: jsonrec2csv +++
 ______________________________________________
 
 Usage:
@@ -784,7 +784,7 @@ Usage:
 
     "jtransform": """______________________________________________
 
-+++  Mercury script: jsonLscan +++
++++  Mercury script: jtransform +++
 ______________________________________________
 
 Usage:
@@ -953,7 +953,7 @@ Each output file is named according to the pattern:
 
     "mapname": """______________________________________________
 
-+++  Mercury script: manifold +++
++++  Mercury script: mapname +++
 ______________________________________________
 
 Usage:
@@ -964,7 +964,7 @@ Usage:
 
     "mergein2j": """______________________________________________
 
-+++  Mercury script: manifold +++
++++  Mercury script: mergein2j +++
 ______________________________________________
 
 Usage:
@@ -1016,7 +1016,7 @@ would yield the JSON output:
 
     "mkcfg": """______________________________________________
 
-+++  Mercury script: mergr +++
++++  Mercury script: mkcfg +++
 ______________________________________________
 
 Usage:
@@ -1031,7 +1031,7 @@ Options:
 
     "ngst": """______________________________________________
 
-+++  Mercury script: mergr +++
++++  Mercury script: ngst +++
 ______________________________________________
 
 Usage:
@@ -1068,7 +1068,7 @@ on each line:
 
     "pause": """______________________________________________
 
-+++  Mercury script: normalize +++
++++  Mercury script: pause +++
 ______________________________________________
 
 Usage:
@@ -1079,7 +1079,7 @@ Usage:
 
     "pgexec": """______________________________________________
 
-+++  Mercury script: normalize +++
++++  Mercury script: pgexec +++
 ______________________________________________
 
 Usage:
@@ -1101,7 +1101,7 @@ Options:
 
     "pgmeta": """______________________________________________
 
-+++  Mercury script: normalize +++
++++  Mercury script: pgmeta +++
 ______________________________________________
 
 Usage:
@@ -1121,7 +1121,7 @@ Options:
 
     "profilr": """______________________________________________
 
-+++  Mercury script: normalize +++
++++  Mercury script: profilr +++
 ______________________________________________
 
 Usage:
@@ -1132,7 +1132,7 @@ Usage:
 
     "qanon": """______________________________________________
 
-+++  Mercury script: normalize +++
++++  Mercury script: qanon +++
 ______________________________________________
 
 Usage:
@@ -1145,7 +1145,7 @@ Options:
 
     "quasr": """______________________________________________
 
-+++  Mercury script: normalize +++
++++  Mercury script: quasr +++
 ______________________________________________
 
 Usage:
@@ -1161,7 +1161,7 @@ Options:
 
     "query2table": """______________________________________________
 
-+++  Mercury script: normalize +++
++++  Mercury script: query2table +++
 ______________________________________________
 
 Usage:
@@ -1190,7 +1190,7 @@ If the --linecount parameter is used, it will repeat as many times as there are 
 
     "seesv": """______________________________________________
 
-+++  Mercury script: repeat +++
++++  Mercury script: seesv +++
 ______________________________________________
 Usage:
             seesv --xform=<transform_file> --xmap=<transform_map>  <datafile>
@@ -1207,7 +1207,7 @@ Usage:
 
     "segmentr": """______________________________________________
 
-+++  Mercury script: repeat +++
++++  Mercury script: segmentr +++
 ______________________________________________
 
 Usage:
@@ -1235,7 +1235,7 @@ each message to a user-defined handler function.
 
     "string2rec": """______________________________________________
 
-+++  Mercury script: sqs-consume +++
++++  Mercury script: string2rec +++
 ______________________________________________
 
 Usage:
@@ -1246,7 +1246,7 @@ Usage:
 
     "svctest": """______________________________________________
 
-+++  Mercury script: sqs-consume +++
++++  Mercury script: svctest +++
 ______________________________________________
 
 Usage:
@@ -1305,7 +1305,7 @@ tuplegen is often used in conjunction with tuple2json to turn a set of lists int
 
     "viewtblcreate": """______________________________________________
 
-+++  Mercury script: tuplegen +++
++++  Mercury script: viewtblcreate +++
 ______________________________________________
 
 Usage:  
@@ -1317,7 +1317,7 @@ Usage:
 
     "warp": """______________________________________________
 
-+++  Mercury script: tuplegen +++
++++  Mercury script: warp +++
 ______________________________________________
 
 Usage:
@@ -1410,7 +1410,7 @@ Usage:
 
     "xlseer": """______________________________________________
 
-+++  Mercury script: xfile +++
++++  Mercury script: xlseer +++
 ______________________________________________
 
 Usage:

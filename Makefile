@@ -42,6 +42,7 @@ test_teamcity:	test_env
 
 
 build-docs:
+	rm -f tempdata/*.py
 	ls scripts > tempdata/script_list.txt 
 	cat tempdata/script_list.txt | xargs -I {} cp scripts/{} tempdata/{}.py
 	
