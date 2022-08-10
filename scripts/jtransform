@@ -16,8 +16,8 @@ import docopt
 import json
 from snap import snap, common
 from mercury.utils import read_stdin
-from xfile_utils import *
-from mlog import mlog
+from mercury.xfile_utils import *
+from mercury.mlog import mlog
 
 
 def transform_record(input_record, transformer, service_registry):

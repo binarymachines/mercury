@@ -23,7 +23,7 @@ The input path(s) need not be valid; that is, they CAN point to nonexistent file
 
 import os, sys
 import docopt
-from mlog import mlog, mlog_err
+from mercury.mlog import mlog, mlog_err
 from mercury.utils import read_stdin
 
 

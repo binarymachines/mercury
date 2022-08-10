@@ -20,7 +20,7 @@ down to a set of unique values. (Think SELECT DISTINCT, but for textfiles.)
 
 import os, sys
 import docopt
-from mlog import mlog, mlog_err
+from mercury.mlog import mlog, mlog_err
 from mercury.utils import read_stdin
 
 

@@ -27,7 +27,7 @@ from snap import snap, common
 from mercury import journaling as jrnl
 from sh import git
 
-from mlog import mlog, mlog_err
+from mercury.mlog import mlog, mlog_err
 
 VERSION_NUM = '0.5.2'
 
