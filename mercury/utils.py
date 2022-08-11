@@ -8,6 +8,7 @@ import re
 from contextlib import contextmanager
 from mercury.journaling import ContextDecorator
 from snap import common
+from mercury.mlog import mlog, mlog_err
 
 
 MACRO_RX = re.compile(r'^~macro\[.+\]$')
@@ -105,21 +106,28 @@ class RetryContext(object):
 
 
 class retry_on_fail(ContextDecorator):
-    def __init__(self, target_function, num_retries: int, retry_hook=None, **func_args):
+    def __init__(self, target_function, test_function, num_retries: int, retry_hook=None, **func_args):
         
         self.max_retries = num_retries
         self.target_function = target_function
         self.retry_hook = retry_hook
         self.target_function_args = func_args
+        self.test_function = test_function
         self.result = None
+        self.is_ok = False
 
 
     def __enter__(self):
 
         num_retries = 0
         while num_retries < self.max_retries:
-            self.result = self.call_target(**self.target_function_args)
-
+            self.result = self.target_function(**self.target_function_args)
+            if self.test_function(self.result):
+                self.is_ok = True
+                break
+            else:
+                mlog('call within retry context-manager failed. Retrying...')
+                num_retries += 1
         return self
         
 

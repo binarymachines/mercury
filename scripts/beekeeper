@@ -542,6 +542,9 @@ def read_macro_args(args):
 def pause():
     time.sleep(1)
 
+def http_call_ok(call_status):
+    return call_status.ok
+
 
 def main(args):
 
@@ -634,13 +637,15 @@ def main(args):
     process_output_as_bytes = args['--bytes']
 
     call_status = None
-    with retry_on_fail(api_target.call, api_target.max_retries, pause, **cli_request_params) as retry_context:
-        call_status = retry_context.result
 
-    #call_status = api_target.call(**cli_request_params)
+    if api_target.max_retries > 0:
+        with retry_on_fail(api_target.call, http_call_ok, api_target.max_retries, pause, **cli_request_params) as retry_context:
+            call_status = retry_context.result
+
+    else:
+        call_status = api_target.call(**cli_request_params)
 
     if call_status.ok:
-
         if api_target.processor:            
             print(api_target.processor.process(call_status, service_registry))
 
