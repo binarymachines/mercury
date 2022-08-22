@@ -20,7 +20,9 @@ import os, sys
 import json
 import time
 import datetime
-from multiprocessing import Process
+from multiprocessing import Process, Pool
+from unittest import result
+from collections import namedtuple
 import boto3
 import docopt
 from snap import snap, common
@@ -30,10 +32,32 @@ from sh import git
 from mercury.mlog import mlog, mlog_err
 
 VERSION_NUM = '0.5.2'
+DEFAULT_POOLSIZE = 5
+
+
+HandlerStatus = namedtuple('HandlerStatus', 'sqs_client queue_url rcpt_handle result')
+
 
 def show_version():
     git_hash = git.describe('--always').lstrip().rstrip()
     return '%s[%s]' % (VERSION_NUM, git_hash)
+
+
+def msg_handler_wrapper_func(sqs_client, queue_url, msg_handler_func, event_type, event_payload, receipt_handle, service_tbl):
+    result = msg_handler_func(event_type, event_payload, receipt_handle, service_tbl)
+    return HandlerStatus(sqs_client=sqs_client, queue_url=queue_url, rcpt_handle=receipt_handle, result=result)
+
+
+def handle_ok(handler_status):
+    # Delete received message from queue
+    handler_status.sqs_client.delete_message(
+        QueueUrl=handler_status.queue_url,
+        ReceiptHandle=handler_status.rcpt_handle
+    )
+
+
+def handle_error(exception):
+    mlog_err(exception, 'Error processing queued message.')
 
 
 def main(args):
@@ -83,82 +107,65 @@ def main(args):
     msg_handler_module = yaml_config['globals']['consumer_module']
     msg_handler_func = common.load_class(msg_handler_name, msg_handler_module)
 
-    child_procs = []
     # loop forever
     
     current_time = datetime.datetime.now().isoformat()
     print('### checking SQS queue for messages at %s...' % current_time, file=sys.stderr)
-    while True:
-        # Receive message from SQS queue
-        response = sqs.receive_message(
-            QueueUrl=queue_url,
-            AttributeNames=[
-                'SentTimestamp'
-            ],
-            MaxNumberOfMessages=max_messages,
-            MessageAttributeNames=[
-                'All'
-            ],
-            VisibilityTimeout=30,
-            # VisibilityTimeout (integer) -- The duration (in seconds) that the received messages
-            # are hidden from subsequent retrieve requests after being retrieved by a ReceiveMessage request.
-            WaitTimeSeconds=1
-            # WaitTimeSeconds (integer) -- The duration (in seconds) for which the call waits for a message 
-            # to arrive in the queue before returning.
-            # If a message is available, the call returns sooner than WaitTimeSeconds . If no messages are available
-            # and the wait time expires, the call returns successfully with an empty list of messages.
-        )
-        
-        inbound_msgs = response.get('Messages') or []
-        if not len(inbound_msgs):
+
+    with Pool(DEFAULT_POOLSIZE) as pool:
+
+        while True:
+            # Receive message from SQS queue
+            response = sqs.receive_message(
+                QueueUrl=queue_url,
+                AttributeNames=[
+                    'SentTimestamp'
+                ],
+                MaxNumberOfMessages=max_messages,
+                MessageAttributeNames=[
+                    'All'
+                ],
+                VisibilityTimeout=30,
+                # VisibilityTimeout (integer) -- The duration (in seconds) that the received messages
+                # are hidden from subsequent retrieve requests after being retrieved by a ReceiveMessage request.
+                WaitTimeSeconds=1
+                # WaitTimeSeconds (integer) -- The duration (in seconds) for which the call waits for a message 
+                # to arrive in the queue before returning.
+                # If a message is available, the call returns sooner than WaitTimeSeconds . If no messages are available
+                # and the wait time expires, the call returns successfully with an empty list of messages.
+            )
             
-            time.sleep(polling_interval)
-            continue
+            inbound_msgs = response.get('Messages') or []
+            if not len(inbound_msgs):
+                time.sleep(polling_interval)
+                continue
 
-        '''
+            msg_count_log = jrnl.CountLog()
+
+            for message in inbound_msgs:
+
+                with jrnl.counter('handle inbound messages', msg_count_log):
+                    receipt_handle = message['ReceiptHandle']
+                    current_time = datetime.datetime.now().isoformat()
+                    print('### spawning message processor at %s...' % current_time, file=sys.stderr)
         
-        
-        @counter('call annotated function', global_count_log)
-        def some_func():
-        pass
-
-        '''
-        msg_count_log = jrnl.CountLog()
-
-        for message in inbound_msgs:
-
-            with jrnl.counter('handle inbound messages', msg_count_log):
-                receipt_handle = message['ReceiptHandle']
-                current_time = datetime.datetime.now().isoformat()
-                print('### spawning message processor at %s...' % current_time, file=sys.stderr)
-
-                try:              
                     message_body_raw = message['Body']
                     message_body = json.loads(message_body_raw)
 
                     for record in message_body['Records']:
                         event_source = record['eventSource']
                         service_name = event_source.split(':')[1]
-
                         event_payload = record[service_name]
 
-                        p = Process(target=msg_handler_func, args=(event_type, event_payload, receipt_handle, service_tbl))
-                        p.start()
-                        child_procs.append(p)
-                        print('### Queued message-handling subprocess.', file=sys.stderr)
+                        
+                        result = pool.apply_async(msg_handler_wrapper_func, 
+                                                    (sqs, queue_url, msg_handler_func, event_type, event_payload, receipt_handle, service_tbl,),
+                                                    callback=handle_ok,
+                                                    error_callback=handle_error)
+                                            
+                        mlog('### Queued message-handling subprocess.')
 
-                        # Delete received message from queue
-                        sqs.delete_message(
-                            QueueUrl=queue_url,
-                            ReceiptHandle=receipt_handle
-                        )
-                        print('### Received and deleted message with receipt: %s' % receipt_handle, file=sys.stderr)
-                except Exception as err:
-                    print('!!! Error processing message with receipt: %s' % receipt_handle, file=sys.stderr)
-                    print('')
-                    print(err, file=sys.stderr)
-
-        mlog(msg_count_log.readout, message_count=msg_count_log.op_data['handle inbound messages']) 
+            mlog(msg_count_log.readout, message_count=msg_count_log.op_data['handle inbound messages']) 
 
 
 if __name__ == '__main__':
