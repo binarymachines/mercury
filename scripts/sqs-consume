@@ -2,7 +2,7 @@
 
 '''
 Usage:
-    sqs-consume --config <configfile> --source <source_name>
+    sqs-consume --config <configfile> --source <source_name> [--msgtype (sns | sqs)]
     sqs-consume --version
 '''
 
@@ -33,7 +33,7 @@ from mercury.mlog import mlog, mlog_err
 
 VERSION_NUM = '0.5.2'
 DEFAULT_POOLSIZE = 5
-
+DEFAULT_MESSAGE_TYPE = 'sqs'
 
 HandlerStatus = namedtuple('HandlerStatus', 'sqs_client queue_url rcpt_handle result')
 
@@ -67,6 +67,10 @@ def main(args):
 
     configfile = args['<configfile>']
     yaml_config = common.read_config_file(configfile)
+
+    source_msg_type = DEFAULT_MESSAGE_TYPE
+    if args.get('sns'):
+        source_msg_type = 'sns'
 
     source_name = args['<source_name>']
     if not yaml_config['sources'].get(source_name):
@@ -148,21 +152,30 @@ def main(args):
                     receipt_handle = message['ReceiptHandle']
                     current_time = datetime.datetime.now().isoformat()
                     print('### spawning message processor at %s...' % current_time, file=sys.stderr)
-        
+
                     message_body_raw = message['Body']
                     message_body = json.loads(message_body_raw)
 
-                    for record in message_body['Records']:
+                    if source_msg_type == 'sns':
+                        message_body_message_raw = message_body['Message']
+                        message_body_data = json.loads(message_body_message_raw)
+
+                    elif source_msg_type == 'sqs':
+                        message_body_data = message_body
+                    
+
+                    for record in message_body_data['Records']:
+
                         event_source = record['eventSource']
                         service_name = event_source.split(':')[1]
+
                         event_payload = record[service_name]
 
-                        
                         result = pool.apply_async(msg_handler_wrapper_func, 
-                                                    (sqs, queue_url, msg_handler_func, event_type, event_payload, receipt_handle, service_tbl,),
-                                                    callback=handle_ok,
-                                                    error_callback=handle_error)
-                                            
+                                                  (sqs, queue_url, msg_handler_func, event_type, event_payload, receipt_handle, service_tbl,),
+                                                  callback=handle_ok,
+                                                  error_callback=handle_error)
+                        
                         mlog('### Queued message-handling subprocess.')
 
             mlog(msg_count_log.readout, message_count=msg_count_log.op_data['handle inbound messages']) 

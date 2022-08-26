@@ -132,7 +132,7 @@ TIMING_BLOCK = 'timer'
 VALID_BLOCK_TYPES = [CMD_BLOCK, VAR_BLOCK, TARGET_BLOCK, TIMING_BLOCK]
 
 BLK_SCRIPT_TEMPLATE = '''
-!/bin/bash
+#!/bin/bash
 
 {command}
 '''
@@ -366,7 +366,7 @@ class DebugSession(object):
 
         cmd = step.command_block
 
-        print(f'$$$ command template:\n{cmd.command_template}')
+        # print(f'$$$ command template:\n{cmd.command_template}')
         print(f'$$$ variable data: {common.jsonpretty(self.vardata)}')
 
         j2env = jinja2.Environment()
@@ -566,10 +566,10 @@ class ConsoleCLI(Cmd):
 
                 var_data = decode_blockbuffer(varbuffer, VAR_BLOCK)
                 # TODO: remove print statements
-                print('$$$ decoding blockbuffer...')
+                # print('$$$ decoding blockbuffer...')
                 decoded_command = decode_blockbuffer(cmd_block, CMD_BLOCK)
 
-                print('$$$ formatting command template...')
+                # print('$$$ formatting command template...')
                 j2env = jinja2.Environment()
                 j2template = j2env.from_string(decoded_command.command_template)
                 live_command = j2template.render(**var_data)
