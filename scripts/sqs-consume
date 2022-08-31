@@ -16,11 +16,15 @@ each message to a user-defined handler function.
 '''
 
 
+from logging import Handler
+import multiprocessing
 import os, sys
 import json
 import time
 import datetime
-from multiprocessing import Process, Pool
+
+from multiprocessing import Process, Pool, Queue
+import queue
 from unittest import result
 from collections import namedtuple
 import boto3
@@ -35,7 +39,10 @@ VERSION_NUM = '0.5.2'
 DEFAULT_POOLSIZE = 5
 DEFAULT_MESSAGE_TYPE = 'sqs'
 
-HandlerStatus = namedtuple('HandlerStatus', 'sqs_client queue_url rcpt_handle result')
+HandlerStatus = namedtuple('HandlerStatus', 'queue_url rcpt_handle result')
+
+
+completion_queue = Queue()
 
 
 def show_version():
@@ -43,21 +50,26 @@ def show_version():
     return '%s[%s]' % (VERSION_NUM, git_hash)
 
 
-def msg_handler_wrapper_func(sqs_client, queue_url, msg_handler_func, event_type, event_payload, receipt_handle, service_tbl):
+#
+# Loading the target function here is suboptimal (and will definitely make us eat slightly more latency), but
+# (a) Python refuses to pickle the passed function, making the wrapper-strategy impossible, and
+# (b) in context it shouldn't matter too much, because the kinds of events we're processing are S3 file uploads.
+# Note that any pipeline needing to process "wire" events directly should use a different strategy.
+#
+def msg_handler_wrapper_func(queue_url, msg_handler_func, event_type, event_payload, receipt_handle, yaml_config):
+
+    service_tbl = snap.initialize_services(yaml_config)
     result = msg_handler_func(event_type, event_payload, receipt_handle, service_tbl)
-    return HandlerStatus(sqs_client=sqs_client, queue_url=queue_url, rcpt_handle=receipt_handle, result=result)
+    return HandlerStatus(queue_url=queue_url, rcpt_handle=receipt_handle, result=result)
 
 
 def handle_ok(handler_status):
-    # Delete received message from queue
-    handler_status.sqs_client.delete_message(
-        QueueUrl=handler_status.queue_url,
-        ReceiptHandle=handler_status.rcpt_handle
-    )
+    global completion_queue
+    completion_queue.put(handler_status)
 
 
 def handle_error(exception):
-    mlog_err(exception, 'Error processing queued message.')
+    mlog_err(exception, detail='Error processing queued message.')
 
 
 def main(args):
@@ -74,32 +86,29 @@ def main(args):
 
     source_name = args['<source_name>']
     if not yaml_config['sources'].get(source_name):
-        raise Exception(f'No queue source "{source_name}" defined. Please check your config file.')
+        raise Exception(f'No queue source {source_name} defined. Please check your config file.')
 
-    service_tbl = snap.initialize_services(yaml_config)
     source_config = yaml_config['sources'][source_name]
 
     # Create SQS client
     region = source_config['region']
     polling_interval = int(source_config['polling_interval_seconds'])
-    
-    print('############## SPINNING UP SQS client', file=sys.stderr)
 
     sqs = None
     auth_method = source_config['auth_method']
 
     if auth_method == 'profile':
-        profile_name = source_config['profile_name'] 
+        profile_name = source_config['profile_name']
         session = boto3.Session(profile_name=profile_name)
         sqs = session.client('sqs', region_name=region)
-    
+
     elif auth_method == 'iam':
         session = boto3.Session()
         sqs = session.client('sqs', region_name=region)
 
     else:
         raise Exception(f'Unsupported auth method: {auth_method}')
-    
+
     queue_url = common.load_config_var(source_config['queue_url'])
     max_messages = int(source_config['max_msgs_per_cycle'])
     msg_handler_name = source_config['handler']
@@ -107,14 +116,16 @@ def main(args):
 
     project_dir = common.load_config_var(yaml_config['globals']['project_home'])
     sys.path.append(project_dir)
-    
+
     msg_handler_module = yaml_config['globals']['consumer_module']
     msg_handler_func = common.load_class(msg_handler_name, msg_handler_module)
 
     # loop forever
-    
+
     current_time = datetime.datetime.now().isoformat()
     print('### checking SQS queue for messages at %s...' % current_time, file=sys.stderr)
+
+    global completion_queue
 
     with Pool(DEFAULT_POOLSIZE) as pool:
 
@@ -138,7 +149,7 @@ def main(args):
                 # If a message is available, the call returns sooner than WaitTimeSeconds . If no messages are available
                 # and the wait time expires, the call returns successfully with an empty list of messages.
             )
-            
+
             inbound_msgs = response.get('Messages') or []
             if not len(inbound_msgs):
                 time.sleep(polling_interval)
@@ -151,7 +162,6 @@ def main(args):
                 with jrnl.counter('handle inbound messages', msg_count_log):
                     receipt_handle = message['ReceiptHandle']
                     current_time = datetime.datetime.now().isoformat()
-                    print('### spawning message processor at %s...' % current_time, file=sys.stderr)
 
                     message_body_raw = message['Body']
                     message_body = json.loads(message_body_raw)
@@ -162,7 +172,6 @@ def main(args):
 
                     elif source_msg_type == 'sqs':
                         message_body_data = message_body
-                    
 
                     for record in message_body_data['Records']:
 
@@ -171,14 +180,23 @@ def main(args):
 
                         event_payload = record[service_name]
 
-                        result = pool.apply_async(msg_handler_wrapper_func, 
-                                                  (sqs, queue_url, msg_handler_func, event_type, event_payload, receipt_handle, service_tbl,),
-                                                  callback=handle_ok,
-                                                  error_callback=handle_error)
-                        
-                        mlog('### Queued message-handling subprocess.')
+                        pool.apply_async(msg_handler_wrapper_func,
+                                        (queue_url, msg_handler_func, event_type, event_payload, receipt_handle, yaml_config),
+                                        callback=handle_ok,
+                                        error_callback=handle_error)
 
-            mlog(msg_count_log.readout, message_count=msg_count_log.op_data['handle inbound messages']) 
+            mlog(msg_count_log.readout, message_count=msg_count_log.op_data['handle inbound messages'])
+
+            while not completion_queue.empty():
+                try:
+                    handler_status = completion_queue.get(False) # don't block, we'll get it on the next iteration of the outer loop
+                    sqs.delete_message(
+                        QueueUrl=handler_status.queue_url,
+                        ReceiptHandle=handler_status.rcpt_handle
+                    )
+                    mlog(f'@@@ Deleted message with handle: {handler_status.rcpt_handle} at {datetime.datetime.now().isoformat()}')
+                except queue.Empty:
+                    break
 
 
 if __name__ == '__main__':
