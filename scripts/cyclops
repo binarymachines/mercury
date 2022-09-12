@@ -327,7 +327,9 @@ def main(args):
             print(cli_params)
 
             for name, value in cli_params.items():
-                if value[0] == '$':
+                if not value:
+                    input_params[name] = None
+                elif value[0] == '$':
                     env_var = common.load_config_var(value)
                     input_params[name] = common.load_config_var(env_var)
                 else:
