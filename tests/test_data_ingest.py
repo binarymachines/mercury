@@ -11,8 +11,6 @@ import os
 import logging
 import yaml
 
-from teamcity import is_running_under_teamcity
-from teamcity.unittestpy import TeamcityTestRunner
 
 LOG_ID = 'test_data_ingest'
 INGEST_YAML_FILE = 'tests/configfiles/sample_ngst_config.yaml'
@@ -46,9 +44,6 @@ if __name__ == '__main__':
     logging.basicConfig(stream=sys.stderr)
     logging.getLogger(LOG_ID).setLevel(logging.DEBUG)
 
-    if is_running_under_teamcity():
-        runner = TeamcityTestRunner()
-    else:
-        runner = unittest.TextTestRunner()
+    runner = unittest.TextTestRunner()
         
     unittest.main(testRunner=runner)
