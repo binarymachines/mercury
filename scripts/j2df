@@ -14,7 +14,7 @@ Options:
 '''
 +mdoc+
 
-j2df (JSONto DataFrame) converts a single JSON object to a DataFrame. 
+j2df (JSON to DataFrame) converts a single JSON object to a DataFrame. 
 It will read its source JSON data from <filename> if the --datafile option is set,
 or from standard input if the --stdin option is set.
 

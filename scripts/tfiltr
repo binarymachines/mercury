@@ -1,20 +1,25 @@
 #!/usr/bin/env python
 
-'''Usage:
-            filtr -x <expression> [--datafile <datafile>] [--skip <skip_count> ] [--limit=<max_records>]
-            filtr -x <expression> -p 
-            filtr --fmodule <filter_module> [--servicemodule <svc_module>] --ffunc <filter_function> [datafile] [--limit=<max_records>]
-            filtr --config <configfile> --list (rules | functions | services)
-            filtr --config <configfile> -r <filter_rule> [--limit=<max_records>]                        
+'''
+Usage:
+	tfiltr -x <expression> [--datafile <datafile>] [--skip <skip_count> ] [--limit=<max_records>]
+    tfiltr -x <expression> -p 
+    tfiltr --fmodule <filter_module> [--servicemodule <svc_module>] --ffunc <filter_function> [datafile] [--limit=<max_records>]
+    tfiltr --config <configfile> --list (rules | functions | services)
+    tfiltr --config <configfile> -r <filter_rule> [--limit=<max_records>]
 
-   Options:
-            -p   --preview      in expression mode, show the generated lambda
+Options:
+    -p   --preview      in expression mode, show the generated lambda
 '''
 
 '''
 +mdoc+
 
-filtr: command line utility for filtering record streams
+tiltr (Text Filter): command line utility for filtering plain text record streams.
+
+There are other filtering utilities in Mercury: cfiltr and jfiltr (for processing 
+CSV and JSON files, respectively). tfiltr is designed to process simple text files where each line
+contains an semi-structured text record.
 
 +mdoc+
 '''

@@ -2,23 +2,23 @@
 
 '''
 Usage:
-            xfile --config <configfile> --delimiter <delimiter> --map <map_name> <datafile> [--limit <max_records>]
-            xfile --config <configfile> --delimiter <delimiter> --map <map_name> -s [--limit <max_records>]
-            xfile --config <configfile> --json --map <map_name> <datafile> [--limit <max_records>]
-            xfile --config <configfile> --json --map <map_name> -s [--limit <max_records>]
-            xfile --config <configfile> --list (sources | maps | globals)
-            xfile -p --delimiter <delimiter> <datafile> [--limit <max_records>]
-            xfile -p --json <datafile> [--limit <max_records>]
+    xfile --config <configfile> --delimiter <delimiter> --map <map_name> <datafile> [--limit <max_records>]
+    xfile --config <configfile> --delimiter <delimiter> --map <map_name> -s [--limit <max_records>]
+    xfile --config <configfile> --json --map <map_name> <datafile> [--limit <max_records>]
+    xfile --config <configfile> --json --map <map_name> -s [--limit <max_records>]
+    xfile --config <configfile> --list (sources | maps | globals)
+    xfile -p --delimiter <delimiter> <datafile> [--limit <max_records>]
+    xfile -p --json <datafile> [--limit <max_records>]
 
-   Options:
-            -s, --stream        :streaming mode (read fron stdin)
-            -p, --passthrough   :passthrough mode (do not transform records)
+Options:
+    -s, --stream        :streaming mode (read fron stdin)
+    -p, --passthrough   :passthrough mode (do not transform records)
 '''
 
 '''
 +mdoc+
 
- xfile: command line utility for extracting and transforming CSV data
+xfile: command line utility for extracting and transforming CSV data
 
 +mdoc+
 '''

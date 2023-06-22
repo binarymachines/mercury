@@ -2,9 +2,9 @@
 
 '''
 Usage:
-    cfilter [-d <delim>] --accept-to <filename> --filter <module.function> <source_file> [--params=<name:value>...] [--limit=<limit>]
-    cfilter [-d <delim>] --reject-to <filename> --filter <module.function> <source_file> [--params=<name:value>...] [--limit=<limit>]
-    cfilter --config <configfile> --setup <setup_name> --source <source_file> [--params=<name:value>...] [--limit=<limit>]
+    cfiltr [-d <delim>] --accept-to <filename> --filter <module.function> <source_file> [--params=<name:value>...] [--limit=<limit>]
+    cfiltr [-d <delim>] --reject-to <filename> --filter <module.function> <source_file> [--params=<name:value>...] [--limit=<limit>]
+    cfiltr --config <configfile> --setup <setup_name> --source <source_file> [--params=<name:value>...] [--limit=<limit>]
 
 Options:
     -d  --delimiter set the delimiter to the specified character (comma is default)
@@ -13,15 +13,15 @@ Options:
 '''
 +mdoc+
 
-cfilter (CSV filter) filters a source CSV file <source_file> by processing each record through 
+cfiltr (CSV filter) filters a source CSV file <source_file> by processing each record through 
 a filter function specified by <module.function>. 
 
 The filter function's signature is:
 
 filter_func(record: dict, line: str, service_registry=None, **filter_args) -> bool
 
-where <line> is the raw CSV record and <record> is its dictionary form. The filter function is only passed a 
-service registry iff cfilter is called with the --config option set; then the service registry will contain
+where <line> is the raw CSV record and <record> is its dictionary form. The filter function is  passed a 
+service registry only if cfilter is called with the --config option set; then the service registry will contain
 live instances of all service objects specified in <configfile>.
 
 
@@ -191,7 +191,7 @@ def main(args):
         limit_param = args.get('--limit')
         if limit_param is not None:
             max_records = int(limit_param)
-        target_filter.process_file(args['<source_file>'], max_records, **input_params)
+        target_filter.process_file(source_file, max_records, **input_params)
 
 
 if __name__ == '__main__':

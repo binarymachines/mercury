@@ -412,8 +412,12 @@ class RecordTransformer(object):
 
     @property
     def num_records_scanned(self):
-        return self.count_log.data['record_count']
-
+        if self.count_log.data.get('record_count') is None:
+            self.count_log.data['record_count'] = 0
+            return 0
+        else:
+            return self.count_log.data['record_count']
+            
 
     @property
     def processing_time_in_seconds(self):

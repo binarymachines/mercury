@@ -8,6 +8,15 @@ Usage:
 
 '''
 
+'''
++mdoc+
+
+dfproc is a Dataframe processor. It allows you to transform a Dataframe according to user-provided Python code
+and emit the altered frame to standard output.
+
++mdoc+
+'''
+
 import os, sys
 from collections import namedtuple
 import importlib

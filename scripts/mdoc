@@ -2,12 +2,9 @@
 
 '''
 Usage:
-  mdoc -l  
+  mdoc
   mdoc <command>
 
-Options:
-  -l --list       show the available man pages
-  -s --search     search for a script name
 '''
 
 import os, sys
@@ -22,17 +19,17 @@ DocEntry = namedtuple('DocEntry', 'syntax manual')
 
 def main(args):
 
-  if args['--list']:
+  if not args.get('<command>'):
     print('\n'.join(mercury_docs.SCRIPT_NAMES))
 
   else:
-    command = args['<command>']
+    command = args.get('<command>', '')
     if command.endswith('?'):
       search_exp = command.rstrip('?')
       for name in mercury_docs.SCRIPT_NAMES:
         if name.startswith(search_exp):
           print(name)
-    
+
     elif command.startswith('?'):
       search_exp = command.lstrip('?')
       for name in mercury_docs.SCRIPT_NAMES:

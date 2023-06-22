@@ -9,6 +9,18 @@ Options:
     -q --quote-all    Quote all outgoing data values
 '''
 
+'''
++mdoc+
+
+csvreorder, as its name implies, reorders the fields in a CSV file and emits the reordered file to standard out.
+Specify your desired field order by creating a regular Python string-array and naming it in <module.list-object>.
+
+You can also direct the behavior of the utility by providing a YAML configfile containing 1 to N "setup" segments; 
+specify the desired one at the command line in the <setup> argument.
+
++mdoc+
+'''
+
 
 import os, sys
 import csv

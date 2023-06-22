@@ -9,6 +9,20 @@
 
 '''
 
+'''
++mdoc+
+
+j2sqlgen (JSON to SQL generator) is designed to generate equivalent tables across different database types.
+
+The (slightly esosteric) use case is: you have a table in (say) MySQL and you want to create the equivalent table
+in (say) PostgreSQL. Because the supported column types differ slightly, simply applying the DDL from the 
+source DB to the target DB is usually not an option. 
+
+j2sqlgen is driven by a YAML configfile
+
++mdoc+
+'''
+
 import os, sys
 import json
 from snap import common

@@ -10,6 +10,13 @@ Options:
     -p,--parallel     : stream bucket contents in parallel        
 '''
 
+'''
++mdoc+
+
++mdoc+
+'''
+
+
 import os, sys
 import json
 import multiprocessing as mp

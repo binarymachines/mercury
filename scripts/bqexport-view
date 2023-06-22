@@ -1,12 +1,18 @@
 #!/usr/bin/env python
 
 '''
-     Usage:  
-        bqexport-view [-p] <project> <dataset> --view <view> --bucket <google_bucket> --format=<fmt> [--rename_to=<name>] [--delimiter=<delimiter>] [--directory=<directory>]        
-        bqexport-view [-p] <project> <dataset> --view_list_file <views> --bucket <google_bucket> --format=<fmt> [--delimiter=<delimiter>] [--directory=<directory>]
+Usage:  
+    bqexport-view [-p] <project> <dataset> --view <view> --bucket <google_bucket> --format=<fmt> [--rename_to=<name>] [--delimiter=<delimiter>] [--directory=<directory>]        
+    bqexport-view [-p] <project> <dataset> --view_list_file <views> --bucket <google_bucket> --format=<fmt> [--delimiter=<delimiter>] [--directory=<directory>]
              
-     Options: 
-        -p,--preview     : show (but do not execute) export command
+Options: 
+    -p,--preview     : show (but do not execute) export command
+'''
+
+'''
++mdoc+
+
++mdoc+
 '''
 
 import os, sys

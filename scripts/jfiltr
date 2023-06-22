@@ -2,9 +2,9 @@
 
 '''
 Usage:
-    jfilter --accept-to <filename> --filter <module.function> <source_file> [--params=<name:value>...] [--limit=<limit>]
-    jfilter --reject-to <filename> --filter <module.function> <source_file> [--params=<name:value>...] [--limit=<limit>]
-    jfilter --config <configfile> --setup <setup_name> --source <source_file> [--params=<name:value>...] [--limit=<limit>]
+    jfiltr --accept-to <filename> --filter <module.function> <source_file> [--params=<name:value>...] [--limit=<limit>]
+    jfiltr --reject-to <filename> --filter <module.function> <source_file> [--params=<name:value>...] [--limit=<limit>]
+    jfiltr --config <configfile> --setup <setup_name> --source <source_file> [--params=<name:value>...] [--limit=<limit>]
 
 Options:
     -c  --csv  process records as CSV
@@ -13,7 +13,7 @@ Options:
 '''
 +mdoc+
 
-jfilter (JSON filter) filters a source JSON file <source_file> by processing each record through 
+jfiltr (JSON filter) filters a source JSON file <source_file> by processing each record through 
 a filter function specified by <module.function>. 
 
 The filter function's signature is:

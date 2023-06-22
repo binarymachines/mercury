@@ -16,8 +16,10 @@ In --listfiles mode, it will read data from each CSV file listed in <filename>.
 In --files mode, it will read data from each CSV file passed on the command line as a comma-separated list
 (no spaces).
 
-Note that csvstack assumes that each file will contain a single-line header. It is agnostic 
-with respect to delimiters.
+Note that csvstack assumes that each file will contain a single-line header. Because it does no 
+record analysis of the CSV files, it is agnostic with respect to delimiters -- BUT it is bad form
+to stack CSV files which use different delimiters. That would result in an output file which mixes multiple
+record formats, which is almost certainly what you do not want.
 
 +mdoc+
 '''
